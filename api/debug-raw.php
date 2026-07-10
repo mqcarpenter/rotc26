@@ -24,14 +24,15 @@ header('Content-Type: application/json');
 
 $type = $_GET['TYPE'] ?? 'league';
 $params = $_GET;
-unset($params['key'], $params['TYPE']);
+unset($params['key'], $params['TYPE'], $params['nol']);
 
-$query = http_build_query(array_merge([
-    'TYPE'   => $type,
-    'L'      => MFL_LEAGUE_ID,
-    'JSON'   => 1,
-    'APIKEY' => MFL_API_KEY,
-], $params));
+// Site-wide types (topAdds, topDrops, adp, etc.) don't take a league
+// param at all — pass ?nol=1 to skip adding L for those.
+$base = ['TYPE' => $type, 'JSON' => 1, 'APIKEY' => MFL_API_KEY];
+if (($_GET['nol'] ?? '') !== '1') {
+    $base['L'] = MFL_LEAGUE_ID;
+}
+$query = http_build_query(array_merge($base, $params));
 $url = 'https://api.myfantasyleague.com/' . MFL_YEAR . '/export?' . $query;
 
 $ch = curl_init($url);
