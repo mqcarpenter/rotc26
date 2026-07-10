@@ -1,0 +1,13 @@
+# Deny direct access to config.php and any stray backup/editor files that
+# might get created next to it (config.php~, config.php.bak, config.php.save).
+# These would otherwise be served as plain text instead of executed as PHP,
+# which is how a real API key ends up leaked.
+<FilesMatch "^config\.php(~|\.bak|\.save)?$|^\.env">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>

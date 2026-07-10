@@ -1,0 +1,295 @@
+/* ============================================================
+   mfl26.css - ROTC standalone site
+   Ported from the MFL-hosted version at
+   https://www.returnofthechampions.com/css/mfl26.css
+
+   CHANGES FROM THE MFL VERSION:
+   - Sections that only existed to fight MFL's own markup
+     (hiding stock menu, restyling MFL's tab bar, hiding
+     table.pageheader) are removed — there's no MFL chrome
+     to hide here, this is your own HTML.
+   - .report / .homepagemodule selectors kept and renamed to
+     plain, semantic classes (.data-table, .card) since you
+     control the markup now and don't need to match MFL's
+     table class names.
+   - Hero banner image/logo lockup is gone. The news carousel
+     (#rotc-postcarousel) is now the full-width hero — see the
+     note from Matteo: no banner, carousel goes edge to edge,
+     tabs/colors stay muted rather than high-contrast.
+   - Everything else (nav, footer, carousel, sidefeed) is a
+     straight port — same class names, same behavior, so this
+     stylesheet is a near-drop-in for the templates in ../templates.
+   ============================================================ */
+
+/* ---- 1. PALETTE TOKENS ------------------------------------ */
+:root{
+  --ink:    #2A1810;   /* darkest chrome: nav, footer */
+  --ink-2:  #4A2312;   /* brown: links, secondary chrome */
+  --accent: #E0531B;   /* orange: the one bright color */
+  --paper:  #FDFBF7;   /* cream: page + odd rows */
+  --card:   #FFFFFF;   /* white: cards + even rows */
+  --sand:   #EFEAE2;   /* tint: hover + highlighted row */
+  --line:   #E4DACE;   /* hairline divider */
+  --muted:  #8A7A6C;   /* dates, secondary text */
+  --on-ink: #FDFBF7;   /* text on dark chrome */
+  --module-head:      #DCCFB2;
+  --module-head-text: #1A1310;
+  --radius: 14px;
+}
+
+/* ---- 2. TYPE + PAGE FRAME ---------------------------------- */
+*{ box-sizing:border-box; }
+body{
+  font-family:"Roboto", Arial, sans-serif;
+  color:var(--ink);
+  background:var(--module-head);
+  margin:0;
+}
+.page{ background:var(--paper); max-width:1400px; margin:0 auto; }
+a{ color:var(--ink-2); text-decoration:none; }
+a:hover{ color:var(--accent); }
+
+/* ---- 3. SECTION HEADERS ------------------------------------
+   Condensed, uppercase, bold, short accent underline.
+   Applies to any card/module/report title. */
+.card-title, .data-table caption{
+  background:transparent;
+  color:var(--ink);
+  font-family:"Roboto Condensed", "Arial Narrow", sans-serif;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  font-size:20px;
+  text-align:left;
+  padding:14px 4px 0 4px;
+  margin:0;
+}
+.card-title::after, .data-table caption::after{
+  content:"";
+  display:block;
+  width:52px;
+  height:3px;
+  background:var(--accent);
+  margin:7px 0 10px 0;
+}
+
+/* ---- 4. CARD (was .homepagemodule) -------------------------- */
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+  padding:0 12px 12px 12px;
+  margin-bottom:18px;
+}
+.home-col{ vertical-align:top; padding:0 8px; }
+
+/* ---- 5. DATA TABLE (was .report) ---------------------------- */
+.data-table{
+  width:100%;
+  background:var(--paper);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  border-collapse:separate;
+  border-spacing:0;
+  overflow:hidden;
+}
+.data-table th{
+  background:var(--module-head);
+  color:var(--module-head-text);
+  font-family:"Roboto Condensed", sans-serif;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  font-size:11px;
+  padding:8px 10px;
+  border:0;
+  text-align:left;
+}
+.data-table tr.odd td{  background:var(--card);  }
+.data-table tr.even td{ background:var(--paper); }
+.data-table td{
+  border-bottom:1px solid var(--line);
+  padding:8px 10px;
+}
+.data-table tr:hover td{ background:var(--sand); }
+.data-table td.pwr{ font-family:"Roboto Condensed", sans-serif; font-weight:700; color:var(--accent); }
+.data-table tr.my-franchise td{ background:var(--sand); box-shadow:inset 3px 0 0 var(--accent); }
+
+@media (max-width:767px){
+  .home-col{ display:block; width:100% !important; padding:0; }
+  .card-title, .data-table caption{ font-size:17px; }
+}
+
+/* ---- 5b. TWO-COLUMN HOME LAYOUT ------------------------------
+   Main column (hero + report cards) beside the sidebar
+   (rotc-sidefeed). Matches the reference screenshot proportions. */
+.home-grid{ display:grid; grid-template-columns:2fr 1fr; gap:20px; padding:20px; align-items:start; }
+@media (max-width:900px){ .home-grid{ grid-template-columns:1fr; } }
+
+/* ---- 6. NAV (rotc-nav) — unchanged from MFL version -------- */
+.rotc-nav{ font-family:"Roboto",Arial,sans-serif; background:var(--ink); position:sticky; top:0; z-index:9999; }
+.rotc-nav *{ box-sizing:border-box; }
+.rotc-bar{ display:flex; align-items:center; gap:28px; max-width:none; margin:0; padding:0 20px; height:62px; }
+.rotc-brand{ display:flex; align-items:center; text-decoration:none; flex:0 0 auto; }
+.rotc-nav .rotc-brand .rotc-logo{ height:36px !important; width:auto !important; max-height:36px !important; max-width:140px !important; object-fit:contain; display:block; }
+.rotc-burger{ display:none; }
+.rotc-burger-btn{ display:none; margin-left:auto; color:var(--paper); font-size:26px; line-height:1; cursor:pointer; user-select:none; }
+.rotc-menu{ list-style:none; display:flex; align-items:center; justify-content:space-between; flex:1; gap:10px; margin:0; padding:0; }
+.rotc-item{ position:relative; }
+.rotc-toggle{ display:none; }
+.rotc-top{ display:block; font-family:"Roboto Condensed",sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:14px; color:rgba(253,251,247,.82); padding:22px 4px; cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; transition:color .15s; }
+.rotc-item:hover .rotc-top{ color:var(--paper); border-bottom-color:var(--accent); }
+.rotc-login{ margin-left:0; }
+.rotc-login .rotc-top{ color:var(--accent); }
+.rotc-sub{ list-style:none; margin:0; padding:6px; position:absolute; top:calc(100% + 6px); left:0; width:240px; max-width:90vw; background:var(--card); border:1px solid var(--line); box-shadow:0 8px 20px rgba(42,24,16,.18); display:none; z-index:10000; box-sizing:border-box; overflow:hidden; }
+.rotc-sub a{ overflow-wrap:break-word; word-break:break-word; display:block; padding:7px 10px; font-size:13px; color:var(--ink-2); }
+.rotc-item:hover .rotc-sub{ display:block; }
+.rotc-item.wide:hover .rotc-sub{ display:flex; }
+.rotc-item.wide .rotc-sub{ width:480px; }
+.rotc-sub-col{ list-style:none; margin:0; padding:0; flex:1 1 50%; min-width:0; }
+.rotc-item:nth-child(n+4) .rotc-sub{ left:auto; right:0; }
+.rotc-sub a:hover{ background:var(--sand); color:var(--accent); }
+@media (max-width:1100px){
+  .rotc-bar{ flex-wrap:wrap; height:auto; padding:10px 16px; }
+  .rotc-burger-btn{ display:block; }
+  .rotc-menu{ flex-direction:column; align-items:stretch; gap:0; width:100%; display:none; padding-top:6px; }
+  .rotc-burger:checked ~ .rotc-bar .rotc-menu{ display:flex; }
+  .rotc-item{ position:static; }
+  .rotc-top{ padding:12px 4px; border-bottom:1px solid rgba(255,255,255,.12); }
+  .rotc-item:hover .rotc-top{ border-bottom-color:rgba(255,255,255,.12); }
+  .rotc-top::after{ content:"+"; float:right; color:var(--accent); font-weight:700; }
+  .rotc-toggle:checked + .rotc-top::after{ content:"-"; }
+  .rotc-sub{ position:static; display:none; border:0; box-shadow:none; background:rgba(255,255,255,.04); padding:0 0 6px 10px; width:auto; }
+  .rotc-item:hover .rotc-sub{ display:none; }
+  .rotc-item.wide:hover .rotc-sub{ display:none; }
+  .rotc-toggle:checked ~ .rotc-sub{ display:block; }
+  .rotc-item.wide .rotc-sub{ width:auto; }
+  .rotc-sub-col{ flex:none; }
+  .rotc-sub a{ color:var(--paper); }
+  .rotc-sub a:hover{ background:rgba(224,83,27,.15); color:var(--accent); }
+}
+
+/* ---- 7. TAB BAR (was .myfantasyleague_tabmenu) --------------
+   Your own tabs now, not MFL's — same underline/pill look,
+   plain markup instead of fighting MFL's #homepagetabs. */
+.tab-bar{ background:var(--paper); border-bottom:1px solid var(--line); padding:10px 20px; }
+.tab-bar ul{ display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; list-style:none; }
+.tab-bar a{
+  display:block;
+  color:var(--ink-2);
+  font-family:"Roboto Condensed", sans-serif;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  font-size:12px;
+  padding:9px 18px;
+  border-radius:999px;
+  transition:background .15s ease, color .15s ease;
+}
+.tab-bar li:hover a{ background:var(--sand); color:var(--ink); }
+.tab-bar li.current a{ background:var(--ink); color:var(--on-ink); }
+
+/* ---- 8. MATCHUP TICKER (rotc-ticker) ------------------------
+   Superseded — Matteo shared the real rotc-header.html source and the
+   live ticker builds its own DOM at runtime with inline styles, not
+   these classes. The guess below was wrong; see templates/matchup-ticker.php
+   for the actual port. Nothing in this project references .rotc-ticker-*
+   anymore — left deleted rather than kept as dead weight. */
+
+/* ---- 9. HERO CAROUSEL (rotc-postcarousel) -------------------
+   Full-width per Matteo's note — meaning it fills its own column
+   edge to edge (no card border/padding like a boxed module), not
+   that it spans behind the sidebar. Sits at the top of the main
+   column, sidebar (rotc-sidefeed) sits beside it — see the
+   two-column layout in home.php / .home-grid below. */
+#rotc-postcarousel{ margin-bottom:18px; }
+#rotc-postcarousel .rotc-pc-track{
+  position:relative;
+  height:clamp(280px, 28vw, 420px);
+  overflow:hidden;
+  background:var(--ink);
+}
+#rotc-postcarousel .rotc-pc-slide{
+  position:absolute; inset:0;
+  opacity:0; transition:opacity .4s;
+  pointer-events:none;
+}
+#rotc-postcarousel .rotc-pc-slide.active{ opacity:1; pointer-events:auto; }
+#rotc-postcarousel .rotc-pc-img{
+  position:absolute; inset:0;
+  background-size:cover; background-position:center center;
+}
+#rotc-postcarousel .rotc-pc-img::after{
+  content:"";
+  position:absolute; inset:0;
+  background:linear-gradient(to left,
+    rgba(30,12,4,.92) 0%,
+    rgba(224,83,27,.85) 22%,
+    rgba(224,83,27,.45) 50%,
+    rgba(224,83,27,0) 78%);
+}
+#rotc-postcarousel .rotc-pc-body{
+  position:absolute; top:0; bottom:0; right:0;
+  width:min(56%, 560px);
+  display:flex; flex-direction:column; justify-content:flex-end;
+  padding:32px 40px; z-index:2;
+}
+#rotc-postcarousel .rotc-pc-meta{ font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:rgba(255,255,255,.85); margin-bottom:8px; }
+#rotc-postcarousel .rotc-pc-body h1{ margin:0 0 10px; font-family:"Roboto Condensed", sans-serif; font-weight:700; font-size:32px; line-height:1.15; color:#fff; }
+#rotc-postcarousel .rotc-pc-body h1 a{ color:#fff; }
+#rotc-postcarousel .rotc-pc-body h1 a:hover{ color:#FFD9C7; }
+#rotc-postcarousel .rotc-pc-excerpt{ font-size:14px; line-height:1.5; color:rgba(255,255,255,.95); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+#rotc-postcarousel .rotc-pc-arrow{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:3;
+  background:rgba(0,0,0,.35); color:#fff; border:0; border-radius:50%;
+  width:36px; height:36px; cursor:pointer; font-size:14px;
+}
+#rotc-postcarousel .rotc-pc-arrow:hover{ background:rgba(0,0,0,.6); }
+#rotc-postcarousel .rotc-pc-prev{ left:16px; }
+#rotc-postcarousel .rotc-pc-next{ right:16px; }
+#rotc-postcarousel .rotc-pc-dots{ position:absolute; left:16px; bottom:18px; z-index:3; margin:0; }
+#rotc-postcarousel .rotc-pc-dot{ width:7px; height:7px; border-radius:50%; display:inline-block; margin:0 4px 0 0; background:rgba(255,255,255,.5); cursor:pointer; }
+#rotc-postcarousel .rotc-pc-dot.active{ background:#fff; }
+
+/* ---- 10. SIDEBAR TABS (rotc-sidefeed) ----------------------- */
+.rotc-sidefeed{
+  background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; margin-bottom:18px; font-family:"Roboto", Arial, sans-serif;
+}
+.rotc-sidefeed-tabs{ display:flex; border-bottom:1px solid var(--line); background:var(--sand); }
+.rotc-sidefeed-tab{
+  flex:1; text-align:center; padding:12px 8px;
+  font-weight:700; font-size:13px; letter-spacing:.03em; text-transform:uppercase;
+  color:var(--muted); cursor:pointer; border-bottom:3px solid transparent;
+  background:none; border-top:0; border-left:0; border-right:0; user-select:none;
+}
+.rotc-sidefeed-tab.active{ color:var(--ink); border-bottom-color:var(--accent); }
+.rotc-sidefeed-panel{ display:none; padding:4px 0; }
+.rotc-sidefeed-panel.active{ display:block; }
+.rotc-sidefeed-item{ padding:10px 14px 12px; border-bottom:1px dashed var(--line); }
+.rotc-sidefeed-item:last-child{ border-bottom:0; }
+.rotc-sidefeed-item .tag{ font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+.rotc-sidefeed-item .title{ display:block; font-weight:700; font-size:13px; margin:2px 0 4px; color:var(--ink); }
+.rotc-sidefeed-item .title:hover{ color:var(--accent); }
+.rotc-sidefeed-item .desc{ font-size:12px; line-height:1.5; color:var(--muted); }
+
+/* ---- 11. FOOTER (rotc-foot) — unchanged from MFL version --- */
+.rotc-foot{ --fline:rgba(255,255,255,.12); --fmuted:#B7A99B; font-family:"Roboto",Arial,sans-serif; background:var(--ink); color:var(--paper); border-top:3px solid var(--accent); margin-top:24px; }
+.rotc-foot *{ box-sizing:border-box; }
+.rotc-foot-grid{ max-width:1200px; margin:0 auto; padding:32px 16px 20px; display:grid; grid-template-columns:1.6fr 1fr 1fr; gap:28px; }
+.rotc-foot h4{ font-family:"Roboto Condensed",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:13px; margin:0 0 12px; color:var(--paper); }
+.rotc-foot h4::after{ content:""; display:block; width:36px; height:3px; background:var(--accent); margin-top:6px; }
+.rotc-foot-brand b{ display:block; font-family:"Roboto Condensed",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size:19px; line-height:1.1; }
+.rotc-foot-brand b span{ color:var(--accent); }
+.rotc-foot-brand p{ color:var(--fmuted); font-size:13px; line-height:1.6; margin:8px 0 0; max-width:34ch; }
+.rotc-foot ul{ list-style:none; margin:0; padding:0; }
+.rotc-foot li{ margin:0 0 8px; }
+.rotc-foot a{ color:var(--paper); font-size:13px; }
+.rotc-foot a:hover{ color:var(--accent); }
+.rotc-foot-group + .rotc-foot-group{ margin-top:22px; }
+.rotc-foot-bar{ border-top:1px solid var(--fline); }
+.rotc-foot-bar div{ max-width:1200px; margin:0 auto; padding:14px 16px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; font-size:12px; color:var(--fmuted); }
+.rotc-foot-bar a{ font-size:12px; color:var(--fmuted); }
+.rotc-foot-bar a:hover{ color:var(--accent); }
+@media (max-width:760px){ .rotc-foot-grid{ grid-template-columns:1fr; gap:22px; } }
