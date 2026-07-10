@@ -27,10 +27,12 @@ $params = $_GET;
 unset($params['key'], $params['TYPE'], $params['nol']);
 
 // Site-wide types (topAdds, topDrops, adp, etc.) don't take a league
-// param at all — pass ?nol=1 to skip adding L for those.
-$base = ['TYPE' => $type, 'JSON' => 1, 'APIKEY' => MFL_API_KEY];
+// param, and the APIKEY (tied to a specific league) seems to trigger a
+// redirect to the league host anyway — pass ?nol=1 to drop both.
+$base = ['TYPE' => $type, 'JSON' => 1];
 if (($_GET['nol'] ?? '') !== '1') {
     $base['L'] = MFL_LEAGUE_ID;
+    $base['APIKEY'] = MFL_API_KEY;
 }
 $query = http_build_query(array_merge($base, $params));
 $url = 'https://api.myfantasyleague.com/' . MFL_YEAR . '/export?' . $query;
@@ -46,10 +48,13 @@ curl_setopt_array($ch, [
 $body = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $err = curl_error($ch);
+$effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
 curl_close($ch);
 
 echo json_encode([
     'requested_type' => $type,
+    'requested_url' => str_replace(MFL_API_KEY, 'REDACTED', $url),
+    'effective_url' => str_replace(MFL_API_KEY, 'REDACTED', $effectiveUrl ?: ''),
     'http_code' => $httpCode,
     'curl_error' => $err,
     'raw' => json_decode($body, true) ?? $body,
