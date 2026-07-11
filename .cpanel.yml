@@ -1,0 +1,4 @@
+---
+deployment:
+  tasks:
+    - /bin/echo "Deployed commit $(git rev-parse HEAD) at $(date)" >> /home/otbdesig/returnofthechampions.com/manage/.deploy.log
