@@ -48,7 +48,12 @@ include __DIR__ . '/templates/header.php';
   </main>
 
   <aside class="home-sidebar">
-    <?php include __DIR__ . '/templates/sidefeed.php'; ?>
+    <?php
+    require_once __DIR__ . '/includes/smack-feed.php';
+    $fetchedSmack = rotc_fetch_smack_items(6);
+    if ($fetchedSmack) { $smack_items = $fetchedSmack; }
+    include __DIR__ . '/templates/sidefeed.php';
+    ?>
   </aside>
 </div>
 
