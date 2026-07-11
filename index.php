@@ -21,9 +21,13 @@ include __DIR__ . '/templates/header.php';
 ?>
 
 <div class="home-grid">
-  <main class="home-main">
-    <?php include __DIR__ . '/templates/hero-carousel.php'; ?>
-
+ <main class="home-main">
+    <?php
+    require_once __DIR__ . '/includes/wp-hero-feed.php';
+    $fetchedSlides = rotc_fetch_hero_slides(5, $base . '/assets/hero/placeholder-1.jpg');
+    if ($fetchedSlides) { $slides = $fetchedSlides; }
+    include __DIR__ . '/templates/hero-carousel.php';
+    ?>
     <div class="card">
       <h2 class="card-title">Monday Report</h2>
       <p>Monday Report will be displayed on Mondays during the season for head-to-head leagues.</p>
