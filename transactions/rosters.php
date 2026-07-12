@@ -148,92 +148,14 @@ if (!$fetchError) {
         if (!empty($row['id'])) $prevPtsById[$row['id']] = $row['score'] ?? '';
     }
 
-    // Auction history -- current + prior year. Later year wins if a
-    // player somehow shows in both (shouldn't happen, but favor the
-    // more recent acquisition just in case).
-    foreach ([(int) MFL_YEAR - 1, (int) MFL_YEAR] as $auctionYear) {
-        $auctionRaw = mfl_cached_get_year('auctionResults', $auctionYear, 21600, []);
-        foreach (mfl_normalize_list($auctionRaw['auctionResults']['auctionUnit']['auction'] ?? null) as $a) {
-            if (empty($a['franchise']) || empty($a['player'])) continue;
-            $key = $a['franchise'] . '|' . $a['player'];
-            $bid = $a['winningBid'] ?? '';
-            $auctionByFranchisePlayer[$key] = $auctionYear . '|' . $bid;
-        }
-    }
-
-    // Draft history -- current + prior year. This league runs a real
-    // snake draft every year alongside the auction (confirmed live:
-    // draftType "SDRAFT" with hundreds of real picks in 2023/2024/2025),
-    // so a player who wasn't a keeper or an auction pickup is very
-    // likely here.
-    foreach ([(int) MFL_YEAR - 1, (int) MFL_YEAR] as $draftYear) {
-        $draftRaw = mfl_cached_get_year('draftResults', $draftYear, 21600, []);
-        foreach (mfl_normalize_list($draftRaw['draftResults']['draftUnit']['draftPick'] ?? null) as $d) {
-            $pid = $d['player'] ?? '';
-            if (empty($d['franchise']) || $pid === '' || $pid === '0000' || $pid === '----') continue;
-            $key = $d['franchise'] . '|' . $pid;
-            $draftByFranchisePlayer[$key] = $draftYear . '|' . ($d['round'] ?? '');
-        }
-    }
-
-    // Trade history -- current + prior year. Each TRADE transaction
-    // lists player ids each side gave up (franchise1_gave_up /
-    // franchise2_gave_up); the players in franchise1's give-up list
-    // went TO franchise2, and vice versa. Confirmed live this data is
-    // structured player ids, not free text.
-    foreach ([(int) MFL_YEAR - 1, (int) MFL_YEAR] as $tradeYear) {
-        $tradeRaw = mfl_cached_get_year('transactions', $tradeYear, 21600, ['TRANS_TYPE' => 'TRADE']);
-        foreach (mfl_normalize_list($tradeRaw['transactions']['transaction'] ?? null) as $t) {
-            if (($t['type'] ?? '') !== 'TRADE') continue;
-            $f1 = $t['franchise'] ?? '';
-            $f2 = $t['franchise2'] ?? '';
-            $f1GaveUp = array_filter(explode(',', $t['franchise1_gave_up'] ?? ''));
-            $f2GaveUp = array_filter(explode(',', $t['franchise2_gave_up'] ?? ''));
-            foreach ($f1GaveUp as $pid) {
-                if ($f2 === '') continue;
-                $tradeByFranchisePlayer[$f2 . '|' . $pid] = $tradeYear . '|' . ($franchises[$f1]['abbrev'] ?? $f1);
-            }
-            foreach ($f2GaveUp as $pid) {
-                if ($f1 === '') continue;
-                $tradeByFranchisePlayer[$f1 . '|' . $pid] = $tradeYear . '|' . ($franchises[$f2]['abbrev'] ?? $f2);
-            }
-        }
-    }
+    // Acquisition history (auction/draft/trade, current + prior year)
+    // -- see rotc_acquisition_maps() in includes/mfl-api.php, shared
+    // with franchise/drop-player.php now too.
+    [$auctionByFranchisePlayer, $draftByFranchisePlayer, $tradeByFranchisePlayer] = rotc_acquisition_maps($franchises);
 }
 
 $STATUS_LABEL = ['ROSTER' => 'Active', 'INJURED_RESERVE' => 'IR', 'TAXI_SQUAD' => 'Taxi'];
-
-/**
- * Builds the Acquired column text for one roster row. See the
- * priority order documented in the file header.
- */
-function rotc_acquired_label(string $franchiseId, string $playerId, string $drafted, array $auctionMap, array $draftMap, array $tradeMap): string {
-    if ($drafted !== '') return $drafted; // raw keeper slot label, e.g. "K1" -- no reinterpretation
-    $key = $franchiseId . '|' . $playerId;
-    // Kept deliberately short (2-digit year, franchise ABBREV not full
-    // name) -- these tables sit in a multi-column card grid, and a full
-    // franchise name here ("2025 Trade w/ Flaming Chankla Chuckers")
-    // was blowing the table width out past its card, forcing the whole
-    // page into horizontal-scroll hell. Round(), player names etc still
-    // use full data -- this is specifically about a column that has to
-    // fit next to five others in ~360px.
-    if (isset($auctionMap[$key])) {
-        [$year, $bid] = explode('|', $auctionMap[$key], 2);
-        $yy = substr($year, -2);
-        return $bid !== '' ? "'$yy Auction \$$bid" : "'$yy Auction";
-    }
-    if (isset($draftMap[$key])) {
-        [$year, $round] = explode('|', $draftMap[$key], 2);
-        $yy = substr($year, -2);
-        return $round !== '' ? "'$yy Rd " . (int) $round : "'$yy Draft";
-    }
-    if (isset($tradeMap[$key])) {
-        [$year, $fromAbbrev] = explode('|', $tradeMap[$key], 2);
-        $yy = substr($year, -2);
-        return "'$yy Trade: $fromAbbrev";
-    }
-    return 'Waiver/FA';
-}
+// rotc_acquired_label() itself now lives in includes/mfl-api.php.
 ?>
 
 <div class="home-grid">

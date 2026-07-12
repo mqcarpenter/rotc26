@@ -30,11 +30,16 @@ $roster = [];
 $players = [];
 $waiverType = null;
 $mflLink = '';
+$acquiredByPlayerId = [];
+$injByPlayerId = [];
+$ytdPtsById = [];
+$prevPtsById = [];
 
 if ($hasConfig) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/mfl-auth.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
     rotc_require_login($pageBase);
 
     $franchiseId = rotc_mfl_franchise_id();
@@ -72,6 +77,35 @@ if ($hasConfig) {
             foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) { $players[$p['id']] = $p; }
         }
     }
+
+    // Acquisition info, same source/logic as transactions/rosters.php
+    // (see rotc_acquisition_maps()/rotc_acquired_label() in
+    // includes/mfl-api.php) -- keeper slot, auction, draft, or trade,
+    // falling back to "Waiver/FA".
+    $franchisesAll = mfl_franchises();
+    [$auctionMap, $draftMap, $tradeMap] = rotc_acquisition_maps($franchisesAll);
+    foreach ($roster as $p) {
+        $acquiredByPlayerId[$p['id']] = rotc_acquired_label($franchiseId, (string) $p['id'], (string) ($p['drafted'] ?? ''), $auctionMap, $draftMap, $tradeMap);
+    }
+
+    // Injury status -- same TYPE=injuries call used on
+    // players/injury-report.php and franchise/submit-lineup.php.
+    $injRaw = mfl_cached_get('injuries', 1800, [], false);
+    foreach (mfl_normalize_list($injRaw['injuries']['injury'] ?? null) as $inj) {
+        if (!empty($inj['id'])) $injByPlayerId[$inj['id']] = $inj['status'] ?? '';
+    }
+
+    // Points scored: current-year year-to-date, and prior year total
+    // -- same TYPE=playerScores(W=YTD) pattern rosters.php uses for
+    // prior year, run twice (current + prior year) rather than once.
+    $ytdRaw = mfl_cached_get('playerScores', 1800, ['W' => 'YTD', 'COUNT' => 3000]);
+    foreach (mfl_normalize_list($ytdRaw['playerScores']['playerScore'] ?? null) as $row) {
+        if (!empty($row['id'])) $ytdPtsById[$row['id']] = $row['score'] ?? '';
+    }
+    $prevYearRaw = mfl_cached_get_year('playerScores', (int) MFL_YEAR - 1, 86400, ['W' => 'YTD', 'COUNT' => 3000]);
+    foreach (mfl_normalize_list($prevYearRaw['playerScores']['playerScore'] ?? null) as $row) {
+        if (!empty($row['id'])) $prevPtsById[$row['id']] = $row['score'] ?? '';
+    }
 }
 
 include __DIR__ . '/../templates/header.php';
@@ -99,19 +133,43 @@ include __DIR__ . '/../templates/header.php';
         <?php else: ?>
           <form method="post" class="rotc-lineup-form">
             <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+            <div style="overflow-x:auto;">
             <table class="rotc-lineup-table">
-              <thead><tr><th>Drop</th><th>Player</th><th>Pos</th><th>Team</th></tr></thead>
+              <thead><tr>
+                <th>Drop</th><th></th><th>Player</th><th>Pos</th><th>Acquired</th>
+                <th>Inj</th><th>YTD Pts</th><th><?= (int) MFL_YEAR - 1 ?> Pts</th>
+              </tr></thead>
               <tbody>
-                <?php foreach ($roster as $p): $pd = $players[$p['id']] ?? []; ?>
+                <?php foreach ($roster as $p):
+                  $pd = $players[$p['id']] ?? [];
+                  $team = $pd['team'] ?? '';
+                  $acquired = $acquiredByPlayerId[$p['id']] ?? 'Waiver/FA';
+                  $injStatus = $injByPlayerId[$p['id']] ?? '';
+                  $ytdPts = $ytdPtsById[$p['id']] ?? '';
+                  $prevPts = $prevPtsById[$p['id']] ?? '';
+                  $statLines = [
+                      'Position'                 => $pd['position'] ?? '',
+                      'Team'                     => $team,
+                      'Acquired'                 => $acquired,
+                      'Injury'                   => $injStatus,
+                      'YTD Pts'                  => $ytdPts,
+                      ((int) MFL_YEAR - 1) . ' Pts' => $prevPts,
+                  ];
+                ?>
                   <tr>
                     <td><input type="checkbox" name="drop[]" value="<?= htmlspecialchars($p['id']) ?>"></td>
-                    <td><?= htmlspecialchars($pd['name'] ?? ('Player #' . $p['id'])) ?></td>
+                    <td><?= rotc_team_logo_img($team) ?></td>
+                    <td><?= rotc_player_hover_span($pd['name'] ?? ('Player #' . $p['id']), $pd, $statLines) ?></td>
                     <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($pd['team'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($acquired) ?></td>
+                    <td><?= htmlspecialchars($injStatus ?: '--') ?></td>
+                    <td><?= $ytdPts !== '' ? htmlspecialchars((string) $ytdPts) : '--' ?></td>
+                    <td><?= $prevPts !== '' ? htmlspecialchars((string) $prevPts) : '--' ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
             </table>
+            </div>
             <button type="submit" class="rotc-btn rotc-btn-danger" onclick="return confirm('Drop the selected player(s)? This happens immediately.');">Drop Selected</button>
           </form>
         <?php endif; ?>
@@ -119,4 +177,5 @@ include __DIR__ . '/../templates/header.php';
     </div>
   </main>
 </div>
+<?php if ($hasConfig) rotc_player_hover_widget(); ?>
 <?php include __DIR__ . '/../templates/footer.php'; ?>
