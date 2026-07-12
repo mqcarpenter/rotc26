@@ -150,16 +150,16 @@ $nav_items = [
 // there's no Social tree to attach it to.
 
 // Label + href per tab -- href defaults to "$base/$slug" (unchanged
-// behavior for main/auction/gameday/season-deets, none of which have a
-// real page yet), except 'standings' which now needs the scores/
-// subfolder since standings.php moved there with the rest of the
-// Scores-section pages.
+// behavior for main/auction/gameday, neither of which have a real page
+// yet), except 'standings' which now needs the scores/ subfolder since
+// standings.php moved there with the rest of the Scores-section pages.
+// 'season-deets' removed per Matteo's request -- unneeded, never had a
+// real page behind it.
 $tabs = [
   'main'          => ['label' => 'Main',         'href' => $base !== '' ? $base . '/' : '/'],
   'auction'       => ['label' => 'Auction',       'href' => "$base/auction"],
   'gameday'       => ['label' => 'Gameday',       'href' => "$base/gameday"],
   'standings'     => ['label' => 'Standings',     'href' => "$base/scores/standings"],
-  'season-deets'  => ['label' => 'Season Deets',  'href' => "$base/season-deets"],
 ];
 ?>
 <!DOCTYPE html>
