@@ -67,7 +67,13 @@ if (!$fetchError) {
     }
 
     $franchises = mfl_franchises();
-    $raw = mfl_cached_get('tradeBait', 900, []);
+    // Normally cached 15 min like everything else in mfl-api.php, but
+    // right after this owner's own submit succeeded on THIS request,
+    // that cache still holds the pre-submit snapshot -- force a fresh
+    // fetch just this once so their own update shows up immediately
+    // instead of looking like it silently didn't take.
+    $tradeBaitTtl = ($submitResult && $submitResult['ok']) ? 0 : 900;
+    $raw = mfl_cached_get('tradeBait', $tradeBaitTtl, []);
     $rows = mfl_normalize_list($raw['tradeBaits']['tradeBait'] ?? null);
     usort($rows, fn($a, $b) => (int) ($b['timestamp'] ?? 0) <=> (int) ($a['timestamp'] ?? 0));
 
