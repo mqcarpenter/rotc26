@@ -6,25 +6,37 @@
  * Rosters page columns exactly: PLAYER, 2025 PTS, BYE, ACQUIRED.
  *
  * "Acquired" detail, in priority order:
- *   1. rosters API's own `drafted` field ("K1"/"K2"/"K3") -- confirmed
- *      live against MFL's own Rosters report -- means the player was
- *      kept, number is the round the keeper cost counts as.
+ *   1. rosters API's own `drafted` field -- shown as-is ("K1"/"K2"/
+ *      "K3"), MFL's own keeper-slot label. Not reinterpreted into
+ *      "round" text; K1/K2/K3 already mean something specific to this
+ *      league (which keeper slot the player occupies).
  *   2. TYPE=auctionResults for the current + prior year -- if the
  *      player was won at auction by this franchise, shows the year
  *      and winning bid. Confirmed live (2025 season) this returns real
  *      {franchise, player, winningBid} data.
- *   3. TYPE=transactions (TRANS_TYPE=TRADE) for the current + prior
+ *   3. TYPE=draftResults for the current + prior year -- this league
+ *      runs an actual snake draft every year (confirmed live: 2023,
+ *      2024, and 2025 all returned draftType "SDRAFT" with hundreds of
+ *      real {round, pick, franchise, player} picks), separate from the
+ *      auction. Anyone not won at auction and not a keeper was very
+ *      likely a draft pick, so this is checked next.
+ *   4. TYPE=transactions (TRANS_TYPE=TRADE) for the current + prior
  *      year -- confirmed live these include structured player ids in
  *      franchise1_gave_up / franchise2_gave_up, so a trade acquisition
  *      can be matched and shows who it came from.
- *   4. Fallback "Waiver/FA" -- MFL's own Rosters page doesn't
- *      distinguish waiver adds from free agent adds either, and the
- *      API has no separate "add" transaction history exposed here, so
- *      this is the honest floor rather than a guess.
+ *   5. Fallback "Waiver/FA" -- only reached if none of the above match
+ *      within the current+prior year window (e.g. a longer-tenured
+ *      player from further back, or an actual waiver/FA add). MFL's
+ *      own Rosters page doesn't distinguish waiver from FA adds
+ *      either, so this is the honest floor rather than a guess.
  *
  * Sortable: each franchise's table sorts independently (client-side --
  * no server round-trip needed for ~25 rows). Click a header to sort,
- * click again to flip direction.
+ * click again to flip direction. Each table sits in its own
+ * overflow-x:auto wrapper so a long "Acquired" value (e.g. "2025 Trade
+ * w/ Grindhouse Zombies") scrolls horizontally on a narrow card instead
+ * of getting silently clipped -- same pattern already used on
+ * free-agents.php / auction-results.php for wide tables.
  *
  * Hover card: see includes/player-hover.php for the shared widget.
  */
@@ -43,6 +55,7 @@ $players = [];
 $byeByTeam = [];
 $prevPtsById = [];
 $auctionByFranchisePlayer = []; // "franchise|player" => "YYYY|$bid"
+$draftByFranchisePlayer = [];   // "franchise|player" => "YYYY|round"
 $tradeByFranchisePlayer = [];   // "franchise|player" => "YYYY|Franchise Name"
 
 if (!$fetchError) {
@@ -75,12 +88,9 @@ if (!$fetchError) {
         if (!empty($row['id'])) $prevPtsById[$row['id']] = $row['score'] ?? '';
     }
 
-    // Auction history -- current + prior year. Current year's auction
-    // hasn't happened yet as of this writing (confirmed live on
-    // auction-results.php), so this is mostly prior-year data today,
-    // but checking both keeps this correct once a new auction runs.
-    // Later year wins if a player somehow shows in both (shouldn't
-    // happen, but favor the more recent acquisition just in case).
+    // Auction history -- current + prior year. Later year wins if a
+    // player somehow shows in both (shouldn't happen, but favor the
+    // more recent acquisition just in case).
     foreach ([(int) MFL_YEAR - 1, (int) MFL_YEAR] as $auctionYear) {
         $auctionRaw = mfl_cached_get_year('auctionResults', $auctionYear, 21600, []);
         foreach (mfl_normalize_list($auctionRaw['auctionResults']['auctionUnit']['auction'] ?? null) as $a) {
@@ -88,6 +98,21 @@ if (!$fetchError) {
             $key = $a['franchise'] . '|' . $a['player'];
             $bid = $a['winningBid'] ?? '';
             $auctionByFranchisePlayer[$key] = $auctionYear . '|' . $bid;
+        }
+    }
+
+    // Draft history -- current + prior year. This league runs a real
+    // snake draft every year alongside the auction (confirmed live:
+    // draftType "SDRAFT" with hundreds of real picks in 2023/2024/2025),
+    // so a player who wasn't a keeper or an auction pickup is very
+    // likely here.
+    foreach ([(int) MFL_YEAR - 1, (int) MFL_YEAR] as $draftYear) {
+        $draftRaw = mfl_cached_get_year('draftResults', $draftYear, 21600, []);
+        foreach (mfl_normalize_list($draftRaw['draftResults']['draftUnit']['draftPick'] ?? null) as $d) {
+            $pid = $d['player'] ?? '';
+            if (empty($d['franchise']) || $pid === '' || $pid === '0000' || $pid === '----') continue;
+            $key = $d['franchise'] . '|' . $pid;
+            $draftByFranchisePlayer[$key] = $draftYear . '|' . ($d['round'] ?? '');
         }
     }
 
@@ -122,15 +147,16 @@ $STATUS_LABEL = ['ROSTER' => 'Active', 'INJURED_RESERVE' => 'IR', 'TAXI_SQUAD' =
  * Builds the Acquired column text for one roster row. See the
  * priority order documented in the file header.
  */
-function rotc_acquired_label(string $franchiseId, string $playerId, string $drafted, array $auctionMap, array $tradeMap): string {
-    if ($drafted !== '') {
-        $round = ltrim($drafted, 'Kk');
-        return $round !== '' ? "Kept (Rd $round)" : 'Kept';
-    }
+function rotc_acquired_label(string $franchiseId, string $playerId, string $drafted, array $auctionMap, array $draftMap, array $tradeMap): string {
+    if ($drafted !== '') return $drafted; // raw keeper slot label, e.g. "K1" -- no reinterpretation
     $key = $franchiseId . '|' . $playerId;
     if (isset($auctionMap[$key])) {
         [$year, $bid] = explode('|', $auctionMap[$key], 2);
         return $bid !== '' ? "$year Auction – \$$bid" : "$year Auction";
+    }
+    if (isset($draftMap[$key])) {
+        [$year, $round] = explode('|', $draftMap[$key], 2);
+        return $round !== '' ? "$year Draft – Rd $round" : "$year Draft";
     }
     if (isset($tradeMap[$key])) {
         [$year, $fromName] = explode('|', $tradeMap[$key], 2);
@@ -149,14 +175,15 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
         <h2 class="card-title">Rosters</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:-6px;">Click a column header to sort. Hover a player's name for details.</p>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px;">
           <?php foreach ($franchises as $id => $f): $roster = $rosters[$id] ?? []; ?>
-            <div style="border:1px solid var(--line);border-radius:var(--radius);padding:12px;">
+            <div style="border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-width:0;">
               <h3 style="margin:0 0 8px;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;"><?= htmlspecialchars($f['name']) ?></h3>
               <?php if (!$roster): ?>
                 <p style="color:var(--muted);font-size:13px;">No players rostered.</p>
               <?php else: ?>
-                <table class="data-table rotc-sortable">
+                <div style="overflow-x:auto;">
+                <table class="data-table rotc-sortable" style="width:100%;">
                   <thead>
                     <tr>
                       <th data-sort="text">Player</th>
@@ -173,22 +200,23 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
                       $team = $pd['team'] ?? '';
                       $status = $STATUS_LABEL[$p['status'] ?? ''] ?? ($p['status'] ?? '');
                       $drafted = $p['drafted'] ?? '';
-                      $acquired = rotc_acquired_label((string) $id, (string) $p['id'], (string) $drafted, $auctionByFranchisePlayer, $tradeByFranchisePlayer);
+                      $acquired = rotc_acquired_label((string) $id, (string) $p['id'], (string) $drafted, $auctionByFranchisePlayer, $draftByFranchisePlayer, $tradeByFranchisePlayer);
                       $pts2025 = $prevPtsById[$p['id']] ?? '';
                       $bye = $byeByTeam[$team] ?? '';
                       $name = $pd['name'] ?? ('Player #' . $p['id']);
                     ?>
                       <tr>
-                        <td><?= rotc_player_hover_span($name, $pd, ['2025 Total' => $pts2025 !== '' ? $pts2025 . ' pts' : '', 'Bye Week' => $bye, 'Roster Status' => $status]) ?></td>
+                        <td style="white-space:nowrap;"><?= rotc_player_hover_span($name, $pd, ['2025 Total' => $pts2025 !== '' ? $pts2025 . ' pts' : '', 'Bye Week' => $bye, 'Roster Status' => $status]) ?></td>
                         <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
                         <td data-value="<?= $pts2025 !== '' ? htmlspecialchars($pts2025) : -1 ?>"><?= htmlspecialchars($pts2025) ?></td>
                         <td data-value="<?= $bye !== '' ? htmlspecialchars($bye) : -1 ?>"><?= htmlspecialchars($bye) ?></td>
                         <td><?= htmlspecialchars($status) ?></td>
-                        <td><?= htmlspecialchars($acquired) ?></td>
+                        <td style="white-space:nowrap;"><?= htmlspecialchars($acquired) ?></td>
                       </tr>
                     <?php endforeach; ?>
                   </tbody>
                 </table>
+                </div>
               <?php endif; ?>
             </div>
           <?php endforeach; ?>

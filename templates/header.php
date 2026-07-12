@@ -124,7 +124,7 @@ $tabs = [
 <nav class="rotc-nav">
   <div class="rotc-bar">
     <a class="rotc-brand" href="<?= $base ?: '/' ?>">
-      <img class="rotc-logo" src="https://returnofthechampions.com/img/rotc-ios_1.PNG" alt="Return of the Champions" width="36" height="36">
+      <img class="rotc-logo" src="<?= $base ?>/assets/img/rotc-icon.png" alt="Return of the Champions" width="36" height="36">
     </a>
     <input type="checkbox" id="rotc-burger" class="rotc-burger">
     <label for="rotc-burger" class="rotc-burger-btn">&#9776;</label>
