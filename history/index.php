@@ -264,6 +264,7 @@ if (!$fetchError) {
       <div class="rotc-history-content">
 
         <div class="card rotc-history-panel" id="hist-single-game">
+          <p style="font-size:11px;color:#999;">[debug] recentSeason=<?php echo var_export($recentSeason, true); ?> | biggest_blowouts rows=<?php echo count($data['biggest_blowouts']); ?> | last row season=<?php echo var_export($data['biggest_blowouts'][count($data['biggest_blowouts'])-1]['season'] ?? null, true); ?></p>
           <h3>Most Points Scored</h3>
           <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['most_points'], 'No data yet.', $recentSeason); ?>
           <h3>Fewest Points Scored</h3>
