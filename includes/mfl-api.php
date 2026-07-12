@@ -16,11 +16,21 @@
  */
 
 function mfl_cached_get(string $type, int $ttlSeconds, array $params = [], bool $includeLeague = true): ?array {
+    return mfl_cached_get_year($type, (int) MFL_YEAR, $ttlSeconds, $params, $includeLeague);
+}
+
+/**
+ * Same as mfl_cached_get() but against an explicit year rather than the
+ * current MFL_YEAR -- needed for things like a free agent's 2025 total
+ * points shown on a 2026 page. Year is part of the cache key so a
+ * prior-year lookup never collides with the current season's entry.
+ */
+function mfl_cached_get_year(string $type, int $year, int $ttlSeconds, array $params = [], bool $includeLeague = true): ?array {
     $cacheDir = sys_get_temp_dir() . '/rotc-mfl-cache';
     if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700, true);
     // Params affect the response shape (e.g. POOLTYPE, W, ALL) so they
     // need to be part of the cache key, not just the request type.
-    $cacheKey = $type . '-' . MFL_LEAGUE_ID . '-' . MFL_YEAR . '-' . ($includeLeague ? 'L' : 'noL') . '-' . md5(serialize($params));
+    $cacheKey = $type . '-' . MFL_LEAGUE_ID . '-' . $year . '-' . ($includeLeague ? 'L' : 'noL') . '-' . md5(serialize($params));
     $cacheFile = $cacheDir . '/' . $cacheKey . '.json';
 
     if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $ttlSeconds) {
@@ -28,11 +38,11 @@ function mfl_cached_get(string $type, int $ttlSeconds, array $params = [], bool 
         if (is_array($cached)) return $cached;
     }
 
-    $data = mfl_fetch($type, $params, $includeLeague);
+    $data = mfl_fetch($type, $params, $includeLeague, $year);
     if ($data !== null) {
         @file_put_contents($cacheFile, json_encode($data));
     } elseif (file_exists($cacheFile)) {
-        // MFL call failed but we have a stale copy — serve it rather than nothing.
+        // MFL call failed but we have a stale copy -- serve it rather than nothing.
         $stale = json_decode(file_get_contents($cacheFile), true);
         if (is_array($stale)) return $stale;
     }
@@ -51,14 +61,14 @@ function mfl_cached_get(string $type, int $ttlSeconds, array $params = [], bool 
  * ("must go to api.myfantasyleague.com") — a dead loop that comes back
  * as an {"error":...} payload instead of data. Pass false for those.
  */
-function mfl_fetch(string $type, array $params = [], bool $includeLeague = true): ?array {
+function mfl_fetch(string $type, array $params = [], bool $includeLeague = true, ?int $year = null): ?array {
     $base = ['TYPE' => $type, 'JSON' => 1, 'APIKEY' => MFL_API_KEY];
     if ($includeLeague) $base['L'] = MFL_LEAGUE_ID;
     $query = http_build_query(array_merge($base, $params));
     // Always hit the generic api host and follow MFL's redirect to the
-    // league's actual host — see the config.php note on why we don't
+    // league's actual host -- see the config.php note on why we don't
     // hardcode a wwwXX server.
-    $url = 'https://api.myfantasyleague.com/' . MFL_YEAR . '/export?' . $query;
+    $url = 'https://api.myfantasyleague.com/' . ($year ?? MFL_YEAR) . '/export?' . $query;
 
     $ch = curl_init($url);
     curl_setopt_array($ch, [

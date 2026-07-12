@@ -3,15 +3,20 @@
  * free-agents.php
  * Free agent listing (paginated), matching Players -> Complete Free
  * Agent Listing on the MFL-hosted page. Uses TYPE=freeAgents (league-
- * scoped, gives just player IDs) joined against TYPE=players for
- * name/team/position.
+ * scoped, gives just player IDs) joined against:
+ *   - TYPE=players               name / position / NFL team / status
+ *   - TYPE=nflByeWeeks           bye week per NFL team
+ *   - TYPE=nflSchedule (W=1)     week 1 opponent per NFL team
+ *   - TYPE=projectedScores (W=1) week 1 projected fantasy points
+ *   - TYPE=playerScores (2025 season, W=YTD) prior-year total points
  *
- * SIMPLIFIED vs the original MFL report: the live page also shows bye
- * week, week 1 opponent, league-wide add%/own%, weekly projections, and
- * prior-year total points. Those each need additional API calls
- * (nflSchedule, nflByeWeeks, topAdds/topOwns, projectedScores,
- * playerScores) that weren't verified/wired in this pass — flagged as
- * a follow-up rather than guessed at.
+ * NOT included: MFL's own ADD PCT / OWN PCT columns. The only
+ * ownership-percentage data the export API exposes is TYPE=topAdds /
+ * topOwns, and both are curated "top ~50 most owned/added players
+ * league-wide" lists — by definition almost never free agents. Wiring
+ * that in would show 0% for virtually every row, which would misrepresent
+ * the data rather than actually reproduce MFL's column. Flagging this
+ * rather than faking it.
  */
 
 $page_title = 'Free Agents — Return of the Champions XXVI';
@@ -47,8 +52,57 @@ if (!$fetchError) {
             $players[$p['id']] = $p;
         }
     }
+
+    // Bye weeks — team abbrev -> bye week number.
+    $byeRaw = mfl_cached_get('nflByeWeeks', 86400, [], false);
+    $byeByTeam = [];
+    foreach (mfl_normalize_list($byeRaw['nflByeWeeks']['team'] ?? null) as $t) {
+        $byeByTeam[$t['id']] = $t['bye_week'] ?? '';
+    }
+
+    // Week 1 opponent — team abbrev -> opponent abbrev.
+    $schedRaw = mfl_cached_get('nflSchedule', 86400, ['W' => 1], false);
+    $oppByTeam = [];
+    foreach (mfl_normalize_list($schedRaw['nflSchedule']['matchup'] ?? null) as $m) {
+        $teams = mfl_normalize_list($m['team'] ?? null);
+        if (count($teams) === 2) {
+            $oppByTeam[$teams[0]['id']] = $teams[1]['id'];
+            $oppByTeam[$teams[1]['id']] = $teams[0]['id'];
+        }
+    }
+
+    // Week 1 projected points — player id -> score.
+    $projRaw = mfl_cached_get('projectedScores', 3600, ['W' => 1, 'COUNT' => 3000]);
+    $projById = [];
+    foreach (mfl_normalize_list($projRaw['projectedScores']['playerScore'] ?? null) as $row) {
+        if (!empty($row['id'])) $projById[$row['id']] = $row['score'] ?? '';
+    }
+
+    // 2025 season total points — player id -> score. Separate league-agnostic
+    // year call, cached long since last year's totals never change.
+    $prevYearRaw = mfl_cached_get_year('playerScores', (int) MFL_YEAR - 1, 86400, ['W' => 'YTD', 'COUNT' => 3000]);
+    $prevPtsById = [];
+    foreach (mfl_normalize_list($prevYearRaw['playerScores']['playerScore'] ?? null) as $row) {
+        if (!empty($row['id'])) $prevPtsById[$row['id']] = $row['score'] ?? '';
+    }
+
     // Preserve freeAgents' own ordering (its default sort), not the join order.
-    $rows = array_values(array_filter(array_map(fn($id) => $players[$id] ?? null, $pageIds)));
+    $rows = [];
+    foreach ($pageIds as $id) {
+        $p = $players[$id] ?? null;
+        if (!$p) continue;
+        $team = $p['team'] ?? '';
+        $rows[] = [
+            'name' => $p['name'] ?? ('Player #' . $id),
+            'position' => $p['position'] ?? '',
+            'team' => $team,
+            'status' => $p['status'] ?? '',
+            'bye' => $byeByTeam[$team] ?? '',
+            'opp' => $oppByTeam[$team] ?? '',
+            'proj' => $projById[$id] ?? '',
+            'pts2025' => $prevPtsById[$id] ?? '',
+        ];
+    }
 }
 
 function rotc_qs(array $overrides): string {
@@ -76,21 +130,33 @@ function rotc_qs(array $overrides): string {
 
         <div style="overflow-x:auto;">
         <table class="data-table">
-          <thead><tr><th>Player</th><th>Pos</th><th>NFL Team</th></tr></thead>
+          <thead><tr>
+            <th>Player</th><th>Pos</th><th>NFL Team</th><th>Status</th>
+            <th>Bye</th><th>Wk 1 Opp</th><th>Wk 1 Proj</th><th>2025 Pts</th>
+          </tr></thead>
           <tbody>
-            <?php foreach ($rows as $i => $p): ?>
+            <?php foreach ($rows as $i => $r): ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                <td><?= htmlspecialchars($p['name'] ?? ('Player #' . $p['id'])) ?></td>
-                <td><?= htmlspecialchars($p['position'] ?? '') ?></td>
-                <td><?= htmlspecialchars($p['team'] ?? '') ?></td>
+                <td><?= htmlspecialchars($r['name']) ?></td>
+                <td><?= htmlspecialchars($r['position']) ?></td>
+                <td><?= htmlspecialchars($r['team']) ?></td>
+                <td><?= htmlspecialchars($r['status']) ?></td>
+                <td><?= htmlspecialchars($r['bye']) ?></td>
+                <td><?= htmlspecialchars($r['opp']) ?></td>
+                <td><?= htmlspecialchars($r['proj']) ?></td>
+                <td><?= htmlspecialchars($r['pts2025']) ?></td>
               </tr>
             <?php endforeach; ?>
             <?php if (!$rows): ?>
-              <tr><td colspan="3">No free agents found.</td></tr>
+              <tr><td colspan="8">No free agents found.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
         </div>
+
+        <p style="color:var(--muted);font-size:12px;margin-top:10px;">
+          Add % / Own % aren't shown — the only ownership data MFL's API exposes (topAdds/topOwns) only covers the ~50 most-owned players league-wide, which by definition excludes free agents.
+        </p>
 
         <div style="display:flex;gap:8px;margin-top:16px;">
           <?php if ($page > 1): ?><a href="<?= rotc_qs(['page' => $page - 1]) ?>">&laquo; Prev</a><?php endif; ?>
