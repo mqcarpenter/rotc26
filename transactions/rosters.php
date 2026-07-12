@@ -60,6 +60,14 @@
  * roster is full as of this writing, so this mostly won't be visible
  * until someone's roster actually has an opening.
  *
+ * Grouped by conference -> division, teams alphabetical within each
+ * division -- same mfl_divisions_conferences() grouping already used
+ * on scores/standings.php, so this page and Standings agree on league
+ * structure. Each division is a native <details> block (open by
+ * default) so it's collapsible with no JS required; the little arrow
+ * in the summary rotates via CSS on [open] (see .rotc-division-group
+ * in assets/mfl26.css).
+ *
  * Hover card: see includes/player-hover.php for the shared widget.
  */
 
@@ -86,6 +94,29 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/player-hover.php';
 
     $franchises = mfl_franchises();
+    $divisions  = mfl_divisions_conferences();
+
+    // Group franchises alphabetically within conference -> division, same
+    // pattern as scores/standings.php, so this page and Standings agree on
+    // league structure. Divisions render in division-export order; teams
+    // within a division are alphabetical per Matteo's request.
+    $groupedFranchises = [];
+    foreach ($divisions as $div) {
+        if (!isset($groupedFranchises[$div['conferenceName']])) $groupedFranchises[$div['conferenceName']] = [];
+        $groupedFranchises[$div['conferenceName']][$div['name']] = [];
+    }
+    foreach ($franchises as $fid => $f) {
+        $divId = $f['division'] ?? null;
+        $div = $divisions[$divId] ?? ['name' => 'Unassigned', 'conferenceName' => ''];
+        $groupedFranchises[$div['conferenceName']][$div['name']][$fid] = $f;
+    }
+    foreach ($groupedFranchises as &$conf) {
+        foreach ($conf as &$divTeams) {
+            uasort($divTeams, function ($a, $b) { return strcasecmp($a['name'], $b['name']); });
+        }
+        unset($divTeams);
+    }
+    unset($conf);
 
     // League-wide roster cap, so the header can flair FULL vs. how many
     // slots are open. Confirmed live: TYPE=league returns rosterSize as
@@ -214,81 +245,89 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
         <h2 class="card-title">Rosters</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:-6px;">Click a column header to sort. Hover a player's name for details.</p>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;">
-          <?php foreach ($franchises as $id => $f):
-            $roster = $rosters[$id] ?? [];
-            $filledCount = count($roster);
-            $openSlots = $rosterSize > 0 ? max(0, $rosterSize - $filledCount) : 0;
-            $isFull = $rosterSize > 0 && $openSlots === 0;
-          ?>
-            <div style="border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-width:0;">
-              <h3 style="margin:0 0 8px;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-                <span><?= htmlspecialchars($f['name']) ?></span>
-                <?php if ($rosterSize > 0): ?>
-                  <span style="font-size:11px;letter-spacing:.04em;padding:3px 8px;border-radius:999px;text-transform:none;font-weight:600;<?= $isFull ? 'background:#1e4d2b;color:#fff;' : 'background:#8a4b12;color:#fff;' ?>">
-                    <?= $isFull ? "FULL ({$filledCount}/{$rosterSize})" : "{$filledCount}/{$rosterSize} - {$openSlots} OPEN" ?>
-                  </span>
-                <?php endif; ?>
-              </h3>
-              <?php if (!$roster): ?>
-                <p style="color:var(--muted);font-size:13px;">No players rostered.</p>
-              <?php else: ?>
-                <div style="overflow-x:auto;">
-                <table class="data-table rotc-sortable rotc-roster-table">
-                  <colgroup>
-                    <col style="width:26px;">
-                    <col style="width:22%;">
-                    <col style="width:9%;">
-                    <col style="width:13%;">
-                    <col style="width:9%;">
-                    <col style="width:13%;">
-                    <col style="width:auto;">
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th></th>
-                      <th data-sort="text">Player</th>
-                      <th data-sort="text">Pos</th>
-                      <th data-sort="num">2025 Pts</th>
-                      <th data-sort="num">Bye</th>
-                      <th data-sort="text">Status</th>
-                      <th data-sort="text">Acquired</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <?php foreach ($roster as $p):
-                      $pd = $players[$p['id']] ?? null;
-                      $team = $pd['team'] ?? '';
-                      $status = $STATUS_LABEL[$p['status'] ?? ''] ?? ($p['status'] ?? '');
-                      $drafted = $p['drafted'] ?? '';
-                      $acquired = rotc_acquired_label((string) $id, (string) $p['id'], (string) $drafted, $auctionByFranchisePlayer, $draftByFranchisePlayer, $tradeByFranchisePlayer);
-                      $pts2025 = $prevPtsById[$p['id']] ?? '';
-                      $bye = $byeByTeam[$team] ?? '';
-                      $name = $pd['name'] ?? ('Player #' . $p['id']);
-                    ?>
-                      <tr>
-                        <td><?= rotc_team_logo_img($team) ?></td>
-                        <td><?= rotc_player_hover_span($name, $pd, ['2025 Total' => $pts2025 !== '' ? $pts2025 . ' pts' : '', 'Bye Week' => $bye, 'Roster Status' => $status]) ?></td>
-                        <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
-                        <td data-value="<?= $pts2025 !== '' ? htmlspecialchars($pts2025) : -1 ?>"><?= htmlspecialchars($pts2025) ?></td>
-                        <td data-value="<?= $bye !== '' ? htmlspecialchars($bye) : -1 ?>"><?= htmlspecialchars($bye) ?></td>
-                        <td><?= htmlspecialchars($status) ?></td>
-                        <td><?= htmlspecialchars($acquired) ?></td>
-                      </tr>
-                    <?php endforeach; ?>
-                    <?php for ($slot = 0; $slot < $openSlots; $slot++): ?>
-                      <tr class="rotc-filler-row" style="color:var(--muted);">
-                        <td></td>
-                        <td colspan="6" style="font-style:italic;">&mdash; open roster slot &mdash;</td>
-                      </tr>
-                    <?php endfor; ?>
-                  </tbody>
-                </table>
+        <?php foreach ($groupedFranchises as $confName => $divs): foreach ($divs as $divName => $teams): if (!$teams) continue; ?>
+          <details class="rotc-division-group" open style="margin:16px 0;">
+            <summary style="cursor:pointer;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:13px;background:var(--module-head);color:var(--module-head-text);padding:8px 10px;border-radius:6px;list-style:none;display:flex;align-items:center;gap:6px;">
+              <span class="rotc-details-arrow" aria-hidden="true">&#9656;</span>
+              <?= $confName !== '' ? htmlspecialchars($confName) . ' — ' . htmlspecialchars($divName) : htmlspecialchars($divName) ?>
+            </summary>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;margin-top:12px;">
+              <?php foreach ($teams as $id => $f):
+                $roster = $rosters[$id] ?? [];
+                $filledCount = count($roster);
+                $openSlots = $rosterSize > 0 ? max(0, $rosterSize - $filledCount) : 0;
+                $isFull = $rosterSize > 0 && $openSlots === 0;
+              ?>
+                <div style="border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-width:0;">
+                  <h3 style="margin:0 0 8px;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                    <span><?= htmlspecialchars($f['name']) ?></span>
+                    <?php if ($rosterSize > 0): ?>
+                      <span style="font-size:11px;letter-spacing:.04em;padding:3px 8px;border-radius:999px;text-transform:none;font-weight:600;<?= $isFull ? 'background:#1e4d2b;color:#fff;' : 'background:#8a4b12;color:#fff;' ?>">
+                        <?= $isFull ? "FULL ({$filledCount}/{$rosterSize})" : "{$filledCount}/{$rosterSize} - {$openSlots} OPEN" ?>
+                      </span>
+                    <?php endif; ?>
+                  </h3>
+                  <?php if (!$roster): ?>
+                    <p style="color:var(--muted);font-size:13px;">No players rostered.</p>
+                  <?php else: ?>
+                    <div style="overflow-x:auto;">
+                    <table class="data-table rotc-sortable rotc-roster-table">
+                      <colgroup>
+                        <col style="width:26px;">
+                        <col style="width:22%;">
+                        <col style="width:9%;">
+                        <col style="width:13%;">
+                        <col style="width:9%;">
+                        <col style="width:13%;">
+                        <col style="width:auto;">
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th></th>
+                          <th data-sort="text">Player</th>
+                          <th data-sort="text">Pos</th>
+                          <th data-sort="num">2025 Pts</th>
+                          <th data-sort="num">Bye</th>
+                          <th data-sort="text">Status</th>
+                          <th data-sort="text">Acquired</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <?php foreach ($roster as $p):
+                          $pd = $players[$p['id']] ?? null;
+                          $team = $pd['team'] ?? '';
+                          $status = $STATUS_LABEL[$p['status'] ?? ''] ?? ($p['status'] ?? '');
+                          $drafted = $p['drafted'] ?? '';
+                          $acquired = rotc_acquired_label((string) $id, (string) $p['id'], (string) $drafted, $auctionByFranchisePlayer, $draftByFranchisePlayer, $tradeByFranchisePlayer);
+                          $pts2025 = $prevPtsById[$p['id']] ?? '';
+                          $bye = $byeByTeam[$team] ?? '';
+                          $name = $pd['name'] ?? ('Player #' . $p['id']);
+                        ?>
+                          <tr>
+                            <td><?= rotc_team_logo_img($team) ?></td>
+                            <td><?= rotc_player_hover_span($name, $pd, ['2025 Total' => $pts2025 !== '' ? $pts2025 . ' pts' : '', 'Bye Week' => $bye, 'Roster Status' => $status]) ?></td>
+                            <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
+                            <td data-value="<?= $pts2025 !== '' ? htmlspecialchars($pts2025) : -1 ?>"><?= htmlspecialchars($pts2025) ?></td>
+                            <td data-value="<?= $bye !== '' ? htmlspecialchars($bye) : -1 ?>"><?= htmlspecialchars($bye) ?></td>
+                            <td><?= htmlspecialchars($status) ?></td>
+                            <td><?= htmlspecialchars($acquired) ?></td>
+                          </tr>
+                        <?php endforeach; ?>
+                        <?php for ($slot = 0; $slot < $openSlots; $slot++): ?>
+                          <tr class="rotc-filler-row" style="color:var(--muted);">
+                            <td></td>
+                            <td colspan="6" style="font-style:italic;">&mdash; open roster slot &mdash;</td>
+                          </tr>
+                        <?php endfor; ?>
+                      </tbody>
+                    </table>
+                    </div>
+                  <?php endif; ?>
                 </div>
-              <?php endif; ?>
+              <?php endforeach; ?>
             </div>
-          <?php endforeach; ?>
-        </div>
+          </details>
+        <?php endforeach; endforeach; ?>
       </div>
     <?php endif; ?>
   </main>

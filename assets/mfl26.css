@@ -327,3 +327,13 @@ a:hover{ color:var(--accent); }
 .rotc-foot-bar a{ font-size:12px; color:var(--fmuted); }
 .rotc-foot-bar a:hover{ color:var(--accent); }
 @media (max-width:760px){ .rotc-foot-grid{ grid-template-columns:1fr; gap:22px; } }
+
+/* Collapsible conference/division groups on transactions/rosters.php.
+   Native <details>/<summary> needs no JS; this just hides the default
+   marker (styled differently per-browser) in favor of one custom arrow
+   glyph that rotates via the [open] attribute selector. */
+.rotc-division-group > summary { user-select: none; }
+.rotc-division-group > summary::-webkit-details-marker { display: none; }
+.rotc-division-group > summary::marker { content: ''; }
+.rotc-division-group .rotc-details-arrow { display: inline-block; transition: transform .15s ease; }
+.rotc-division-group[open] > summary .rotc-details-arrow { transform: rotate(90deg); }
