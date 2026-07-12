@@ -345,3 +345,27 @@ a:hover{ color:var(--accent); }
    column on narrow viewports so it still respects small screens. */
 .rotc-roster-division-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:12px; }
 @media (max-width:900px){ .rotc-roster-division-grid{ grid-template-columns:1fr; } }
+
+/* Front-page "newspaper" recap: hero (Game of the Week) + hub (every
+   other matchup that week) — see includes/weekly-recap.php and
+   templates/weekly-recap-hub.php. Kept inside the existing .card
+   wrapper on index.php, so no card border/radius/background repeated
+   here, just the internal layout. */
+.rotc-recap-kicker{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.08em; font-size:12px; color:var(--accent); font-weight:700; margin-bottom:4px; }
+.rotc-recap-headline{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-size:26px; line-height:1.15; margin:0 0 14px; color:var(--ink); }
+.rotc-recap-scoreboard{ display:flex; align-items:center; justify-content:center; gap:24px; padding:14px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin-bottom:12px; flex-wrap:wrap; }
+.rotc-recap-side{ text-align:center; min-width:140px; }
+.rotc-recap-side img{ border-radius:50%; margin-bottom:6px; }
+.rotc-recap-side-name{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-size:13px; color:var(--muted); margin-bottom:4px; }
+.rotc-recap-side-score{ font-family:"Roboto Condensed", sans-serif; font-size:28px; color:var(--ink); }
+.rotc-recap-top-performer{ font-size:11px; color:var(--muted); font-family:system-ui, sans-serif; margin-top:2px; }
+.rotc-recap-vs{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; color:var(--muted); font-size:13px; }
+.rotc-recap-blurb{ font-size:15px; line-height:1.5; margin:0; }
+.rotc-recap-hub{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:14px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.rotc-recap-card{ border:1px solid var(--line); border-radius:10px; padding:12px; background:var(--paper); }
+.rotc-recap-card h3{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-size:14px; margin:0 0 8px; line-height:1.25; }
+.rotc-recap-card-score{ display:flex; align-items:center; justify-content:space-between; font-family:"Roboto Condensed", sans-serif; font-size:16px; margin-bottom:8px; }
+.rotc-recap-card-score img{ vertical-align:middle; border-radius:50%; }
+.rotc-recap-card-dash{ color:var(--muted); }
+.rotc-recap-card p{ font-size:13px; color:var(--muted); margin:0; line-height:1.4; }
+@media (max-width:600px){ .rotc-recap-headline{ font-size:21px; } .rotc-recap-side-score{ font-size:22px; } }

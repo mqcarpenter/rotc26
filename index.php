@@ -35,9 +35,29 @@ include __DIR__ . '/templates/header.php';
     </div>
 
     <div class="card">
-      <h2 class="card-title">Fantasy Recap &mdash; Game of the Week</h2>
-      <p>No Week 1 recaps are available.</p>
-      <!-- TODO: pull from WordPress REST API recap post type -->
+      <h2 class="card-title">Fantasy Recap</h2>
+      <?php
+      require_once __DIR__ . '/includes/weekly-recap.php';
+      $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
+      $recap = null;
+      if (file_exists($configPath)) {
+          require_once $configPath;
+          require_once __DIR__ . '/includes/mfl-api.php';
+          // PLACEHOLDER: 2026's Week 1 hasn't been played yet, so this
+          // shows 2025's Week 17 (the last completed week of last
+          // season) purely so the hero+hub layout has real data to
+          // render. Once 2026 has a completed week, point this at
+          // (int) MFL_YEAR and that week instead -- see the TODO below.
+          $recap = rotc_weekly_recap(2025, 17);
+      }
+      ?>
+      <?php if ($recap): ?>
+        <?php include __DIR__ . '/templates/weekly-recap-hub.php'; ?>
+      <?php else: ?>
+        <p>No recap available yet.</p>
+      <?php endif; ?>
+      <!-- TODO once 2026 Week 1 is complete: swap rotc_weekly_recap(2025, 17)
+           above for the current season/most-recently-completed week. -->
     </div>
 
     <div class="card">
