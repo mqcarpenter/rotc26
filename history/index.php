@@ -236,7 +236,7 @@ if (!$fetchError) {
 
     <?php if ($fetchError): ?>
       <div class="card">
-        <p>League history data isn't available right now — the rotchist_ database connection isn't configured yet. Add the ROTCHIST_DB_* constants to config.php (see includes/rotchist-db.php).</p>
+        <p>League history data isn't available right now — the rotchist_ read-only database connection isn't configured yet. Add the ROTCHIST_READ_DB_* constants to config.php (see includes/rotchist-db.php).</p>
       </div>
     <?php else: ?>
 
