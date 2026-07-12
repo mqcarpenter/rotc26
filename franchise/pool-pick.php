@@ -101,7 +101,7 @@ include __DIR__ . '/../templates/header.php';
         <p>This isn't available right now — check back soon.</p>
       <?php else: ?>
         <?php if ($result && $result['ok']): ?>
-          <p class="rotc-login-success">Picks submitted for Week <?= (int) $week ?>.</p>
+          <p class="rotc-login-success">Picks submitted for Week <?= (int) $week ?>.<br>Good luck, punk.</p>
         <?php elseif ($result && !$result['ok']): ?>
           <p class="rotc-login-error"><?= nl2br(htmlspecialchars($result['error'])) ?></p>
         <?php endif; ?>

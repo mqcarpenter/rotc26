@@ -215,7 +215,7 @@ if ($hasConfig) {
         <?php endif; ?>
 
         <?php if ($result && $result['ok']): ?>
-          <p class="rotc-login-success">Lineup submitted for Week <?= (int) $week ?>.</p>
+          <p class="rotc-login-success">Lineup submitted for Week <?= (int) $week ?>.<br>Good luck, punk.</p>
         <?php elseif ($result && !$result['ok']): ?>
           <p class="rotc-login-error"><?= nl2br(htmlspecialchars($result['error'])) ?></p>
         <?php endif; ?>

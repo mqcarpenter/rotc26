@@ -108,7 +108,7 @@ function rotc_trade_roster_list(array $roster, array $players, string $fieldName
         <p>This isn't available right now — check back soon.</p>
       <?php else: ?>
         <?php if ($result && $result['ok']): ?>
-          <p class="rotc-login-success">Trade offer sent.</p>
+          <p class="rotc-login-success">Trade offer sent.<br>Good luck, punk.</p>
         <?php elseif ($result && !$result['ok']): ?>
           <p class="rotc-login-error"><?= nl2br(htmlspecialchars($result['error'])) ?></p>
         <?php endif; ?>

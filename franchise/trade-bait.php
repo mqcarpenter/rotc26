@@ -95,7 +95,7 @@ include __DIR__ . '/../templates/header.php';
       <div class="card">
         <h2 class="card-title">Set Your Trade Bait</h2>
         <?php if ($submitResult && $submitResult['ok']): ?>
-          <p class="rotc-login-success">Trade bait updated.</p>
+          <p class="rotc-login-success">Trade bait updated.<br>Good luck, punk.</p>
         <?php elseif ($submitResult && !$submitResult['ok']): ?>
           <p class="rotc-login-error"><?= nl2br(htmlspecialchars($submitResult['error'])) ?></p>
         <?php endif; ?>

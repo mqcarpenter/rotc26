@@ -89,7 +89,7 @@ include __DIR__ . '/../templates/header.php';
         </p>
       <?php else: ?>
         <?php if ($result && $result['ok']): ?>
-          <p class="rotc-login-success">Player(s) dropped.</p>
+          <p class="rotc-login-success">Player(s) dropped.<br>Good luck, punk.</p>
         <?php elseif ($result && !$result['ok']): ?>
           <p class="rotc-login-error"><?= nl2br(htmlspecialchars($result['error'])) ?></p>
         <?php endif; ?>
