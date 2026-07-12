@@ -127,7 +127,8 @@ $tabs = [
 <title><?= $page_title ?? 'Return of the Champions' ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,400i,700|Roboto+Condensed:400,700|Roboto:400,400i,700" rel="stylesheet">
-<link rel="stylesheet" href="<?= $base ?>/assets/mfl26.css">
+<?php $cssVer = @filemtime(__DIR__ . '/../assets/mfl26.css') ?: time(); ?>
+<link rel="stylesheet" href="<?= $base ?>/assets/mfl26.css?v=<?= $cssVer ?>">
 </head>
 <body>
 <div class="page">
