@@ -251,7 +251,7 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
               <span class="rotc-details-arrow" aria-hidden="true">&#9656;</span>
               <?= $confName !== '' ? htmlspecialchars($confName) . ' — ' . htmlspecialchars($divName) : htmlspecialchars($divName) ?>
             </summary>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;margin-top:12px;">
+            <div class="rotc-roster-division-grid">
               <?php foreach ($teams as $id => $f):
                 $roster = $rosters[$id] ?? [];
                 $filledCount = count($roster);

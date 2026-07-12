@@ -337,3 +337,11 @@ a:hover{ color:var(--accent); }
 .rotc-division-group > summary::marker { content: ''; }
 .rotc-division-group .rotc-details-arrow { display: inline-block; transition: transform .15s ease; }
 .rotc-division-group[open] > summary .rotc-details-arrow { transform: rotate(90deg); }
+
+/* Fixed 2-per-row grid for roster cards within a division (rather than
+   auto-fit, which let 3-4 narrow cards pack into a row on wide screens
+   and forced the roster table inside each one to word-wrap). Two cards
+   gives each table enough width for its columns; collapses to a single
+   column on narrow viewports so it still respects small screens. */
+.rotc-roster-division-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:12px; }
+@media (max-width:900px){ .rotc-roster-division-grid{ grid-template-columns:1fr; } }
