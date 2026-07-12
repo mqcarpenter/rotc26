@@ -64,7 +64,6 @@ $nav_items = [
   'Players' => ['wide' => true, 'sub' => [
     ['Top Performers / Player Stats', "$base/players/top-performers"],
     ['Projected Stats', "$base/players/projected-stats"],
-    ['Fantasy Depth Charts', "$mfl/depth_chart?L=67102"],
     ['Top Adds/Drops/Starters', "$base/players/top-adds-drops-starters"],
     ['Points Allowed - By Position', "$base/players/points-allowed"],
     ['Who Should I Start?', "$base/players/who-should-i-start"],
