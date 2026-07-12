@@ -41,7 +41,7 @@ $mfl = 'https://www42.myfantasyleague.com/2026';
 // and its href here together, or a link goes stale.
 $nav_items = [
   'Scores' => ['wide' => true, 'sub' => [
-    ['Live Scoring', "$mfl/ajax_ls?L=67102"],
+    ['Live Scoring', "$base/scores/live-scoring"],
     ['Standings', "$base/scores/standings"],
     ['Weekly Results', "$base/scores/weekly-results"],
     ['Weekly Summary', "$base/scores/weekly-summary"],
@@ -49,7 +49,7 @@ $nav_items = [
     ['Starting Lineups', "$base/scores/starting-lineups"],
     ['Fantasy Schedule', "$base/scores/fantasy-schedule"],
     ['Playoff Brackets', "$base/scores/playoff-brackets"],
-    ['NFL Schedule', "$mfl/pro_schedule?L=67102"],
+    ['NFL Schedule', "$base/scores/nfl-schedule"],
     ['Fantasy Previews', "$mfl/options?L=67102&O=207"],
     ['Fantasy Recaps', "$mfl/options?L=67102&O=177"],
   ]],
