@@ -56,7 +56,7 @@ $nav_items = [
     ['Points Allowed - By Position', "$mfl/options?L=67102&O=81"],
     ['Who Should I Start?', "$mfl/options?L=67102&O=205"],
     ['Complete Free Agent Listing', "$mfl/reports?L=67102&R=FULLFA"],
-    ['NFL Injury Report', "$mfl/injury?L=67102"],
+    ['NFL Injury Report', "$base/injury-report"],
     ['Player News', "$mfl/news_articles?L=67102&P=*"],
     ['Player Search', "$mfl/player_search?L=67102"],
   ]],
