@@ -1,9 +1,12 @@
 <?php
 /**
  * includes/weekly-recap.php
- * Builds a "newspaper hub" recap of one week's matchups from real MFL
- * score data (TYPE=weeklyResults), for the front page's Fantasy Recap
- * section.
+ * Builds a full written recap article for one week's matchups from
+ * real MFL score data (TYPE=weeklyResults) -- for the front page's
+ * interactive recap hub and the standalone scores/weekly-recap-
+ * article.php page. Both share this one data builder + paragraph
+ * generator so there's a single source of truth for what the article
+ * says, not two copies that can drift apart.
  *
  * Why this exists instead of pulling MFL's own Fantasy Recaps text
  * (myfantasyleague.com/options?O=177): confirmed live that content
@@ -13,199 +16,68 @@
  * type -- there is no recap/preview/news type in that list. That
  * licensed narrative text (Genius Sports) just isn't exposed, matching
  * the same restriction already found on Player News. So instead of
- * scraping/porting MFL's copy, this generates our own recap from the
- * real scores in TYPE=weeklyResults -- same "results" substance,
- * written from data we're actually allowed to pull.
+ * scraping/porting MFL's copy, this generates our own recap from real
+ * data we're actually allowed to pull:
  *
- * Images: team helmet art (includes/helmets.php), not stock photos --
- * this league doesn't have per-story photography, and the helmet is
- * the one piece of per-franchise "art" every page already uses.
+ * - Full box score for both sides (every starter's fantasy points),
+ *   final score, and result -- TYPE=weeklyResults.
+ * - "Left points on the bench" callout, computed from weeklyResults'
+ *   own optimal-lineup fields (opt_pts / optimal vs starters).
+ * - Positional week-rank for each side's top performer ("3rd-best TE
+ *   performance in the league this week"), computed by ranking every
+ *   NFL player at that position against the real league-wide
+ *   TYPE=playerScores pool for that week, using TYPE=players (no
+ *   PLAYERS filter -- confirmed live this returns the full ~2800-
+ *   player DB with position included) for the position lookup. Built
+ *   entirely from fantasy points, never raw box-score stats -- MFL's
+ *   ToS doesn't allow exposing those via the API, so individual stat
+ *   lines ("281 passing yards and 1 TD") are the one thing this can't
+ *   replicate that MFL's own article has.
+ * - Next week's opponent + their record, from TYPE=schedule.
+ * - Records shown are each franchise's FINAL record for $year
+ *   (TYPE=leagueStandings), not their record entering week $week --
+ *   a deliberate simplification for a placeholder built from an
+ *   already-completed past season (see the comment at that fetch).
  *
- * Player mentions (each matchup's top-scoring starter) are wrapped in
- * the same hoverable widget rosters.php uses (includes/player-hover.php)
- * with real bio + that week's fantasy score as the "key stats" --
- * never fabricated in-game box-score stats (yards/TDs/etc), since
- * MFL's ToS doesn't allow exposing raw NFL stats via the API. A
- * caller must include includes/player-hover.php and call
+ * Flavor lines: one closing line per matchup, picked from Matteo's
+ * curated bank (includes/recap-phrases.php) rather than a fabricated
+ * quote attributed to a real person. Picked deterministically (seeded
+ * by franchise+week+category) so a given matchup shows the same line
+ * on every reload instead of flickering, and picked from whichever
+ * category fits the result (blowout / nail-biter / bench-mismanagement
+ * / general).
+ *
+ * Player mentions throughout (top performers, bench-miss callouts,
+ * full box scores) are wrapped in the same hoverable widget
+ * rosters.php uses (includes/player-hover.php) -- a caller must call
  * rotc_player_hover_widget() once on the page for these to work.
- *
- * "Game of the Week" (the hero) is the matchup with the smallest
- * margin -- the closest, most dramatic result of the week. Every
- * other matchup becomes a smaller "hub" card.
  */
 
 require_once __DIR__ . '/helmets.php';
+require_once __DIR__ . '/player-hover.php';
+require_once __DIR__ . '/recap-phrases.php';
 
 /**
- * Blurb text is returned as an array of parts so the template can
- * render plain text and hoverable player mentions differently without
- * re-parsing a string: [['type'=>'text','value'=>...], ['type'=>'player',
- * 'name'=>,'pd'=>,'score'=>], ...].
+ * Picks a flavor line from Matteo's phrase bank. Falls back to
+ * 'general' if the requested category is empty, and returns '' if
+ * the bank has nothing at all yet.
  */
-function rotc_recap_blurb_parts(array $winner, array $loser, float $margin): array {
-    $parts = [];
-    if ($margin < 3) {
-        $parts[] = ['type' => 'text', 'value' => "{$winner['name']} edged out {$loser['name']} by just {$margin} points"];
-    } elseif ($margin > 40) {
-        $parts[] = ['type' => 'text', 'value' => "{$winner['name']} blew past {$loser['name']} by {$margin} points"];
-    } else {
-        $parts[] = ['type' => 'text', 'value' => "{$winner['name']} beat {$loser['name']} " . number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2)];
-    }
-    $parts[] = ['type' => 'text', 'value' => '. '];
-    if ($winner['topPerformer']) {
-        $parts[] = ['type' => 'text', 'value' => ''];
-        $parts[] = ['type' => 'player', 'name' => $winner['topPerformer']['name'], 'pd' => $winner['topPerformer']['pd'], 'score' => $winner['topPerformer']['score']];
-        $parts[] = ['type' => 'text', 'value' => ' led the way with ' . number_format($winner['topPerformer']['score'], 1) . ' points.'];
-    }
-    return $parts;
+function rotc_recap_flavor_line(string $seed, string $category = 'general'): string {
+    $pool = ROTC_RECAP_PHRASES[$category] ?? [];
+    if (!$pool) $pool = ROTC_RECAP_PHRASES['general'] ?? [];
+    if (!$pool) return '';
+    $i = crc32($seed) % count($pool);
+    return $pool[$i];
 }
 
-/**
- * @return array|null null if no data (bad week, unplayed week, fetch
- *   failure). Otherwise: ['year'=>, 'week'=>, 'isPlayoffs'=>bool,
- *   'hero'=>matchup, 'hub'=>[matchup, ...]], where each matchup is
- *   ['a'=>side, 'b'=>side, 'margin'=>float, 'combined'=>float,
- *   'category'=>string, 'blurbParts'=>[...]], and each side is
- *   ['id'=>, 'name'=>, 'abbrev'=>, 'icon'=>, 'helmet'=>, 'helmetFlip'=>bool,
- *   'score'=>float, 'result'=>'W'|'L'|'T',
- *   'topPerformer'=>['name'=>,'score'=>float,'pd'=>array]|null].
- */
-function rotc_weekly_recap(int $year, int $week): ?array {
-    $franchises = mfl_franchises();
-    $raw = mfl_cached_get_year('weeklyResults', $year, 3600, ['W' => $week]);
-    $matchups = mfl_normalize_list($raw['weeklyResults']['matchup'] ?? null);
-    if (!$matchups) return null;
-
-    // Collect every matchup's per-side top-scoring starter so their
-    // bio/photo can be resolved in one batched TYPE=players call
-    // instead of one call per player.
-    $topIds = [];
-    $built = [];
-
-    foreach ($matchups as $m) {
-        $sides = mfl_normalize_list($m['franchise'] ?? null);
-        if (count($sides) < 2) continue;
-
-        $parsedSides = [];
-        foreach ($sides as $s) {
-            $players = mfl_normalize_list($s['player'] ?? null);
-            $topPlayerId = null;
-            $topScore = -1.0;
-            foreach ($players as $p) {
-                if (($p['status'] ?? '') !== 'starter') continue;
-                $sc = (float) ($p['score'] ?? 0);
-                if ($sc > $topScore) { $topScore = $sc; $topPlayerId = $p['id'] ?? null; }
-            }
-            if ($topPlayerId) $topIds[] = $topPlayerId;
-
-            $fid = $s['id'] ?? '';
-            $parsedSides[] = [
-                'id'           => $fid,
-                'name'         => $franchises[$fid]['name'] ?? ('Franchise ' . $fid),
-                'abbrev'       => $franchises[$fid]['abbrev'] ?? $fid,
-                'icon'         => $franchises[$fid]['icon'] ?? '',
-                'helmet'       => rotc_helmet_src($fid, 'right'),
-                'helmetFlip'   => rotc_helmet_flip($fid, 'right'),
-                'score'        => (float) ($s['score'] ?? 0),
-                'result'       => $s['result'] ?? '',
-                'topPlayerId'  => $topPlayerId,
-                'topScore'     => $topScore > 0 ? $topScore : null,
-            ];
-        }
-        if (count($parsedSides) < 2) continue;
-
-        [$a, $b] = $parsedSides;
-        $built[] = [
-            'a'          => $a,
-            'b'          => $b,
-            'margin'     => round(abs($a['score'] - $b['score']), 2),
-            'combined'   => round($a['score'] + $b['score'], 2),
-            'isPlayoffs' => ($m['regularSeason'] ?? '1') === '0',
-        ];
+function rotc_ordinal(int $n): string {
+    if ($n % 100 >= 11 && $n % 100 <= 13) return $n . 'th';
+    switch ($n % 10) {
+        case 1: return $n . 'st';
+        case 2: return $n . 'nd';
+        case 3: return $n . 'rd';
+        default: return $n . 'th';
     }
-
-    if (!$built) return null;
-
-    // Resolve top-scorer bio/photo in one batched call (DETAILS=1 for
-    // espn_id/position/team, same shape rosters.php's hover cards use).
-    $playerData = [];
-    if ($topIds) {
-        $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', array_unique($topIds)), 'DETAILS' => 1], false);
-        foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
-            $playerData[$p['id']] = $p;
-        }
-    }
-
-    foreach ($built as &$mu) {
-        foreach (['a', 'b'] as $side) {
-            $pid = $mu[$side]['topPlayerId'];
-            $pd = $pid ? ($playerData[$pid] ?? null) : null;
-            $mu[$side]['topPerformer'] = ($pd && $mu[$side]['topScore'])
-                ? ['name' => $pd['name'] ?? 'Unknown', 'score' => $mu[$side]['topScore'], 'pd' => $pd]
-                : null;
-            unset($mu[$side]['topPlayerId'], $mu[$side]['topScore']);
-        }
-
-        $winner = $mu['a']['score'] >= $mu['b']['score'] ? $mu['a'] : $mu['b'];
-        $loser  = $mu['a']['score'] >= $mu['b']['score'] ? $mu['b'] : $mu['a'];
-        $mu['category'] = $mu['margin'] < 3 ? 'Nail-Biter' : ($mu['margin'] > 40 ? 'Blowout' : 'Result');
-        $mu['blurbParts'] = rotc_recap_blurb_parts($winner, $loser, $mu['margin']);
-    }
-    unset($mu);
-
-    // Hero = closest margin (most dramatic result of the week).
-    usort($built, function ($x, $y) { return $x['margin'] <=> $y['margin']; });
-    $hero = array_shift($built);
-
-    return [
-        'year'       => $year,
-        'week'       => $week,
-        'isPlayoffs' => $hero['isPlayoffs'],
-        'hero'       => $hero,
-        'hub'        => $built,
-    ];
-}
-
-/**
- * ---------------------------------------------------------------------
- * Full "article" recap -- the deeper version of rotc_weekly_recap()
- * above, matching MFL's long-form Fantasy Recaps page in structure
- * (myfantasyleague.com/options?O=177&W=N) but built only from data the
- * API actually exposes. What MFL's real article has that this can't
- * reproduce: individual raw NFL stat lines ("281 passing yards and 1
- * TD"), invented quotes attributed to real people by name, and a
- * point-spread prediction for next week. Confirmed those either
- * require raw box-score data blocked by MFL's ToS, or a projection
- * model this project doesn't have yet.
- *
- * What this DOES add over the homepage hub: a full box score for both
- * sides (every starter's fantasy points, not just the leader), a
- * "left points on the bench" callout computed from the real optimal-
- * lineup data MFL's weeklyResults already includes, a positional
- * week-rank for each side's top performer (computed by ranking every
- * NFL player at that position against the real league-wide
- * TYPE=playerScores pool for that week -- no restricted data, just
- * fantasy points), and the next week's opponent (TYPE=schedule).
- * In place of a fabricated attributed quote, each matchup gets one
- * unattributed "locker room" flavor line picked from a small fixed
- * pool, seeded by franchise+week so it's stable on reload rather than
- * random -- deliberately NOT presented as a real quote from a real
- * named person.
- */
-
-const ROTC_RECAP_FLAVOR_LINES = [
-    "The locker room was buzzing after this one.",
-    "A statement performance from start to finish.",
-    "Every point counted down to the final whistle.",
-    "This one will be talked about all week.",
-    "A tough script to flip for the other side.",
-    "The kind of week that swings a whole season.",
-];
-
-/** Deterministic pick so the same matchup+week always shows the same line (no flicker on reload), without pretending it's a real quote. */
-function rotc_recap_flavor_line(string $franchiseId, int $week): string {
-    $i = crc32($franchiseId . '-' . $week) % count(ROTC_RECAP_FLAVOR_LINES);
-    return ROTC_RECAP_FLAVOR_LINES[$i];
 }
 
 /**
@@ -230,15 +102,71 @@ function rotc_positional_week_rank(string $playerId, string $position, array $we
 }
 
 /**
+ * One flowing sentence covering the result + a side's top performer
+ * (+ that side's bench-miss callout, if any), meant to be used as one
+ * half of a two-paragraph article body (winner paragraph / loser
+ * paragraph). $resultLead is prepended only when non-empty (used for
+ * the winner's paragraph, which opens with the final score).
+ */
+function rotc_recap_side_paragraph(array $side, string $resultLead, int $week): string {
+    $out = $resultLead;
+    $tp = $side['topPerformer'];
+    if ($tp) {
+        $rankTxt = '';
+        if ($tp['positionRank']) {
+            $rankTxt = ' &mdash; the ' . rotc_ordinal($tp['positionRank']['rank']) . '-best ' . htmlspecialchars($tp['pd']['position'] ?? '') . ' performance in the league this week';
+        }
+        $out .= ($out !== '' ? ' ' : '') . htmlspecialchars($side['name'] . ' got a big lift from ')
+            . rotc_player_hover_span($tp['name'], $tp['pd'], ['Week ' . $week . ' Score' => number_format($tp['score'], 1) . ' pts'])
+            . ', who put up ' . htmlspecialchars(number_format($tp['score'], 1)) . ' fantasy points' . $rankTxt . '.';
+    }
+    if ($side['benchMiss'] && $side['optPts'] && ($side['optPts'] - $side['score']) >= 3) {
+        $out .= ' ' . htmlspecialchars($side['name'] . ' left points on the table, too -- ')
+            . rotc_player_hover_span($side['benchMiss']['name'], $side['benchMiss']['pd'], ['Left on Bench' => number_format($side['benchMiss']['score'], 1) . ' pts'])
+            . htmlspecialchars(' sat on the bench for ' . number_format($side['benchMiss']['score'], 1) . ' unused points, with a best-possible lineup worth ' . number_format($side['optPts'], 2) . '.');
+    }
+    return $out;
+}
+
+/**
+ * Builds the full article body as three paragraphs: winner's
+ * storyline, loser's storyline, and a closing look-ahead. Shared by
+ * both the front-page interactive hub and the standalone recap
+ * article page so the two always say the same thing.
+ * @return array ['p1'=>html, 'p2'=>html, 'p3'=>?html]
+ */
+function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $week): array {
+    $resultLead = $game['margin'] < 3
+        ? htmlspecialchars($winner['name'] . ' edged out ' . $loser['name'] . ' by just ' . $game['margin'] . ' points.')
+        : ($game['margin'] > 40
+            ? htmlspecialchars($winner['name'] . ' blew past ' . $loser['name'] . ' by ' . $game['margin'] . ' points.')
+            : htmlspecialchars($winner['name'] . ' beat ' . $loser['name'] . ' ' . number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2) . '.'));
+
+    $p1 = rotc_recap_side_paragraph($winner, $resultLead, $week);
+    $p2 = rotc_recap_side_paragraph($loser, htmlspecialchars($loser['name'] . ' couldn\u{2019}t quite complete the comeback.'), $week);
+
+    $p3parts = [];
+    if ($game['flavor'] !== '') $p3parts[] = htmlspecialchars($game['flavor']);
+    $lookahead = [];
+    if ($winner['nextOpponent']) $lookahead[] = htmlspecialchars('Up next, ' . $winner['name'] . ' face the (' . $winner['nextOpponent']['record'] . ') ' . $winner['nextOpponent']['name'] . '.');
+    if ($loser['nextOpponent']) $lookahead[] = htmlspecialchars($loser['name'] . ' look to bounce back against the (' . $loser['nextOpponent']['record'] . ') ' . $loser['nextOpponent']['name'] . '.');
+    $p3parts = array_merge($p3parts, $lookahead);
+    $p3 = $p3parts ? implode(' ', $p3parts) : null;
+
+    return ['p1' => $p1, 'p2' => $p2, 'p3' => $p3];
+}
+
+/**
  * @return array|null null if no data. Otherwise: ['year'=>,'week'=>,
  *   'games'=>[game, ...]] ordered Game-of-the-Week first, where each
  *   game is: ['a'=>fullSide,'b'=>fullSide,'margin'=>float,
- *   'isGameOfWeek'=>bool,'isPlayoffs'=>bool], and each fullSide is a
- *   basic side (see rotc_weekly_recap()) plus: 'record'=>string,
- *   'optPts'=>float|null, 'benchMiss'=>['name','pd','score']|null,
+ *   'category'=>string,'flavor'=>string,'isGameOfWeek'=>bool,
+ *   'isPlayoffs'=>bool], and each fullSide is: ['id','name','abbrev',
+ *   'icon','helmet','helmetFlip','score','optPts','result','record',
  *   'boxScore'=>[['name','pd','position','score'], ...],
- *   'topPerformer'=>[...,'positionRank'=>['rank','total']|null],
- *   'nextOpponent'=>['name','abbrev','record']|null, 'flavor'=>string.
+ *   'topPerformer'=>['name','pd','score','positionRank'=>['rank','total']|null]|null,
+ *   'benchMiss'=>['name','pd','score']|null,
+ *   'nextOpponent'=>['name','abbrev','record']|null].
  */
 function rotc_weekly_recap_article(int $year, int $week): ?array {
     $franchises = mfl_franchises();
@@ -260,7 +188,7 @@ function rotc_weekly_recap_article(int $year, int $week): ?array {
     }
 
     // Next-week opponents, from the league's own fantasy schedule (not
-    // nflSchedule). Skipped for the season's final week.
+    // nflSchedule). Empty for the season's final week.
     $nextOpponents = [];
     $nextRaw = mfl_cached_get_year('schedule', $year, 86400, ['W' => $week + 1]);
     foreach (mfl_normalize_list($nextRaw['schedule']['weeklySchedule']['matchup'] ?? null) as $m) {
@@ -388,13 +316,18 @@ function rotc_weekly_recap_article(int $year, int $week): ?array {
                 'score' => $raw['score'], 'optPts' => $raw['optPts'], 'result' => $raw['result'],
                 'record' => $records[$fid] ?? '',
                 'boxScore' => $boxScore, 'topPerformer' => $topPerformer, 'benchMiss' => $benchMiss,
-                'nextOpponent' => $nextOpponent, 'flavor' => rotc_recap_flavor_line($fid, $week),
+                'nextOpponent' => $nextOpponent,
             ];
         }
 
+        $margin = round(abs($fullSides['a']['score'] - $fullSides['b']['score']), 2);
+        $category = $margin < 3 ? 'nailbiter' : ($margin > 40 ? 'blowout' : 'general');
+        $flavorCategory = ($fullSides['a']['benchMiss'] || $fullSides['b']['benchMiss']) && $category === 'general' ? 'benchMiss' : $category;
+
         $games[] = [
-            'a' => $fullSides['a'], 'b' => $fullSides['b'],
-            'margin' => round(abs($fullSides['a']['score'] - $fullSides['b']['score']), 2),
+            'a' => $fullSides['a'], 'b' => $fullSides['b'], 'margin' => $margin,
+            'category' => $category === 'nailbiter' ? 'Nail-Biter' : ($category === 'blowout' ? 'Blowout' : 'Result'),
+            'flavor' => rotc_recap_flavor_line($fullSides['a']['id'] . '-' . $fullSides['b']['id'] . '-' . $week, $flavorCategory),
             'isPlayoffs' => $rs['isPlayoffs'],
         ];
     }

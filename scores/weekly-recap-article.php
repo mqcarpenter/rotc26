@@ -5,11 +5,10 @@
  * long-form article per matchup, matching the structure of MFL's own
  * Fantasy Recaps page (myfantasyleague.com/options?O=177&W=N) as
  * closely as the API allows. See includes/weekly-recap.php's doc
- * comment on rotc_weekly_recap_article() for exactly what could and
- * couldn't be reproduced and why (short version: individual raw NFL
- * stat lines and real attributed quotes aren't available through the
- * API; full box scores, bench-mismanagement callouts, positional
- * week-rank, and next-week opponents are, and this uses all of them).
+ * comment for exactly what could and couldn't be reproduced and why,
+ * and for rotc_recap_paragraphs() -- the shared paragraph builder this
+ * page and the front-page interactive hub both use, so the two always
+ * tell the same story.
  *
  * PLACEHOLDER DATA: 2026 has no completed weeks yet, so this defaults
  * to the fully-completed 2025 season (?year=2025) with a week selector
@@ -34,49 +33,9 @@ $recap = null;
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
-    require_once __DIR__ . '/../includes/helmets.php';
-    require_once __DIR__ . '/../includes/player-hover.php';
-    require_once __DIR__ . '/../includes/weekly-recap.php';
+    require_once __DIR__ . '/../includes/weekly-recap.php'; // also pulls in helmets.php + player-hover.php
 
     $recap = rotc_weekly_recap_article($year, $week);
-}
-
-/** Verb + score line, same margin bands the homepage hub uses. */
-function rotc_article_result_line(array $winner, array $loser, float $margin): string {
-    if ($margin < 3) return "{$winner['name']} edged out {$loser['name']} by just {$margin} points";
-    if ($margin > 40) return "{$winner['name']} blew past {$loser['name']} by {$margin} points";
-    return "{$winner['name']} beat {$loser['name']} " . number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2);
-}
-
-function rotc_article_performer_line(array $side, bool $isWinner): string {
-    $tp = $side['topPerformer'];
-    if (!$tp) return '';
-    $rankTxt = '';
-    if ($tp['positionRank']) {
-        $rankTxt = ' &mdash; the ' . rotc_ordinal($tp['positionRank']['rank']) . '-best ' . htmlspecialchars($tp['pd']['position'] ?? '') . ' performance in the league this week';
-    }
-    $lead = $isWinner ? "{$side['name']} were led by " : "{$side['name']} got a strong effort from ";
-    return htmlspecialchars($lead) . rotc_player_hover_span($tp['name'], $tp['pd'], ['Week ' . $GLOBALS['week'] . ' Score' => number_format($tp['score'], 1) . ' pts'])
-        . ' with ' . htmlspecialchars(number_format($tp['score'], 1)) . ' fantasy points' . $rankTxt . '.';
-}
-
-function rotc_ordinal(int $n): string {
-    if ($n % 100 >= 11 && $n % 100 <= 13) return $n . 'th';
-    switch ($n % 10) {
-        case 1: return $n . 'st';
-        case 2: return $n . 'nd';
-        case 3: return $n . 'rd';
-        default: return $n . 'th';
-    }
-}
-
-function rotc_article_bench_line(array $side): string {
-    if (!$side['benchMiss'] || !$side['optPts']) return '';
-    $gap = round($side['optPts'] - $side['score'], 2);
-    if ($gap < 3) return '';
-    return htmlspecialchars($side['name'] . ' could have scored ' . number_format($side['optPts'], 2) . ' points with their best possible lineup -- ')
-        . rotc_player_hover_span($side['benchMiss']['name'], $side['benchMiss']['pd'], ['Left on Bench' => number_format($side['benchMiss']['score'], 1) . ' pts'])
-        . ' and ' . htmlspecialchars(number_format($side['benchMiss']['score'], 1)) . ' points stayed on the bench.';
 }
 
 function rotc_article_box_score(array $side): void {
@@ -120,29 +79,20 @@ function rotc_article_box_score(array $side): void {
         <?php foreach ($recap['games'] as $game):
           $winner = $game['a']['score'] >= $game['b']['score'] ? $game['a'] : $game['b'];
           $loser  = $game['a']['score'] >= $game['b']['score'] ? $game['b'] : $game['a'];
+          $paras = rotc_recap_paragraphs($winner, $loser, $game, $week);
         ?>
-          <div class="card">
+          <div class="card" id="game-<?= htmlspecialchars($winner['id']) ?>-<?= htmlspecialchars($loser['id']) ?>">
             <?php if ($game['isGameOfWeek']): ?>
               <div class="rotc-recap-kicker">Game of the Week</div>
+            <?php else: ?>
+              <div class="rotc-recap-card-kicker"><?= htmlspecialchars($game['category']) ?></div>
             <?php endif; ?>
-            <h2 class="card-title" style="margin-top:<?= $game['isGameOfWeek'] ? '2px' : '0' ?>;"><?= htmlspecialchars($winner['name']) ?> Defeats <?= htmlspecialchars($loser['name']) ?></h2>
+            <h2 class="card-title" style="margin-top:2px;"><?= htmlspecialchars($winner['name']) ?> Defeats <?= htmlspecialchars($loser['name']) ?></h2>
             <p style="color:var(--muted);font-size:13px;margin-top:-8px;">Final: <?= htmlspecialchars(number_format($winner['score'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($loser['score'], 2)) ?> &middot; <?= htmlspecialchars($winner['name']) ?> (<?= htmlspecialchars($winner['record']) ?>) &middot; <?= htmlspecialchars($loser['name']) ?> (<?= htmlspecialchars($loser['record']) ?>)</p>
 
-            <p><?= htmlspecialchars(rotc_article_result_line($winner, $loser, $game['margin'])) ?>.</p>
-            <p><?= rotc_article_performer_line($winner, true) ?></p>
-            <p><?= rotc_article_performer_line($loser, false) ?></p>
-            <?php $winnerBench = rotc_article_bench_line($winner); if ($winnerBench): ?><p><?= $winnerBench ?></p><?php endif; ?>
-            <?php $loserBench = rotc_article_bench_line($loser); if ($loserBench): ?><p><?= $loserBench ?></p><?php endif; ?>
-
-            <?php if ($winner['nextOpponent'] || $loser['nextOpponent']): ?>
-              <p style="color:var(--muted);">
-                Up next in Week <?= htmlspecialchars($week + 1) ?>:
-                <?php if ($winner['nextOpponent']): ?><?= htmlspecialchars($winner['name']) ?> face the (<?= htmlspecialchars($winner['nextOpponent']['record']) ?>) <?= htmlspecialchars($winner['nextOpponent']['name']) ?>.<?php endif; ?>
-                <?php if ($loser['nextOpponent']): ?> <?= htmlspecialchars($loser['name']) ?> face the (<?= htmlspecialchars($loser['nextOpponent']['record']) ?>) <?= htmlspecialchars($loser['nextOpponent']['name']) ?>.<?php endif; ?>
-              </p>
-            <?php endif; ?>
-
-            <p style="font-style:italic;color:var(--muted);font-size:13px;"><?= htmlspecialchars($winner['flavor']) ?></p>
+            <p><?= $paras['p1'] ?></p>
+            <p><?= $paras['p2'] ?></p>
+            <?php if ($paras['p3']): ?><p style="color:var(--muted);"><?= $paras['p3'] ?></p><?php endif; ?>
 
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;margin-top:12px;">
               <div>

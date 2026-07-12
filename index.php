@@ -37,8 +37,7 @@ include __DIR__ . '/templates/header.php';
     <div class="card">
       <h2 class="card-title">Fantasy Recap</h2>
       <?php
-      require_once __DIR__ . '/includes/weekly-recap.php';
-      require_once __DIR__ . '/includes/player-hover.php'; // rotc_player_hover_span() for blurb mentions
+      require_once __DIR__ . '/includes/weekly-recap.php'; // also pulls in helmets.php + player-hover.php
       $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
       $recap = null;
       if (file_exists($configPath)) {
@@ -46,19 +45,18 @@ include __DIR__ . '/templates/header.php';
           require_once __DIR__ . '/includes/mfl-api.php';
           // PLACEHOLDER: 2026's Week 1 hasn't been played yet, so this
           // shows 2025's Week 17 (the last completed week of last
-          // season) purely so the hero+hub layout has real data to
-          // render. Once 2026 has a completed week, point this at
-          // (int) MFL_YEAR and that week instead -- see the TODO below.
-          $recap = rotc_weekly_recap(2025, 17);
+          // season) purely so the hub has real data to render. Once
+          // 2026 has a completed week, point this at (int) MFL_YEAR
+          // and that week instead -- see the TODO below.
+          $recap = rotc_weekly_recap_article(2025, 17);
       }
       ?>
       <?php if ($recap): ?>
         <?php include __DIR__ . '/templates/weekly-recap-hub.php'; ?>
-        <p style="margin-top:14px;"><a href="<?= $base ?>/scores/weekly-recap-article?year=<?= $recap['year'] ?>&week=<?= $recap['week'] ?>" style="font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;font-size:13px;letter-spacing:.03em;">Read the full Week <?= htmlspecialchars($recap['week']) ?> recap &rarr;</a></p>
       <?php else: ?>
         <p>No recap available yet.</p>
       <?php endif; ?>
-      <!-- TODO once 2026 Week 1 is complete: swap rotc_weekly_recap(2025, 17)
+      <!-- TODO once 2026 Week 1 is complete: swap rotc_weekly_recap_article(2025, 17)
            above for the current season/most-recently-completed week. -->
     </div>
 
