@@ -24,6 +24,7 @@ $picks = [];
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('draftResults', 3600, []);
@@ -52,13 +53,14 @@ if (!$fetchError) {
         <?php else: ?>
           <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Round</th><th>Pick</th><th>Franchise</th><th>Player</th></tr></thead>
+            <thead><tr><th>Round</th><th>Pick</th><th>Franchise</th><th></th><th>Player</th></tr></thead>
             <tbody>
               <?php foreach ($picks as $i => $p): $pd = $players[$p['player'] ?? ''] ?? null; ?>
                 <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                   <td><?= htmlspecialchars($p['round'] ?? '') ?></td>
                   <td><?= htmlspecialchars($p['pick'] ?? '') ?></td>
                   <td><?= htmlspecialchars($franchises[$p['franchise'] ?? '']['name'] ?? ($p['franchise'] ?? '')) ?></td>
+                  <td><?= rotc_team_logo_img($pd['team'] ?? null) ?></td>
                   <td><?= htmlspecialchars($pd['name'] ?? ('Player #' . ($p['player'] ?? ''))) ?></td>
                 </tr>
               <?php endforeach; ?>

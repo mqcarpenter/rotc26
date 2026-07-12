@@ -24,6 +24,7 @@ $rows = [];
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
 
     $raw = mfl_cached_get('playerScores', 1800, ['W' => $weekParam, 'COUNT' => 200]);
     $list = mfl_normalize_list($raw['playerScores']['playerScore'] ?? null);
@@ -81,19 +82,19 @@ function rotc_qs3(array $overrides): string {
 
         <div style="overflow-x:auto;">
         <table class="data-table">
-          <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>NFL Team</th><th>Pts</th></tr></thead>
+          <thead><tr><th>#</th><th></th><th>Player</th><th>Pos</th><th>NFL Team</th><th>Pts</th></tr></thead>
           <tbody>
             <?php foreach ($rows as $i => $r): ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= $i + 1 ?></td>
-                <td><?= htmlspecialchars($r['name']) ?></td>
+                <td><?= rotc_team_logo_img($r['team']) ?></td><td><?= htmlspecialchars($r['name']) ?></td>
                 <td><?= htmlspecialchars($r['position']) ?></td>
                 <td><?= htmlspecialchars($r['team']) ?></td>
                 <td><?= htmlspecialchars($r['score']) ?></td>
               </tr>
             <?php endforeach; ?>
             <?php if (!$rows): ?>
-              <tr><td colspan="5">No games played yet — check back once the season kicks off.</td></tr>
+              <tr><td colspan="6">No games played yet — check back once the season kicks off.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>

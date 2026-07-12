@@ -27,6 +27,7 @@ $results = [];
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('auctionResults', 900, []);
@@ -55,11 +56,12 @@ if (!$fetchError) {
         <?php else: ?>
           <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Franchise</th><th>Player</th><th>Winning Bid</th></tr></thead>
+            <thead><tr><th>Franchise</th><th></th><th>Player</th><th>Winning Bid</th></tr></thead>
             <tbody>
               <?php foreach ($results as $i => $r): $pd = $players[$r['player'] ?? ''] ?? null; ?>
                 <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                   <td><?= htmlspecialchars($franchises[$r['franchise'] ?? '']['name'] ?? ($r['franchise'] ?? '')) ?></td>
+                  <td><?= rotc_team_logo_img($pd['team'] ?? null) ?></td>
                   <td><?= htmlspecialchars($pd['name'] ?? ('Player #' . ($r['player'] ?? ''))) ?></td>
                   <td>$<?= htmlspecialchars($r['winningBid'] ?? '') ?></td>
                 </tr>

@@ -22,6 +22,7 @@ $rows = [];
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
 
     $raw = mfl_cached_get('aav', 3600, ['PERIOD' => 'RECENT'], false);
     $list = mfl_normalize_list($raw['aav']['player'] ?? null);
@@ -63,11 +64,12 @@ if (!$fetchError) {
 
         <div style="overflow-x:auto;">
         <table class="data-table">
-          <thead><tr><th>Rank</th><th>Player</th><th>Pos</th><th>Team</th><th>Avg Value</th><th>Min</th><th>Max</th><th>Auction %</th></tr></thead>
+          <thead><tr><th>Rank</th><th></th><th>Player</th><th>Pos</th><th>Team</th><th>Avg Value</th><th>Min</th><th>Max</th><th>Auction %</th></tr></thead>
           <tbody>
             <?php foreach ($rows as $i => $r): ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= htmlspecialchars($r['rank'] ?? '') ?></td>
+                <td><?= rotc_team_logo_img($r['team']) ?></td>
                 <td><?= htmlspecialchars($r['name']) ?></td>
                 <td><?= htmlspecialchars($r['position']) ?></td>
                 <td><?= htmlspecialchars($r['team']) ?></td>
@@ -78,7 +80,7 @@ if (!$fetchError) {
               </tr>
             <?php endforeach; ?>
             <?php if (!$rows): ?>
-              <tr><td colspan="8">No AAV data available.</td></tr>
+              <tr><td colspan="9">No AAV data available.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>

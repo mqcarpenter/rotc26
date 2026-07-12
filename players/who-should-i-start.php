@@ -24,6 +24,7 @@ $week = max(1, (int) ($_GET['week'] ?? 1));
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
 
     $franchises = mfl_franchises();
     if (!$franchiseId && $franchises) $franchiseId = array_key_first($franchises);
@@ -31,6 +32,17 @@ if (!$fetchError) {
     if ($franchiseId) {
         $raw = mfl_cached_get('whoShouldIStart', 900, ['FRANCHISE' => $franchiseId, 'W' => $week]);
         $rows = mfl_normalize_list($raw['whoShouldIStart']['playerShouldStart'] ?? $raw['whoShouldIStart']['player'] ?? null);
+
+        // Rows only carry a bare player id -- resolve name/team so the
+        // table shows an actual name + team logo instead of a raw number.
+        $wsisIds = array_column($rows, 'id');
+        $wsisPlayers = [];
+        if ($wsisIds) {
+            $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $wsisIds)], false);
+            foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
+                $wsisPlayers[$p['id']] = $p;
+            }
+        }
     }
 }
 
@@ -64,17 +76,18 @@ function rotc_qs4(array $overrides): string {
 
         <div style="overflow-x:auto;">
         <table class="data-table">
-          <thead><tr><th>Player</th><th>Recommendation</th><th>Start %</th></tr></thead>
+          <thead><tr><th></th><th>Player</th><th>Recommendation</th><th>Start %</th></tr></thead>
           <tbody>
-            <?php foreach ($rows as $i => $r): ?>
+            <?php foreach ($rows as $i => $r): $wp = $wsisPlayers[$r['id'] ?? ''] ?? null; ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                <td><?= htmlspecialchars($r['id'] ?? '') ?></td>
+                <td><?= rotc_team_logo_img($wp['team'] ?? null) ?></td>
+                <td><?= htmlspecialchars($wp['name'] ?? ('Player #' . ($r['id'] ?? ''))) ?></td>
                 <td><?= htmlspecialchars($r['status'] ?? $r['recommendation'] ?? '') ?></td>
                 <td><?= htmlspecialchars($r['percent'] ?? '') ?></td>
               </tr>
             <?php endforeach; ?>
             <?php if (!$rows): ?>
-              <tr><td colspan="3">No recommendation available yet for this week — check back once lineups are in play.</td></tr>
+              <tr><td colspan="4">No recommendation available yet for this week — check back once lineups are in play.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>

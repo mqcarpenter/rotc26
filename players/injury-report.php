@@ -34,6 +34,7 @@ $NFL_TEAMS = [
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
 
     $injuriesRaw = mfl_cached_get('injuries', 1800, [], false); // 30 min; not league-scoped, so no L param
     $injuries = mfl_normalize_list($injuriesRaw['injuries']['injury'] ?? null);
@@ -79,7 +80,8 @@ if (!$fetchError) {
         <h2 class="card-title">NFL Injury Report</h2>
         <p style="color:var(--muted);font-size:13px;">Week <?= htmlspecialchars($injuriesRaw['injuries']['week'] ?? '') ?></p>
         <?php foreach ($byTeam as $team => $rows): ?>
-          <h3 style="font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:13px;background:var(--module-head);color:var(--module-head-text);padding:6px 10px;margin:16px 0 0;border-radius:6px;">
+          <h3 style="font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;letter-spacing:.05em;font-size:13px;background:var(--module-head);color:var(--module-head-text);padding:6px 10px;margin:16px 0 0;border-radius:6px;display:flex;align-items:center;gap:8px;">
+            <?= rotc_team_logo_img($team === 'FA' ? null : $team, 18) ?>
             <?= htmlspecialchars($NFL_TEAMS[$team] ?? $team) ?>
           </h3>
           <div style="overflow-x:auto;">

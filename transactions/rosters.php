@@ -34,14 +34,19 @@
  * no server round-trip needed for ~25 rows). Click a header to sort,
  * click again to flip direction.
  *
- * Responsive: cards use minmax(min(100%,380px),1fr) so a card never
- * demands more width than the viewport has, and each table still sits
- * in an overflow-x:auto wrapper as a safety net. The real fix for
- * clipped Acquired text, though, was shortening the label itself --
- * "2025 Trade w/ Flaming Chankla Chuckers" (39 chars) was blowing the
- * whole table out to ~570px regardless of card width. Acquired now
- * uses a 2-digit year and the franchise ABBREV instead of full name
- * (e.g. "'25 Trade: KRYPTON"), which fits comfortably.
+ * Responsive, for real this time: cards use minmax(min(100%,380px),1fr)
+ * so a card never demands more width than the viewport has, Acquired
+ * text was shortened (2-digit year + franchise ABBREV, e.g. "'25
+ * Trade: KRYPTON" instead of "2025 Trade w/ Flaming Chankla Chuckers"),
+ * AND the table itself uses table-layout:fixed with percentage column
+ * widths (.rotc-roster-table in mfl26.css) so it is PHYSICALLY
+ * incapable of exceeding its card's width -- cell content wraps within
+ * its column instead. Two earlier attempts at this relied on
+ * overflow-x:auto horizontal scroll as the safety net, which was
+ * technically present but nobody could tell it was there (no visible
+ * scrollbar, no bleed-through at the card edge), so from the outside
+ * it just looked like data was missing. This fix doesn't depend on
+ * anyone discovering a scrollbar.
  *
  * First column is the player's NFL team logo (ESPN's public CDN, see
  * rotc_team_logo_img() in includes/player-hover.php).
@@ -201,7 +206,16 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
                 <p style="color:var(--muted);font-size:13px;">No players rostered.</p>
               <?php else: ?>
                 <div style="overflow-x:auto;">
-                <table class="data-table rotc-sortable" style="width:100%;">
+                <table class="data-table rotc-sortable rotc-roster-table">
+                  <colgroup>
+                    <col style="width:26px;">
+                    <col style="width:22%;">
+                    <col style="width:9%;">
+                    <col style="width:13%;">
+                    <col style="width:9%;">
+                    <col style="width:13%;">
+                    <col style="width:auto;">
+                  </colgroup>
                   <thead>
                     <tr>
                       <th></th>

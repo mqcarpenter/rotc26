@@ -33,21 +33,27 @@ const ROTC_ESPN_TEAM_MAP = [
     'NEP' => 'ne', 'NOS' => 'no', 'SFO' => 'sf', 'TBB' => 'tb', 'WAS' => 'wsh',
 ];
 
-function rotc_team_logo_url(?string $mflTeamCode): ?string {
-    if (!$mflTeamCode) return null;
+// ESPN's NFL league shield -- used as the logo for players with no
+// current NFL team (released vets still shown in the free agent pool,
+// mainly). Confirmed live this URL returns 200.
+const ROTC_NFL_SHIELD_LOGO = 'https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png';
+
+function rotc_team_logo_url(?string $mflTeamCode): string {
+    if (!$mflTeamCode) return ROTC_NFL_SHIELD_LOGO;
     $code = ROTC_ESPN_TEAM_MAP[$mflTeamCode] ?? strtolower($mflTeamCode);
     return 'https://a.espncdn.com/i/teamlogos/nfl/500/' . $code . '.png';
 }
 
 /**
- * <img> tag for a team logo, sized for a table cell. Fails silently
- * (hides itself via onerror) rather than showing a broken-image icon
- * if a code isn't mapped or ESPN's CDN hiccups.
+ * <img> tag for a team logo, sized for a table cell. Falls back to the
+ * generic NFL shield for a player with no team code (e.g. a free agent
+ * not currently on an NFL roster) rather than showing nothing. Fails
+ * silently (hides itself via onerror) if ESPN's CDN itself hiccups.
  */
 function rotc_team_logo_img(?string $mflTeamCode, int $size = 20): string {
     $url = rotc_team_logo_url($mflTeamCode);
-    if (!$url) return '';
-    return '<img src="' . htmlspecialchars($url) . '" alt="' . htmlspecialchars($mflTeamCode ?? '') . '"'
+    $alt = $mflTeamCode ?: 'FA';
+    return '<img src="' . htmlspecialchars($url) . '" alt="' . htmlspecialchars($alt) . '"'
         . ' width="' . $size . '" height="' . $size . '"'
         . ' style="display:block;object-fit:contain;" loading="lazy"'
         . ' onerror="this.style.display=\'none\'">';

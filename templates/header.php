@@ -72,15 +72,15 @@ $nav_items = [
     ['NFL Injury Report', "$base/players/injury-report"],
     ['Player News', "$mfl/news_articles?L=67102&P=*"],
   ]],
+  // Select Keepers, Keepers, and All Reports removed from this menu per
+  // Matteo's request. keepers.php still exists at draft-auction/keepers.php
+  // (not deleted, just unlinked) in case it's wanted back later.
   'Draft & Auction' => ['wide' => false, 'sub' => [
     ['Draft Results', "$base/draft-auction/draft-results"],
     ['ADP Report', "$base/draft-auction/adp-report"],
-    ['Select Keepers', "$mfl/options?L=67102&O=144"],
-    ['Keepers', "$base/draft-auction/keepers"],
     ['Auction Results', "$base/draft-auction/auction-results"],
     ['Auction Bid', "$mfl/options?L=67102&O=43"],
     ['AAV Report', "$base/draft-auction/aav-report"],
-    ['All Reports', "$mfl/all_reports?L=67102"],
   ]],
   'League' => ['wide' => true, 'sub' => [
     ['League Calendar', "$base/league/league-calendar"],
