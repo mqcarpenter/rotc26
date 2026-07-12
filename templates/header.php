@@ -213,7 +213,7 @@ $tabs = [
       </li>
       <li class="rotc-item rotc-login">
         <?php if ($is_logged_in): ?>
-          <a class="rotc-top" href="<?= $base ?>/logout.php" title="Log out<?= $rotc_ownerUsername ? ' (' . htmlspecialchars($rotc_ownerUsername) . ')' : '' ?>">Logout<?= $rotc_ownerUsername ? ' (' . htmlspecialchars($rotc_ownerUsername) . ')' : '' ?></a>
+          <a class="rotc-top" href="<?= $base ?>/logout.php" title="<?= $rotc_ownerUsername ? 'Logged in as ' . htmlspecialchars($rotc_ownerUsername) : '' ?>">Logout</a>
         <?php else: ?>
           <a class="rotc-top" href="<?= $base ?>/login.php">Login</a>
         <?php endif; ?>

@@ -194,7 +194,23 @@ function rotc_mfl_authed_request(string $command, string $type, array $params = 
     $fields = array_merge(['TYPE' => $type, 'JSON' => 1], $params);
     if ($includeLeague && defined('MFL_LEAGUE_ID')) $fields['L'] = MFL_LEAGUE_ID;
 
-    $ch = curl_init("https://api.myfantasyleague.com/{$year}/{$command}");
+    // League-scoped calls (rosters, lineup, tradeProposal, poolPicks,
+    // etc.) go DIRECTLY to this league's real host (e.g.
+    // www42.myfantasyleague.com, confirmed live via TYPE=league's own
+    // baseURL field) rather than to api.myfantasyleague.com. Bug found
+    // after a real login test: hitting api.myfantasyleague.com for a
+    // league-scoped call gets a 302 redirect to the real host, and
+    // curl's CURLOPT_COOKIE (a single header value set for the
+    // original request) is NOT reliably replayed to the redirected
+    // host -- so the redirected request arrives unauthenticated,
+    // which is exactly why rosters came back empty and the poolPicks
+    // submit failed. Going straight to the real host sidesteps the
+    // redirect (and the cookie loss) entirely. Non-league calls
+    // (myleagues) have no per-league host and correctly stay on
+    // api.myfantasyleague.com per MFL's own docs.
+    $host = ($includeLeague && defined('MFL_LEAGUE_ID')) ? rotc_mfl_league_host($year) : 'https://api.myfantasyleague.com';
+
+    $ch = curl_init("{$host}/{$year}/{$command}");
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT        => 12,
@@ -212,6 +228,20 @@ function rotc_mfl_authed_request(string $command, string $type, array $params = 
 
     $data = json_decode($body, true);
     return is_array($data) ? $data : null;
+}
+
+/**
+ * This league's real host (e.g. "https://www42.myfantasyleague.com"),
+ * read from TYPE=league's own baseURL field -- confirmed live. Uses
+ * the existing read-only APIKEY-based mfl_cached_get() (no login
+ * needed for this lookup, and it's cached for a day same as anywhere
+ * else league info is fetched), so resolving the host never itself
+ * depends on the owner being logged in.
+ */
+function rotc_mfl_league_host(int $year): string {
+    $leagueRaw = mfl_cached_get_year('league', $year, 86400);
+    $base = $leagueRaw['league']['baseURL'] ?? null;
+    return is_string($base) && $base !== '' ? rtrim($base, '/') : 'https://api.myfantasyleague.com';
 }
 
 /**

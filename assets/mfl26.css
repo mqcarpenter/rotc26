@@ -436,3 +436,12 @@ a:hover{ color:var(--accent); }
    like a normal live link. */
 a.rotc-nav-inactive{ color:#8a7a6c99 !important; font-style:italic; cursor:default; }
 a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; }
+
+/* franchise/index.php soft-landing grid of action cards. */
+.rotc-franchise-actions{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin-top:10px; }
+.rotc-franchise-action{ display:flex; flex-direction:column; gap:4px; border:1px solid var(--line); border-radius:var(--radius); padding:14px; }
+.rotc-franchise-action:hover{ background:var(--sand); }
+.rotc-franchise-action-title{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-weight:700; font-size:14px; color:var(--ink); }
+.rotc-franchise-action-desc{ font-size:12px; color:var(--muted); }
+a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-title,
+a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a7a6c99 !important; }
