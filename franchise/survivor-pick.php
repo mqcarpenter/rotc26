@@ -93,7 +93,7 @@ include __DIR__ . '/../templates/header.php';
         <?php if ($result && $result['ok']): ?>
           <p class="rotc-login-success">Pick submitted for Week <?= (int) $week ?>: <?= htmlspecialchars($_POST['pick'] ?? '') ?>.</p>
         <?php elseif ($result && !$result['ok']): ?>
-          <p class="rotc-login-error"><?= htmlspecialchars($result['error']) ?></p>
+          <p class="rotc-login-error"><?= nl2br(htmlspecialchars($result['error'])) ?></p>
         <?php endif; ?>
 
         <form method="get" class="rotc-inline-form">

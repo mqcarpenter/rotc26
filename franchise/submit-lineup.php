@@ -217,7 +217,7 @@ if ($hasConfig) {
         <?php if ($result && $result['ok']): ?>
           <p class="rotc-login-success">Lineup submitted for Week <?= (int) $week ?>.</p>
         <?php elseif ($result && !$result['ok']): ?>
-          <p class="rotc-login-error"><?= htmlspecialchars($result['error']) ?></p>
+          <p class="rotc-login-error"><?= nl2br(htmlspecialchars($result['error'])) ?></p>
         <?php endif; ?>
 
         <form method="get" class="rotc-inline-form">

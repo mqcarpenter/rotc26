@@ -97,7 +97,7 @@ include __DIR__ . '/../templates/header.php';
         <?php if ($submitResult && $submitResult['ok']): ?>
           <p class="rotc-login-success">Trade bait updated.</p>
         <?php elseif ($submitResult && !$submitResult['ok']): ?>
-          <p class="rotc-login-error"><?= htmlspecialchars($submitResult['error']) ?></p>
+          <p class="rotc-login-error"><?= nl2br(htmlspecialchars($submitResult['error'])) ?></p>
         <?php endif; ?>
         <?php if (!$myRoster): ?>
           <p>No roster found.</p>
