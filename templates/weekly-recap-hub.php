@@ -38,7 +38,8 @@
             <div class="rotc-recap-byline"><?= $game['isPlayoffs'] ? 'Playoffs' : 'Week ' . htmlspecialchars($recap['week']) ?> &middot; <?= htmlspecialchars($recap['year']) ?> Season &mdash; Final: <?= htmlspecialchars(number_format($winner['score'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($loser['score'], 2)) ?></div>
             <p class="rotc-recap-blurb"><?= $paras['p1'] ?></p>
             <p class="rotc-recap-blurb"><?= $paras['p2'] ?></p>
-            <?php if ($paras['p3']): ?><p class="rotc-recap-blurb" style="color:var(--muted);"><?= $paras['p3'] ?></p><?php endif; ?>
+            <?php if ($paras['p3']): ?><p class="rotc-recap-blurb" style="color:var(--muted);font-style:italic;"><?= $paras['p3'] ?></p><?php endif; ?>
+            <?php if ($paras['p4']): ?><p class="rotc-recap-blurb" style="color:var(--muted);"><?= $paras['p4'] ?></p><?php endif; ?>
             <a href="<?= $base ?>/scores/weekly-recap-article?year=<?= $recap['year'] ?>&week=<?= $recap['week'] ?>#game-<?= htmlspecialchars($winner['id']) ?>-<?= htmlspecialchars($loser['id']) ?>" style="font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;font-size:13px;letter-spacing:.03em;">Full box score &rarr;</a>
           </div>
         </div>

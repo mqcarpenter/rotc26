@@ -58,16 +58,46 @@ require_once __DIR__ . '/player-hover.php';
 require_once __DIR__ . '/recap-phrases.php';
 
 /**
- * Picks a flavor line from Matteo's phrase bank. Falls back to
- * 'general' if the requested category is empty, and returns '' if
- * the bank has nothing at all yet.
+ * Categories that read as generic broadcast-style color commentary --
+ * safe to weave into any matchup regardless of who's actually playing,
+ * since none of them name a real person tied to a real quote or claim
+ * to report a specific real event. Openers and closers are handled
+ * separately (they bookend the article, not mixed into the middle).
  */
-function rotc_recap_flavor_line(string $seed, string $category = 'general'): string {
-    $pool = ROTC_RECAP_PHRASES[$category] ?? [];
-    if (!$pool) $pool = ROTC_RECAP_PHRASES['general'] ?? [];
-    if (!$pool) return '';
-    $i = crc32($seed) % count($pool);
-    return $pool[$i];
+const ROTC_RECAP_COLOR_CATEGORIES = [
+    'crowdAtmosphere', 'stadiumConcessions', 'playerPuns', 'gamePlay',
+    'keyPlays', 'fanEngagement', 'genericDetails', 'additionalGameAction',
+    'environmentDetails', 'deepCutPuns', 'moreGameAction',
+    'fanStadiumEnergy', 'finalElements',
+];
+
+/**
+ * Deterministically picks $count distinct lines from the merged pool
+ * of the given phrase-bank categories, seeded so the same $seed always
+ * returns the same lines (stable on reload, not flickering on every
+ * request). Returns fewer than $count if the pool is too small/empty.
+ */
+function rotc_recap_pick_phrases(string $seed, array $categories, int $count): array {
+    $pool = [];
+    foreach ($categories as $cat) {
+        $pool = array_merge($pool, ROTC_RECAP_PHRASE_BANK[$cat] ?? []);
+    }
+    if (!$pool) return [];
+    $picked = [];
+    $tries = 0;
+    $maxTries = $count * 8;
+    while (count($picked) < min($count, count($pool)) && $tries < $maxTries) {
+        $i = crc32($seed . '#' . $tries) % count($pool);
+        $val = $pool[$i];
+        if (!in_array($val, $picked, true)) $picked[] = $val;
+        $tries++;
+    }
+    return $picked;
+}
+
+function rotc_recap_pick_phrase(string $seed, array $categories): string {
+    $picked = rotc_recap_pick_phrases($seed, $categories, 1);
+    return $picked ? $picked[0] : '';
 }
 
 function rotc_ordinal(int $n): string {
@@ -129,38 +159,53 @@ function rotc_recap_side_paragraph(array $side, string $resultLead, int $week): 
 }
 
 /**
- * Builds the full article body as three paragraphs: winner's
- * storyline, loser's storyline, and a closing look-ahead. Shared by
+ * Builds the full article body as four paragraphs -- opener + winner's
+ * storyline, loser's storyline, a color/atmosphere beat pulled from
+ * Matteo's phrase bank, and a closing look-ahead + sign-off. Shared by
  * both the front-page interactive hub and the standalone recap
  * article page so the two always say the same thing.
- * @return array ['p1'=>html, 'p2'=>html, 'p3'=>?html]
+ *
+ * The color lines (crowd noise, stadium details, generic play-by-play
+ * flourishes, etc.) are picked from Matteo's bank and woven in as
+ * connective flavor around the real facts (real score, real top
+ * performer, real bench-miss, real next opponent) -- same idea as a
+ * broadcast using hype lines between real play calls. They're never
+ * substituted for the factual sentences, only added alongside them.
+ *
+ * @return array ['p1'=>html, 'p2'=>html, 'p3'=>?html, 'p4'=>?html]
  */
 function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $week): array {
+    $seed = $winner['id'] . '-' . $loser['id'] . '-' . $week;
+
     $resultLead = $game['margin'] < 3
         ? htmlspecialchars($winner['name'] . ' edged out ' . $loser['name'] . ' by just ' . $game['margin'] . ' points.')
         : ($game['margin'] > 40
             ? htmlspecialchars($winner['name'] . ' blew past ' . $loser['name'] . ' by ' . $game['margin'] . ' points.')
             : htmlspecialchars($winner['name'] . ' beat ' . $loser['name'] . ' ' . number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2) . '.'));
 
-    $p1 = rotc_recap_side_paragraph($winner, $resultLead, $week);
+    $opener = rotc_recap_pick_phrase($seed . '-opener', ['openers']);
+    $p1 = ($opener !== '' ? htmlspecialchars($opener) . ' ' : '') . rotc_recap_side_paragraph($winner, $resultLead, $week);
+
     $p2 = rotc_recap_side_paragraph($loser, htmlspecialchars($loser['name'] . ' couldn\u{2019}t quite complete the comeback.'), $week);
 
-    $p3parts = [];
-    if ($game['flavor'] !== '') $p3parts[] = htmlspecialchars($game['flavor']);
-    $lookahead = [];
-    if ($winner['nextOpponent']) $lookahead[] = htmlspecialchars('Up next, ' . $winner['name'] . ' face the (' . $winner['nextOpponent']['record'] . ') ' . $winner['nextOpponent']['name'] . '.');
-    if ($loser['nextOpponent']) $lookahead[] = htmlspecialchars($loser['name'] . ' look to bounce back against the (' . $loser['nextOpponent']['record'] . ') ' . $loser['nextOpponent']['name'] . '.');
-    $p3parts = array_merge($p3parts, $lookahead);
-    $p3 = $p3parts ? implode(' ', $p3parts) : null;
+    $colorLines = rotc_recap_pick_phrases($seed . '-color', ROTC_RECAP_COLOR_CATEGORIES, 2);
+    $p3 = $colorLines ? implode(' ', array_map('htmlspecialchars', $colorLines)) : null;
 
-    return ['p1' => $p1, 'p2' => $p2, 'p3' => $p3];
+    $p4parts = [];
+    if ($winner['nextOpponent']) $p4parts[] = htmlspecialchars('Up next, ' . $winner['name'] . ' face the (' . $winner['nextOpponent']['record'] . ') ' . $winner['nextOpponent']['name'] . '.');
+    if ($loser['nextOpponent']) $p4parts[] = htmlspecialchars($loser['name'] . ' look to bounce back against the (' . $loser['nextOpponent']['record'] . ') ' . $loser['nextOpponent']['name'] . '.');
+    $closer = rotc_recap_pick_phrase($seed . '-closer', ['closers']);
+    if ($closer !== '') $p4parts[] = htmlspecialchars($closer);
+    $p4 = $p4parts ? implode(' ', $p4parts) : null;
+
+    return ['p1' => $p1, 'p2' => $p2, 'p3' => $p3, 'p4' => $p4];
 }
 
 /**
  * @return array|null null if no data. Otherwise: ['year'=>,'week'=>,
  *   'games'=>[game, ...]] ordered Game-of-the-Week first, where each
  *   game is: ['a'=>fullSide,'b'=>fullSide,'margin'=>float,
- *   'category'=>string,'flavor'=>string,'isGameOfWeek'=>bool,
+ *   'category'=>string,'isGameOfWeek'=>bool,
  *   'isPlayoffs'=>bool], and each fullSide is: ['id','name','abbrev',
  *   'icon','helmet','helmetFlip','score','optPts','result','record',
  *   'boxScore'=>[['name','pd','position','score'], ...],
@@ -321,13 +366,11 @@ function rotc_weekly_recap_article(int $year, int $week): ?array {
         }
 
         $margin = round(abs($fullSides['a']['score'] - $fullSides['b']['score']), 2);
-        $category = $margin < 3 ? 'nailbiter' : ($margin > 40 ? 'blowout' : 'general');
-        $flavorCategory = ($fullSides['a']['benchMiss'] || $fullSides['b']['benchMiss']) && $category === 'general' ? 'benchMiss' : $category;
+        $category = $margin < 3 ? 'Nail-Biter' : ($margin > 40 ? 'Blowout' : 'Result');
 
         $games[] = [
             'a' => $fullSides['a'], 'b' => $fullSides['b'], 'margin' => $margin,
-            'category' => $category === 'nailbiter' ? 'Nail-Biter' : ($category === 'blowout' ? 'Blowout' : 'Result'),
-            'flavor' => rotc_recap_flavor_line($fullSides['a']['id'] . '-' . $fullSides['b']['id'] . '-' . $week, $flavorCategory),
+            'category' => $category,
             'isPlayoffs' => $rs['isPlayoffs'],
         ];
     }

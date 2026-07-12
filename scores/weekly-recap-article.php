@@ -92,7 +92,8 @@ function rotc_article_box_score(array $side): void {
 
             <p><?= $paras['p1'] ?></p>
             <p><?= $paras['p2'] ?></p>
-            <?php if ($paras['p3']): ?><p style="color:var(--muted);"><?= $paras['p3'] ?></p><?php endif; ?>
+            <?php if ($paras['p3']): ?><p style="color:var(--muted);font-style:italic;"><?= $paras['p3'] ?></p><?php endif; ?>
+            <?php if ($paras['p4']): ?><p style="color:var(--muted);"><?= $paras['p4'] ?></p><?php endif; ?>
 
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;margin-top:12px;">
               <div>
