@@ -54,7 +54,14 @@ $data = [];
 $recentSeason = null;
 
 if (!$fetchError) {
-    $recentSeason = (int) $db->query("SELECT MAX(season) FROM rotchist_mfl_games")->fetchColumn();
+    // Only count a season as "current" once at least one game in it has an
+    // actual result — MFL creates next season's league shell (with a copied
+    // schedule) well before it's played, so an unplayed future season could
+    // otherwise show up here with placeholder scores and no real games.
+    $recentSeason = (int) $db->query("
+        SELECT MAX(season) FROM rotchist_mfl_games
+        WHERE franchise1_result IS NOT NULL OR franchise2_result IS NOT NULL
+    ")->fetchColumn();
     if ($recentSeason <= 0) $recentSeason = null;
 
     // ------------------------------------------------------------------
@@ -264,7 +271,6 @@ if (!$fetchError) {
       <div class="rotc-history-content">
 
         <div class="card rotc-history-panel" id="hist-single-game">
-          <p style="font-size:11px;color:#999;">[debug] recentSeason=<?php echo var_export($recentSeason, true); ?> | biggest_blowouts rows=<?php echo count($data['biggest_blowouts']); ?> | last row season=<?php echo var_export($data['biggest_blowouts'][count($data['biggest_blowouts'])-1]['season'] ?? null, true); ?></p>
           <h3>Most Points Scored</h3>
           <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['most_points'], 'No data yet.', $recentSeason); ?>
           <h3>Fewest Points Scored</h3>
