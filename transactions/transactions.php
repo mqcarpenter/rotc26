@@ -82,9 +82,15 @@ function rotc_txn_details(array $t, array $players, array $franchises): string {
     $sides = explode('|', $raw, 2);
     $added = array_filter(explode(',', $sides[0] ?? ''));
     $dropped = array_filter(explode(',', $sides[1] ?? ''));
+    $franchiseName = $franchises[$t['franchise'] ?? '']['name'] ?? ($t['franchise'] ?? 'This team');
     $parts = [];
     if ($added) $parts[] = 'Added: ' . htmlspecialchars(implode(', ', array_map($nameOf, $added)));
-    if ($dropped) $parts[] = 'Dropped: ' . htmlspecialchars(implode(', ', array_map($nameOf, $dropped)));
+    // Per Matteo's request: a drop gets themed language instead of a
+    // plain "Dropped: X" label, one line per dropped player so a
+    // multi-player drop doesn't cram everyone into one sentence.
+    foreach ($dropped as $id) {
+        $parts[] = htmlspecialchars($franchiseName) . ' gave up on ' . htmlspecialchars($nameOf($id)) . '. See ya.';
+    }
     return $parts ? implode('<br>', $parts) : htmlspecialchars($raw);
 }
 
