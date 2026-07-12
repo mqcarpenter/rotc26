@@ -54,13 +54,15 @@ $data = [];
 $recentSeason = null;
 
 if (!$fetchError) {
-    // Only count a season as "current" once at least one game in it has an
-    // actual result — MFL creates next season's league shell (with a copied
-    // schedule) well before it's played, so an unplayed future season could
-    // otherwise show up here with placeholder scores and no real games.
+    // Only count a season as "current" once at least one game in it has a
+    // real (non-zero) score on either side. MFL creates next season's league
+    // shell (with a copied schedule) well before it's played, and an
+    // unplayed 0.00-0.00 placeholder matchup can still carry a "T" result
+    // from MFL despite nothing having been played, so checking for a result
+    // alone isn't enough — no real fantasy matchup ever finishes 0-0.
     $recentSeason = (int) $db->query("
         SELECT MAX(season) FROM rotchist_mfl_games
-        WHERE franchise1_result IS NOT NULL OR franchise2_result IS NOT NULL
+        WHERE franchise1_score > 0 OR franchise2_score > 0
     ")->fetchColumn();
     if ($recentSeason <= 0) $recentSeason = null;
 
@@ -257,8 +259,6 @@ if (!$fetchError) {
         <p>League history data isn't available right now — the rotchist_ read-only database connection isn't configured yet. Add the ROTCHIST_READ_DB_* constants to config.php (see includes/rotchist-db.php).</p>
       </div>
     <?php else: ?>
-
-    <p style="font-size:11px;color:#999;">[debug] recentSeason=<?php echo var_export($recentSeason, true); ?> | season_wins rows=<?php echo count($data['season_wins']); ?> | season_wins seasons=<?php echo implode(',', array_map(fn($r) => $r['season'], $data['season_wins'])); ?></p>
 
     <div class="rotc-history-layout">
       <nav class="rotc-history-nav" aria-label="Records categories">
