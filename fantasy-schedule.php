@@ -50,17 +50,17 @@ if (!$fetchError) {
                 $away = null; $home = null;
                 foreach ($teams as $t) { if (($t['isHome'] ?? '0') === '1') $home = $t; else $away = $t; }
                 $awayId = $away['id'] ?? ''; $homeId = $home['id'] ?? '';
-                $awayHelmet = $awayId ? rotc_helmet_src($awayId, 'right') : null;
-                $homeHelmet = $homeId ? rotc_helmet_src($homeId, 'left') : null;
+                $awayHelmet = $awayId ? rotc_helmet_src($awayId, 'left') : null;
+                $homeHelmet = $homeId ? rotc_helmet_src($homeId, 'right') : null;
               ?>
                 <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                   <td>
-                    <?php if ($awayHelmet): ?><img src="<?= htmlspecialchars($awayHelmet) ?>" alt="" width="26" height="26" style="vertical-align:middle;border-radius:50%;margin-right:8px;<?= rotc_helmet_flip($awayId, 'right') ? 'transform:scaleX(-1);' : '' ?>"><?php endif; ?>
+                    <?php if ($awayHelmet): ?><img src="<?= htmlspecialchars($awayHelmet) ?>" alt="" width="26" height="26" style="vertical-align:middle;border-radius:50%;margin-right:8px;<?= rotc_helmet_flip($awayId, 'left') ? 'transform:scaleX(-1);' : '' ?>"><?php endif; ?>
                     <?= htmlspecialchars($franchises[$awayId]['name'] ?? ($awayId ?: '?')) ?>
                   </td>
                   <td style="text-align:center;color:var(--muted);">at</td>
                   <td>
-                    <?php if ($homeHelmet): ?><img src="<?= htmlspecialchars($homeHelmet) ?>" alt="" width="26" height="26" style="vertical-align:middle;border-radius:50%;margin-right:8px;<?= rotc_helmet_flip($homeId, 'left') ? 'transform:scaleX(-1);' : '' ?>"><?php endif; ?>
+                    <?php if ($homeHelmet): ?><img src="<?= htmlspecialchars($homeHelmet) ?>" alt="" width="26" height="26" style="vertical-align:middle;border-radius:50%;margin-right:8px;<?= rotc_helmet_flip($homeId, 'right') ? 'transform:scaleX(-1);' : '' ?>"><?php endif; ?>
                     <?= htmlspecialchars($franchises[$homeId]['name'] ?? ($homeId ?: '?')) ?>
                   </td>
                 </tr>
