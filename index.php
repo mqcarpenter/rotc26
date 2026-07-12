@@ -38,6 +38,7 @@ include __DIR__ . '/templates/header.php';
       <h2 class="card-title">Fantasy Recap</h2>
       <?php
       require_once __DIR__ . '/includes/weekly-recap.php';
+      require_once __DIR__ . '/includes/player-hover.php'; // rotc_player_hover_span() for blurb mentions
       $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
       $recap = null;
       if (file_exists($configPath)) {
@@ -66,6 +67,8 @@ include __DIR__ . '/templates/header.php';
       <!-- TODO: pull from WordPress REST API preview post type -->
     </div>
   </main>
+
+  <?php if ($recap) rotc_player_hover_widget(); ?>
 
   <aside class="home-sidebar">
     <?php
