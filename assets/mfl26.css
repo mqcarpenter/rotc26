@@ -140,6 +140,15 @@ a:hover{ color:var(--accent); }
    (rotc-sidefeed). Matches the reference screenshot proportions. */
 .home-grid{ display:grid; grid-template-columns:2fr 1fr; gap:20px; padding:20px; align-items:start; }
 @media (max-width:900px){ .home-grid{ grid-template-columns:1fr; } }
+/* Every built report page (rosters, free agents, standings, etc.) reuses
+   .home-grid but only ever renders the <main>, no <aside> sidebar -- the
+   2fr/1fr split was still reserving a blank 1/3 of the page for a
+   sidebar that doesn't exist there, capping every report to ~66% of the
+   available width regardless of screen size. Only the homepage
+   (index.php) actually has two children (<main> + <aside
+   class="home-sidebar">), so :only-child correctly targets every other
+   page without touching per-page markup. */
+.home-grid > .home-main:only-child{ grid-column: 1 / -1; }
 
 /* ---- 6. NAV (rotc-nav) — unchanged from MFL version -------- */
 .rotc-nav{ font-family:"Roboto",Arial,sans-serif; background:var(--ink); position:sticky; top:0; z-index:9999; }

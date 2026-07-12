@@ -39,7 +39,12 @@ const ROTC_ESPN_TEAM_MAP = [
 const ROTC_NFL_SHIELD_LOGO = 'https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png';
 
 function rotc_team_logo_url(?string $mflTeamCode): string {
-    if (!$mflTeamCode) return ROTC_NFL_SHIELD_LOGO;
+    // MFL represents "not currently on an NFL roster" as the literal
+    // string "FA" (confirmed live on free-agents.php), not a blank
+    // value -- ESPN's CDN has no team logo file for "fa" (confirmed
+    // 404), so that string was silently falling through to a broken
+    // image before this check. Both blank AND "FA" mean no team.
+    if (!$mflTeamCode || strtoupper($mflTeamCode) === 'FA') return ROTC_NFL_SHIELD_LOGO;
     $code = ROTC_ESPN_TEAM_MAP[$mflTeamCode] ?? strtolower($mflTeamCode);
     return 'https://a.espncdn.com/i/teamlogos/nfl/500/' . $code . '.png';
 }
