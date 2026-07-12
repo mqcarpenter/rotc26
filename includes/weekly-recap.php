@@ -213,6 +213,63 @@ function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $we
  *   'benchMiss'=>['name','pd','score']|null,
  *   'nextOpponent'=>['name','abbrev','record']|null].
  */
+/**
+ * Determines the most recently COMPLETED week of $year's fantasy
+ * season, so the recap can auto-advance without anyone manually
+ * swapping a hardcoded week number. Confirmed live against a real
+ * completed season (2025): TYPE=league exposes 'endWeek' (17 for this
+ * league, covering the 3-week playoff bracket after a 14-week regular
+ * season -- also confirmed via 'lastRegularSeasonWeek'), and
+ * TYPE=nflSchedule gives each week's real per-game kickoff unix
+ * timestamps.
+ *
+ * A week counts as "complete" once 4 hours have passed since its
+ * LATEST kickoff -- long enough for a Monday Night Football game
+ * (kickoff ~8:15pm ET) to have finished and scores to have settled.
+ * That lands the rollover in the early hours of Tuesday morning for a
+ * normal week without hardcoding "Tuesday" anywhere -- it's driven by
+ * the real schedule, so a week with no Monday game (e.g. a bye-heavy
+ * week, or a relocated game) still rolls over correctly whenever ITS
+ * last game actually ends.
+ *
+ * Walks forward from Week 1 rather than jumping to a guessed week,
+ * stopping at the first week that isn't complete yet (or has no
+ * schedule at all, e.g. past $endWeek or before the season is
+ * published) -- so it always returns the LATEST complete week, not
+ * just any complete week.
+ *
+ * @return array|null ['year'=>,'week'=>] or null if no week has
+ *   completed yet this season (preseason, or before Week 1 kicks off).
+ */
+function rotc_current_recap_week(int $year): ?array {
+    $leagueRaw = mfl_cached_get_year('league', $year, 86400, []);
+    $endWeek = (int) ($leagueRaw['league']['endWeek'] ?? 17);
+    if ($endWeek < 1) $endWeek = 17;
+
+    $now = time();
+    $completedWeek = null;
+    for ($w = 1; $w <= $endWeek; $w++) {
+        $raw = mfl_cached_get_year('nflSchedule', $year, 21600, ['W' => $w], false);
+        $games = mfl_normalize_list($raw['nflSchedule']['matchup'] ?? null);
+        if (!$games) break; // no published schedule for this week -- stop here.
+
+        $lastKickoff = 0;
+        foreach ($games as $g) {
+            $k = (int) ($g['kickoff'] ?? 0);
+            if ($k > $lastKickoff) $lastKickoff = $k;
+        }
+        if ($lastKickoff === 0) break;
+
+        if ($now >= $lastKickoff + (4 * 3600)) {
+            $completedWeek = $w;
+        } else {
+            break; // this week (and everything after it) isn't done yet.
+        }
+    }
+
+    return $completedWeek ? ['year' => $year, 'week' => $completedWeek] : null;
+}
+
 function rotc_weekly_recap_article(int $year, int $week): ?array {
     $franchises = mfl_franchises();
     $raw = mfl_cached_get_year('weeklyResults', $year, 86400, ['W' => $week]);

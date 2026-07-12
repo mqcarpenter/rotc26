@@ -10,10 +10,18 @@
  * page and the front-page interactive hub both use, so the two always
  * tell the same story.
  *
- * PLACEHOLDER DATA: 2026 has no completed weeks yet, so this defaults
- * to the fully-completed 2025 season (?year=2025) with a week selector
- * across all 17 weeks. Once 2026 has real completed weeks, default
- * $year to (int) MFL_YEAR instead -- see the TODO below.
+ * Auto-advancing week: with no ?year=/?week= in the URL, this shows
+ * the most recently COMPLETED week of the CURRENT season
+ * (rotc_current_recap_week() in includes/weekly-recap.php, driven by
+ * real NFL kickoff timestamps -- rolls over a few hours after each
+ * week's last game ends). Explicit ?year=&week= always wins, so the
+ * week-selector links below can still browse any past week without
+ * fighting the auto-detection.
+ *
+ * PLACEHOLDER: until the current season has a completed week
+ * (preseason, or before Week 1 kicks off), this falls back to the
+ * fully-completed 2025 season's Week 17 so the page has real data to
+ * render instead of sitting empty.
  */
 
 $page_title = 'Weekly Recap — Return of the Champions XXVI';
@@ -24,16 +32,25 @@ include __DIR__ . '/../templates/header.php';
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
 
-// TODO once 2026 Week 1 is complete: default $year to (int) MFL_YEAR
-// (after config is loaded) instead of hardcoding 2025.
-$year = max(2020, (int) ($_GET['year'] ?? 2025));
-$week = max(1, min(17, (int) ($_GET['week'] ?? 17)));
+$explicitYear = isset($_GET['year']) ? (int) $_GET['year'] : null;
+$explicitWeek = isset($_GET['week']) ? (int) $_GET['week'] : null;
+$year = $explicitYear ?? 2025;
+$week = $explicitWeek ?? 17;
 $recap = null;
 
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/weekly-recap.php'; // also pulls in helmets.php + player-hover.php
+
+    if ($explicitYear === null && $explicitWeek === null) {
+        $current = rotc_current_recap_week((int) MFL_YEAR);
+        if ($current) { $year = $current['year']; $week = $current['week']; }
+        // else: nothing completed yet this season -- $year/$week stay
+        // on the 2025 Week 17 placeholder set above.
+    }
+    $year = max(2020, $year);
+    $week = max(1, min(17, $week));
 
     $recap = rotc_weekly_recap_article($year, $week);
 }

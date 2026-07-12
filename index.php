@@ -43,12 +43,23 @@ include __DIR__ . '/templates/header.php';
       if (file_exists($configPath)) {
           require_once $configPath;
           require_once __DIR__ . '/includes/mfl-api.php';
-          // PLACEHOLDER: 2026's Week 1 hasn't been played yet, so this
-          // shows 2025's Week 17 (the last completed week of last
-          // season) purely so the hub has real data to render. Once
-          // 2026 has a completed week, point this at (int) MFL_YEAR
-          // and that week instead -- see the TODO below.
-          $recap = rotc_weekly_recap_article(2025, 17);
+          // Auto-advances every week: rotc_current_recap_week() finds
+          // the most recently COMPLETED week from real NFL kickoff
+          // timestamps, rolling over ~4 hours after that week's last
+          // game ends (Monday Night Football finishing around
+          // midnight ET means this naturally lands early Tuesday
+          // morning without hardcoding a day of the week anywhere).
+          $current = rotc_current_recap_week((int) MFL_YEAR);
+          if ($current) {
+              $recap = rotc_weekly_recap_article($current['year'], $current['week']);
+          } else {
+              // PLACEHOLDER: no week of the current season has
+              // completed yet (preseason, or before Week 1 kicks off)
+              // -- show 2025's Week 17 (last season's finale) so the
+              // hub still has real data to render instead of sitting
+              // empty all summer.
+              $recap = rotc_weekly_recap_article(2025, 17);
+          }
       }
       ?>
       <?php if ($recap): ?>
@@ -56,8 +67,6 @@ include __DIR__ . '/templates/header.php';
       <?php else: ?>
         <p>No recap available yet.</p>
       <?php endif; ?>
-      <!-- TODO once 2026 Week 1 is complete: swap rotc_weekly_recap_article(2025, 17)
-           above for the current season/most-recently-completed week. -->
     </div>
 
     <div class="card">
