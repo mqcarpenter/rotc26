@@ -29,13 +29,13 @@ $mfl = 'https://www42.myfantasyleague.com/2026';
 $nav_items = [
   'Scores' => ['wide' => true, 'sub' => [
     ['Live Scoring', "$mfl/ajax_ls?L=67102"],
-    ['Standings', "$mfl/standings?L=67102"],
-    ['Weekly Results', "$mfl/options?L=67102&O=22"],
-    ['Weekly Summary', "$mfl/options?L=67102&O=31"],
-    ['Power Rank', "$mfl/options?L=67102&O=101"],
-    ['Starting Lineups', "$mfl/options?L=67102&O=06"],
-    ['Fantasy Schedule', "$mfl/options?L=67102&O=15"],
-    ['Playoff Brackets', "$mfl/options?L=67102&O=79"],
+    ['Standings', "$base/standings"],
+    ['Weekly Results', "$base/weekly-results"],
+    ['Weekly Summary', "$base/weekly-summary"],
+    ['Power Rank', "$base/power-rank"],
+    ['Starting Lineups', "$base/starting-lineups"],
+    ['Fantasy Schedule', "$base/fantasy-schedule"],
+    ['Playoff Brackets', "$base/playoff-brackets"],
     ['NFL Schedule', "$mfl/pro_schedule?L=67102"],
     ['Fantasy Previews', "$mfl/options?L=67102&O=207"],
     ['Fantasy Recaps', "$mfl/options?L=67102&O=177"],
@@ -43,9 +43,9 @@ $nav_items = [
   'Transactions' => ['wide' => false, 'sub' => [
     ['Add/Drops', "$mfl/add_drop?L=67102"],
     ['Submit Lineup', "$mfl/options?L=67102&O=02"],
-    ['Rosters', "$mfl/options?L=67102&O=07"],
-    ['Transactions', "$mfl/options?L=67102&O=03"],
-    ['Trades', "$mfl/options?L=67102&O=05"],
+    ['Rosters', "$base/rosters"],
+    ['Transactions', "$base/transactions"],
+    ['Trades', "$base/trades"],
     ['Taxi Squad', "$mfl/options?L=67102&O=98"],
   ]],
   'Players' => ['wide' => true, 'sub' => [
