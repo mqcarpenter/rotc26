@@ -137,6 +137,12 @@ $nav_items = [
     ["Pick 'Em Results", "$base/scores/standings#fantasy-pool"],
     ['Survivor Results', "$base/scores/standings#survivor-pool"],
   ]],
+  // New top-level section: league history / all-time records, sourced
+  // from the rotchist_ database (see includes/rotchist-db.php) rather
+  // than the live MFL API -- separate data source, separate nav item.
+  'History' => ['wide' => false, 'sub' => [
+    ['Records Hub', "$base/history/"],
+  ]],
 ];
 // "Email to Entire League" was a Social submenu item -- Social was removed
 // per Matteo's request (moving league comms to the WhatsApp group instead,
