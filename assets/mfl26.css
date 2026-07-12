@@ -171,8 +171,9 @@ a:hover{ color:var(--accent); }
 }
 
 /* ---- 7. TAB BAR (was .myfantasyleague_tabmenu) --------------
-   Your own tabs now, not MFL's — same underline/pill look,
-   plain markup instead of fighting MFL's #homepagetabs. */
+   Your own tabs now, not MFL's — ghost style: pill-shaped outline,
+   no solid fill. Active tab gets a ring instead of the old filled-
+   pill look; plain markup instead of fighting MFL's #homepagetabs. */
 .tab-bar{ background:var(--paper); border-bottom:1px solid var(--line); padding:10px 20px; }
 .tab-bar ul{ display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; list-style:none; }
 .tab-bar a{
@@ -185,10 +186,11 @@ a:hover{ color:var(--accent); }
   font-size:12px;
   padding:9px 18px;
   border-radius:999px;
-  transition:background .15s ease, color .15s ease;
+  border:1px solid transparent;
+  transition:background .15s ease, color .15s ease, border-color .15s ease;
 }
 .tab-bar li:hover a{ background:var(--sand); color:var(--ink); }
-.tab-bar li.current a{ background:var(--ink); color:var(--on-ink); }
+.tab-bar li.current a{ background:transparent; color:var(--ink); border-color:var(--ink); }
 
 /* ---- 8. MATCHUP TICKER (rotc-ticker) ------------------------
    Superseded — Matteo shared the real rotc-header.html source and the
