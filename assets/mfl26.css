@@ -479,6 +479,12 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
 .rotc-history-panel{ }
 .rotc-history-panel h3{ margin-top:22px; }
 .rotc-history-panel h3:first-child{ margin-top:0; }
+.rotc-history-row-latest{
+  background: linear-gradient(90deg, rgba(224,83,27,0.10), rgba(224,83,27,0.03));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.rotc-history-row-latest td{ font-weight:600; }
+.rotc-history-crown{ margin-right:2px; }
 @media (max-width:800px){
   .rotc-history-layout{ flex-direction:column; }
   .rotc-history-nav{ position:static; flex-direction:row; flex-wrap:wrap; }
