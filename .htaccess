@@ -11,3 +11,18 @@
     Deny from all
   </IfModule>
 </FilesMatch>
+
+# templates/ and includes/ are PHP fragments meant to be include()'d by
+# index.php etc — they reference variables the caller sets up first, so
+# hitting them directly throws PHP notices instead of a real page. Block
+# direct requests; index.php and friends still include() them fine since
+# that's a filesystem read, not an HTTP request.
+RewriteEngine On
+RewriteRule ^(templates|includes)/ - [F,L]
+
+# Clean URLs for the tab bar: /standings -> standings.php, etc. Only
+# kicks in when no real file/directory matches the request, so
+# /assets/mfl26.css and /api/matchup-ticker.php are untouched.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-z0-9-]+)/?$ $1.php [L,QSA]

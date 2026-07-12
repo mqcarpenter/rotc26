@@ -34,61 +34,8 @@ if (!file_exists($configPath)) {
     exit;
 }
 require_once $configPath;
+require_once __DIR__ . '/../includes/mfl-api.php';
 header('Content-Type: application/json');
-
-// Simple file cache so gameday traffic doesn't re-fetch MFL on every
-// pageview. Franchise names barely change (cache a day); matchup/score
-// data should feel live-ish but doesn't need sub-minute freshness for a
-// ticker (cache a minute).
-function mfl_cached_get(string $type, int $ttlSeconds, array $params = []): ?array {
-    $cacheDir = sys_get_temp_dir() . '/rotc-mfl-cache';
-    if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700, true);
-    $cacheFile = $cacheDir . '/' . $type . '-' . MFL_LEAGUE_ID . '-' . MFL_YEAR . '.json';
-
-    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $ttlSeconds) {
-        $cached = json_decode(file_get_contents($cacheFile), true);
-        if (is_array($cached)) return $cached;
-    }
-
-    $data = mfl_fetch($type, $params);
-    if ($data !== null) {
-        @file_put_contents($cacheFile, json_encode($data));
-    } elseif (file_exists($cacheFile)) {
-        // MFL call failed but we have a stale copy — serve it rather than nothing.
-        $stale = json_decode(file_get_contents($cacheFile), true);
-        if (is_array($stale)) return $stale;
-    }
-    return $data;
-}
-
-function mfl_fetch(string $type, array $params = []): ?array {
-    $query = http_build_query(array_merge([
-        'TYPE'   => $type,
-        'L'      => MFL_LEAGUE_ID,
-        'JSON'   => 1,
-        'APIKEY' => MFL_API_KEY,
-    ], $params));
-    // Always hit the generic api host and follow MFL's redirect to the
-    // league's actual host — see the config.php note on why we don't
-    // hardcode a wwwXX server.
-    $url = 'https://api.myfantasyleague.com/' . MFL_YEAR . '/export?' . $query;
-
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 8,
-        CURLOPT_USERAGENT      => MFL_USER_AGENT,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS      => 3,
-    ]);
-    $body = curl_exec($ch);
-    $ok = $body !== false && curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200;
-    curl_close($ch);
-    if (!$ok) return null;
-
-    $data = json_decode($body, true);
-    return is_array($data) ? $data : null;
-}
 
 try {
     $league = mfl_cached_get('league', 86400);

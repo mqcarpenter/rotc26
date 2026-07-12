@@ -115,7 +115,6 @@ $tabs = [
   'auction'       => 'Auction',
   'gameday'       => 'Gameday',
   'standings'     => 'Standings',
-  'hardcore-stats'=> 'Hardcore Stats',
   'season-deets'  => 'Season Deets',
 ];
 ?>
