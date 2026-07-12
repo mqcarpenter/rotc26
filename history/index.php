@@ -240,66 +240,85 @@ if (!$fetchError) {
       </div>
     <?php else: ?>
 
-    <div class="card">
-      <h2 class="card-title">League History</h2>
-      <p>All-time records, computed live from the full game-by-game log pulled directly from MFL (2004&ndash;2025). Re-run <code>rotchist_mfl_ingest.php</code> after new games are played and everything below updates automatically.</p>
+    <div class="rotc-history-layout">
+      <nav class="rotc-history-nav" aria-label="Records categories">
+        <button type="button" class="active" data-target="hist-single-game">Single Game</button>
+        <button type="button" data-target="hist-single-season">Single Season</button>
+        <button type="button" data-target="hist-career">Career</button>
+        <button type="button" data-target="hist-postseason">Postseason</button>
+        <button type="button" data-target="hist-milestones">Milestones</button>
+        <button type="button" data-target="hist-players">Player Records</button>
+      </nav>
+
+      <div class="rotc-history-content">
+
+        <div class="card rotc-history-panel" id="hist-single-game">
+          <h3>Most Points Scored</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['most_points']); ?>
+          <h3>Fewest Points Scored</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['fewest_points']); ?>
+          <h3>Most Points Scored in a Loss</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['most_in_loss']); ?>
+          <h3>Fewest Points Scored in a Win</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['fewest_in_win']); ?>
+          <h3>Most Combined Points</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team1' => 'Team', 'team2' => 'Team', 'combined' => 'Combined'], $data['most_combined']); ?>
+          <h3>Biggest Blowouts</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team1' => 'Team', 'score1' => 'Score', 'team2' => 'Team', 'score2' => 'Score', 'margin' => 'Margin'], $data['biggest_blowouts']); ?>
+          <h3>Closest Games</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team1' => 'Team', 'score1' => 'Score', 'team2' => 'Team', 'score2' => 'Score', 'margin' => 'Margin'], $data['closest_games']); ?>
+        </div>
+
+        <div class="card rotc-history-panel" id="hist-single-season" hidden>
+          <h3>Most Wins in a Season</h3>
+          <?php rotchist_table(['season' => 'Season', 'team_name' => 'Team', 'wins' => 'Wins', 'points' => 'Points'], $data['season_wins']); ?>
+          <h3>Most Points in a Season</h3>
+          <?php rotchist_table(['season' => 'Season', 'team_name' => 'Team', 'points' => 'Points'], $data['season_points']); ?>
+        </div>
+
+        <div class="card rotc-history-panel" id="hist-career" hidden>
+          <p style="margin-top:0;color:var(--muted);font-size:13px;">Covers 2004&ndash;present — MFL has no record of this league's 2003 season.</p>
+          <h3>Wins</h3>
+          <?php rotchist_table(['team_name' => 'Team', 'wins' => 'Wins', 'losses' => 'Losses', 'points' => 'Points'], $data['career_wins']); ?>
+          <h3>Points Scored</h3>
+          <?php rotchist_table(['team_name' => 'Team', 'points' => 'Points'], $data['career_points']); ?>
+        </div>
+
+        <div class="card rotc-history-panel" id="hist-postseason" hidden>
+          <h3>Playoff Wins</h3>
+          <?php rotchist_table(['team_name' => 'Team', 'wins' => 'Wins', 'losses' => 'Losses'], $data['playoff_wins']); ?>
+          <h3>Top Playoff Game Scores</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['playoff_top_games']); ?>
+        </div>
+
+        <div class="card rotc-history-panel" id="hist-milestones" hidden>
+          <h3>200+ Point Games</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['double_century'], 'No 200-point games yet.'); ?>
+        </div>
+
+        <div class="card rotc-history-panel" id="hist-players" hidden>
+          <h3>Top Individual Scores — Starters</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'player_name' => 'Player', 'position' => 'Pos', 'nfl_team' => 'NFL', 'fantasy_team' => 'Fantasy Team', 'score' => 'Score'], $data['top_player_games']); ?>
+          <h3>Top Individual Scores — Bench</h3>
+          <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'player_name' => 'Player', 'position' => 'Pos', 'nfl_team' => 'NFL', 'fantasy_team' => 'Fantasy Team', 'score' => 'Score'], $data['top_player_games_bench']); ?>
+        </div>
+
+      </div>
     </div>
 
-    <div class="card">
-      <h2 class="card-title">Single Game Records</h2>
-      <h3>Most Points Scored</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['most_points']); ?>
-      <h3>Fewest Points Scored</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['fewest_points']); ?>
-      <h3>Most Points Scored in a Loss</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['most_in_loss']); ?>
-      <h3>Fewest Points Scored in a Win</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['fewest_in_win']); ?>
-      <h3>Most Combined Points</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team1' => 'Team', 'team2' => 'Team', 'combined' => 'Combined'], $data['most_combined']); ?>
-      <h3>Biggest Blowouts</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team1' => 'Team', 'score1' => 'Score', 'team2' => 'Team', 'score2' => 'Score', 'margin' => 'Margin'], $data['biggest_blowouts']); ?>
-      <h3>Closest Games</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team1' => 'Team', 'score1' => 'Score', 'team2' => 'Team', 'score2' => 'Score', 'margin' => 'Margin'], $data['closest_games']); ?>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">Single Season Records</h2>
-      <h3>Most Wins in a Season</h3>
-      <?php rotchist_table(['season' => 'Season', 'team_name' => 'Team', 'wins' => 'Wins', 'points' => 'Points'], $data['season_wins']); ?>
-      <h3>Most Points in a Season</h3>
-      <?php rotchist_table(['season' => 'Season', 'team_name' => 'Team', 'points' => 'Points'], $data['season_points']); ?>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">Career Records <span style="font-weight:normal;font-size:12px;">(2004&ndash;present)</span></h2>
-      <h3>Wins</h3>
-      <?php rotchist_table(['team_name' => 'Team', 'wins' => 'Wins', 'losses' => 'Losses', 'points' => 'Points'], $data['career_wins']); ?>
-      <h3>Points Scored</h3>
-      <?php rotchist_table(['team_name' => 'Team', 'points' => 'Points'], $data['career_points']); ?>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">Postseason Records</h2>
-      <h3>Playoff Wins</h3>
-      <?php rotchist_table(['team_name' => 'Team', 'wins' => 'Wins', 'losses' => 'Losses'], $data['playoff_wins']); ?>
-      <h3>Top Playoff Game Scores</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['playoff_top_games']); ?>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">Milestones</h2>
-      <h3>200+ Point Games</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['double_century'], 'No 200-point games yet.'); ?>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">Player Records</h2>
-      <h3>Top Individual Scores — Starters</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'player_name' => 'Player', 'position' => 'Pos', 'nfl_team' => 'NFL', 'fantasy_team' => 'Fantasy Team', 'score' => 'Score'], $data['top_player_games']); ?>
-      <h3>Top Individual Scores — Bench</h3>
-      <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'player_name' => 'Player', 'position' => 'Pos', 'nfl_team' => 'NFL', 'fantasy_team' => 'Fantasy Team', 'score' => 'Score'], $data['top_player_games_bench']); ?>
-    </div>
+    <script>
+    (function () {
+      var buttons = document.querySelectorAll('.rotc-history-nav button');
+      buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          buttons.forEach(function (b) { b.classList.remove('active'); });
+          document.querySelectorAll('.rotc-history-panel').forEach(function (p) { p.hidden = true; });
+          btn.classList.add('active');
+          document.getElementById(btn.dataset.target).hidden = false;
+        });
+      });
+    })();
+    </script>
 
     <?php endif; ?>
   </main>

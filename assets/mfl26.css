@@ -459,3 +459,28 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
 .rotc-pill-add{ background:#e8f5e9; color:#1b5e20; }
 .rotc-pill-swap{ background:#fff3e0; color:#8a5a00; }
 .rotc-pill-trade{ background:#e3f2fd; color:#0d47a1; }
+
+/* League History records hub (history/index.php) -- sidebar + panel
+   layout instead of one long stack of cards. Sidebar lists every
+   category up front (nothing hidden below the fold) and uses the
+   horizontal space a single stretched column was wasting; JS toggles
+   which panel is visible, no page reload. */
+.rotc-history-layout{ display:flex; gap:20px; align-items:flex-start; }
+.rotc-history-nav{ flex:0 0 210px; position:sticky; top:16px; display:flex; flex-direction:column; gap:4px; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:10px; }
+.rotc-history-nav button{
+  display:block; width:100%; text-align:left; background:transparent; border:none;
+  font-family:"Roboto Condensed", sans-serif; font-weight:700; text-transform:uppercase;
+  letter-spacing:.04em; font-size:12.5px; color:var(--ink-2); padding:10px 12px;
+  border-radius:8px; cursor:pointer; transition:background .15s ease, color .15s ease;
+}
+.rotc-history-nav button:hover{ background:var(--sand); color:var(--ink); }
+.rotc-history-nav button.active{ background:var(--ink); color:var(--on-ink); }
+.rotc-history-content{ flex:1; min-width:0; }
+.rotc-history-panel{ }
+.rotc-history-panel h3{ margin-top:22px; }
+.rotc-history-panel h3:first-child{ margin-top:0; }
+@media (max-width:800px){
+  .rotc-history-layout{ flex-direction:column; }
+  .rotc-history-nav{ position:static; flex-direction:row; flex-wrap:wrap; }
+  .rotc-history-nav button{ width:auto; }
+}
