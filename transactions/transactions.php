@@ -4,11 +4,14 @@
  * Matches Reports -> Transactions Report. TYPE=transactions,
  * TRANS_TYPE filterable.
  *
- * Per Matteo's request, Waivers, Free Agent moves, and Taxi Squad are
- * excluded from this report entirely (league doesn't use them) --
- * filtered server-side (ROTC_TXN_EXCLUDED_TYPES below) regardless of
- * which filter pill is selected, and dropped from the filter pills
- * themselves, rather than just hidden from the default view.
+ * Per Matteo's request, Waivers and Taxi Squad are excluded from this
+ * report entirely (league doesn't use either) -- filtered server-side
+ * (ROTC_TXN_EXCLUDED_TYPES below) regardless of which filter pill is
+ * selected. FREE_AGENT is deliberately NOT excluded even though it was
+ * originally lumped in with those two by mistake -- in this no-waiver
+ * league, FREE_AGENT is MFL's actual type for every immediate add/drop
+ * (including a plain drop with no add), so excluding it hid every real
+ * roster move instead of just the unused waiver/taxi features.
  *
  * The raw `transaction` field's format was confirmed live from a real
  * FREE_AGENT-type drop made through this site's own Drop a Player page
@@ -31,12 +34,19 @@ include __DIR__ . '/../templates/header.php';
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
 
-// Waivers, Free Agent moves, and Taxi Squad -- this league doesn't use
-// any of these, so they're excluded outright rather than just hidden
-// behind a filter pill. WAIVER/BBID_WAIVER variants included even
-// though this league's currentWaiverType is NONE (so they shouldn't
-// occur), just in case that setting ever changes.
-const ROTC_TXN_EXCLUDED_TYPES = ['WAIVER', 'BBID_WAIVER', 'WAIVER_REQUEST', 'BBID_WAIVER_REQUEST', 'FREE_AGENT', 'TAXI'];
+// Waivers and Taxi Squad -- this league doesn't use either (confirmed
+// live: currentWaiverType is NONE, and Taxi Squad was dropped from the
+// nav entirely per Matteo's earlier request), so those are excluded
+// outright rather than just hidden behind a filter pill.
+//
+// FREE_AGENT is NOT excluded, even though it was originally lumped in
+// here by mistake: in a NONE-waiver league like this one, EVERY
+// immediate add/drop (including a plain drop with no add, like
+// franchise/drop-player.php submits) is recorded by MFL as type
+// FREE_AGENT -- it's not a leftover "waiver system" artifact, it's the
+// actual record of the roster moves this league does use. Excluding it
+// hid every real drop/add, including Matteo's own test drop.
+const ROTC_TXN_EXCLUDED_TYPES = ['WAIVER', 'BBID_WAIVER', 'WAIVER_REQUEST', 'BBID_WAIVER_REQUEST', 'TAXI'];
 
 $filter = $_GET['type'] ?? 'DEFAULT';
 $franchises = [];
