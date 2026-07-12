@@ -128,7 +128,7 @@ function rotc_pick_value(array $weekRow): string {
     </div>
 
     <div class="card">
-      <h2 class="card-title">NFL Pick 'Em Pool</h2>
+      <h2 class="card-title" id="nfl-pool">NFL Pick 'Em Pool</h2>
       <?php if (empty(mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
@@ -157,7 +157,7 @@ function rotc_pick_value(array $weekRow): string {
     </div>
 
     <div class="card">
-      <h2 class="card-title">Fantasy Pick 'Em Pool</h2>
+      <h2 class="card-title" id="fantasy-pool">Fantasy Pick 'Em Pool</h2>
       <?php if (empty(mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
@@ -186,7 +186,7 @@ function rotc_pick_value(array $weekRow): string {
     </div>
 
     <div class="card">
-      <h2 class="card-title">Survivor Pool</h2>
+      <h2 class="card-title" id="survivor-pool">Survivor Pool</h2>
       <?php if (empty(mfl_normalize_list($survivor['survivorPool']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
