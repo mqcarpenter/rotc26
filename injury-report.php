@@ -35,16 +35,16 @@ if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/includes/mfl-api.php';
 
-    $injuriesRaw = mfl_cached_get('injuries', 1800); // 30 min — status changes during the week but not minute to minute
-    $injuries = $injuriesRaw['injuries']['injury'] ?? [];
+    $injuriesRaw = mfl_cached_get('injuries', 1800, [], false); // 30 min; not league-scoped, so no L param
+    $injuries = mfl_normalize_list($injuriesRaw['injuries']['injury'] ?? null);
 
     $ids = array_column($injuries, 'id');
     $players = [];
     if ($ids) {
         // Chunk since very long player lists can hit URL length limits.
         foreach (array_chunk($ids, 150) as $chunk) {
-            $resp = mfl_cached_get('players', 1800, ['PLAYERS' => implode(',', $chunk)]);
-            foreach ($resp['players']['player'] ?? [] as $p) {
+            $resp = mfl_cached_get('players', 1800, ['PLAYERS' => implode(',', $chunk)], false);
+            foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
                 $players[$p['id']] = $p;
             }
         }

@@ -43,7 +43,7 @@ if (!$fetchError) {
     $divisions  = mfl_divisions_conferences();
 
     $standingsRaw = mfl_cached_get('leagueStandings', 300, ['ALL' => 1]);
-    $standings = $standingsRaw['leagueStandings']['franchise'] ?? [];
+    $standings = mfl_normalize_list($standingsRaw['leagueStandings']['franchise'] ?? null);
 
     // Group by conference -> division, in division-export order.
     $grouped = [];
@@ -129,14 +129,14 @@ function rotc_pick_value(array $weekRow): string {
 
     <div class="card">
       <h2 class="card-title">NFL Pick 'Em Pool</h2>
-      <?php if (empty($nflPool['poolPicks']['franchise'])): ?>
+      <?php if (empty(mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
         <div style="overflow-x:auto;">
         <table class="data-table">
           <thead><tr><th>Franchise</th><?php foreach ($poolWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?><th>Total</th></tr></thead>
           <tbody>
-            <?php foreach ($nflPool['poolPicks']['franchise'] as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; $total = 0; ?>
+            <?php foreach (mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; $total = 0; ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= htmlspecialchars($f['name']) ?></td>
                 <?php foreach ($poolWeeks as $w):
@@ -158,14 +158,14 @@ function rotc_pick_value(array $weekRow): string {
 
     <div class="card">
       <h2 class="card-title">Fantasy Pick 'Em Pool</h2>
-      <?php if (empty($fantasyPool['poolPicks']['franchise'])): ?>
+      <?php if (empty(mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
         <div style="overflow-x:auto;">
         <table class="data-table">
           <thead><tr><th>Franchise</th><?php foreach ($poolWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?><th>Total</th></tr></thead>
           <tbody>
-            <?php foreach ($fantasyPool['poolPicks']['franchise'] as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; $total = 0; ?>
+            <?php foreach (mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; $total = 0; ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= htmlspecialchars($f['name']) ?></td>
                 <?php foreach ($poolWeeks as $w):
@@ -187,14 +187,14 @@ function rotc_pick_value(array $weekRow): string {
 
     <div class="card">
       <h2 class="card-title">Survivor Pool</h2>
-      <?php if (empty($survivor['survivorPool']['franchise'])): ?>
+      <?php if (empty(mfl_normalize_list($survivor['survivorPool']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
         <div style="overflow-x:auto;">
         <table class="data-table">
           <thead><tr><th>Franchise</th><?php foreach ($survivorWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?></tr></thead>
           <tbody>
-            <?php foreach ($survivor['survivorPool']['franchise'] as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; ?>
+            <?php foreach (mfl_normalize_list($survivor['survivorPool']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= htmlspecialchars($f['name']) ?></td>
                 <?php foreach ($survivorWeeks as $w):

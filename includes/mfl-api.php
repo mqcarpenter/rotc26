@@ -15,12 +15,12 @@
  * liveScoring on gameday wants a much shorter TTL.
  */
 
-function mfl_cached_get(string $type, int $ttlSeconds, array $params = []): ?array {
+function mfl_cached_get(string $type, int $ttlSeconds, array $params = [], bool $includeLeague = true): ?array {
     $cacheDir = sys_get_temp_dir() . '/rotc-mfl-cache';
     if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700, true);
     // Params affect the response shape (e.g. POOLTYPE, W, ALL) so they
     // need to be part of the cache key, not just the request type.
-    $cacheKey = $type . '-' . MFL_LEAGUE_ID . '-' . MFL_YEAR . '-' . md5(serialize($params));
+    $cacheKey = $type . '-' . MFL_LEAGUE_ID . '-' . MFL_YEAR . '-' . ($includeLeague ? 'L' : 'noL') . '-' . md5(serialize($params));
     $cacheFile = $cacheDir . '/' . $cacheKey . '.json';
 
     if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < $ttlSeconds) {
@@ -28,7 +28,7 @@ function mfl_cached_get(string $type, int $ttlSeconds, array $params = []): ?arr
         if (is_array($cached)) return $cached;
     }
 
-    $data = mfl_fetch($type, $params);
+    $data = mfl_fetch($type, $params, $includeLeague);
     if ($data !== null) {
         @file_put_contents($cacheFile, json_encode($data));
     } elseif (file_exists($cacheFile)) {
@@ -39,13 +39,22 @@ function mfl_cached_get(string $type, int $ttlSeconds, array $params = []): ?arr
     return $data;
 }
 
-function mfl_fetch(string $type, array $params = []): ?array {
-    $query = http_build_query(array_merge([
-        'TYPE'   => $type,
-        'L'      => MFL_LEAGUE_ID,
-        'JSON'   => 1,
-        'APIKEY' => MFL_API_KEY,
-    ], $params));
+/**
+ * $includeLeague controls whether 'L' (league id) is sent at all.
+ * Most types need it (league, leagueStandings, rosters, freeAgents,
+ * pool, survivorPool, ...). A handful of NFL-wide / player-database
+ * types (injuries, players, playerRanks, adp, aav, topAdds, topDrops,
+ * topStarters, topOwns, nflSchedule, nflByeWeeks, allRules,
+ * playerProfile) are NOT league-scoped per MFL's own API docs, and
+ * confirmed live: sending L on those makes api.myfantasyleague.com
+ * redirect to the league's wwwXX host, which then rejects the request
+ * ("must go to api.myfantasyleague.com") — a dead loop that comes back
+ * as an {"error":...} payload instead of data. Pass false for those.
+ */
+function mfl_fetch(string $type, array $params = [], bool $includeLeague = true): ?array {
+    $base = ['TYPE' => $type, 'JSON' => 1, 'APIKEY' => MFL_API_KEY];
+    if ($includeLeague) $base['L'] = MFL_LEAGUE_ID;
+    $query = http_build_query(array_merge($base, $params));
     // Always hit the generic api host and follow MFL's redirect to the
     // league's actual host — see the config.php note on why we don't
     // hardcode a wwwXX server.
@@ -65,7 +74,22 @@ function mfl_fetch(string $type, array $params = []): ?array {
     if (!$ok) return null;
 
     $data = json_decode($body, true);
-    return is_array($data) ? $data : null;
+    if (!is_array($data) || isset($data['error'])) return null;
+    return $data;
+}
+
+/**
+ * MFL collapses single-result lists to a bare associative array instead
+ * of a one-item list (confirmed live: TYPE=players with one match
+ * returns "player":{...} not "player":[{...}]). Every place that reads
+ * a *[] list from the API needs to run it through this first, or a
+ * result set of exactly one silently breaks a plain foreach.
+ */
+function mfl_normalize_list($val): array {
+    if ($val === null) return [];
+    if (!is_array($val)) return [];
+    $isAssoc = array_keys($val) !== range(0, count($val) - 1);
+    return $isAssoc ? [$val] : $val;
 }
 
 /**
@@ -77,7 +101,7 @@ function mfl_fetch(string $type, array $params = []): ?array {
 function mfl_franchises(): array {
     $league = mfl_cached_get('league', 86400);
     $out = [];
-    foreach ($league['league']['franchises']['franchise'] ?? [] as $f) {
+    foreach (mfl_normalize_list($league['league']['franchises']['franchise'] ?? null) as $f) {
         $out[$f['id']] = [
             'name'     => trim($f['name']),
             'icon'     => $f['icon'] ?? '',
@@ -96,11 +120,11 @@ function mfl_franchises(): array {
 function mfl_divisions_conferences(): array {
     $league = mfl_cached_get('league', 86400);
     $conferences = [];
-    foreach ($league['league']['conferences']['conference'] ?? [] as $c) {
+    foreach (mfl_normalize_list($league['league']['conferences']['conference'] ?? null) as $c) {
         $conferences[$c['id']] = $c['name'];
     }
     $divisions = [];
-    foreach ($league['league']['divisions']['division'] ?? [] as $d) {
+    foreach (mfl_normalize_list($league['league']['divisions']['division'] ?? null) as $d) {
         $divisions[$d['id']] = [
             'name'           => $d['name'],
             'conference'     => $d['conference'],
