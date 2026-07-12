@@ -12,7 +12,7 @@
 $page_title = 'League Calendar — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -21,7 +21,7 @@ $events = [];
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
     $raw = mfl_cached_get('calendar', 3600, []);
     $events = mfl_normalize_list($raw['calendar']['event'] ?? null);
@@ -69,4 +69,4 @@ $TYPE_LABEL = [
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

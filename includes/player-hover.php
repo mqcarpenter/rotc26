@@ -18,6 +18,41 @@
  * that line everywhere it's used.
  */
 
+/**
+ * NFL team logo (ESPN's public team-logo CDN), keyed off MFL's team
+ * abbreviation (the `team` field on players/byeWeeks/schedule records).
+ * MFL and ESPN don't always use the same code for the same team --
+ * confirmed live against TYPE=nflByeWeeks (lists every MFL code:
+ * GBP, JAC, KCC, LVR, NEP, NOS, SFO, TBB, WAS differ from ESPN's gb,
+ * jax, kc, lv, ne, no, sf, tb, wsh) and verified each mapped ESPN URL
+ * below returns 200. Everything not listed matches MFL's code
+ * lowercased (they're the same for the other 23 teams).
+ */
+const ROTC_ESPN_TEAM_MAP = [
+    'GBP' => 'gb', 'JAC' => 'jax', 'KCC' => 'kc', 'LVR' => 'lv',
+    'NEP' => 'ne', 'NOS' => 'no', 'SFO' => 'sf', 'TBB' => 'tb', 'WAS' => 'wsh',
+];
+
+function rotc_team_logo_url(?string $mflTeamCode): ?string {
+    if (!$mflTeamCode) return null;
+    $code = ROTC_ESPN_TEAM_MAP[$mflTeamCode] ?? strtolower($mflTeamCode);
+    return 'https://a.espncdn.com/i/teamlogos/nfl/500/' . $code . '.png';
+}
+
+/**
+ * <img> tag for a team logo, sized for a table cell. Fails silently
+ * (hides itself via onerror) rather than showing a broken-image icon
+ * if a code isn't mapped or ESPN's CDN hiccups.
+ */
+function rotc_team_logo_img(?string $mflTeamCode, int $size = 20): string {
+    $url = rotc_team_logo_url($mflTeamCode);
+    if (!$url) return '';
+    return '<img src="' . htmlspecialchars($url) . '" alt="' . htmlspecialchars($mflTeamCode ?? '') . '"'
+        . ' width="' . $size . '" height="' . $size . '"'
+        . ' style="display:block;object-fit:contain;" loading="lazy"'
+        . ' onerror="this.style.display=\'none\'">';
+}
+
 function rotc_espn_photo(?array $pd): ?string {
     if (!$pd || empty($pd['espn_id'])) return null;
     return 'https://a.espncdn.com/i/headshots/nfl/players/full/' . $pd['espn_id'] . '.png';

@@ -11,7 +11,7 @@
 $page_title = 'League Rules — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -21,7 +21,7 @@ $ruleLookup = [];
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
     $allRaw = mfl_cached_get('allRules', 86400, [], false);
     foreach (mfl_normalize_list($allRaw['allRules']['rule'] ?? null) as $r) {
@@ -76,4 +76,4 @@ function rotc_rule_range(array $rule): string {
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

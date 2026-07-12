@@ -13,7 +13,7 @@
 $page_title = 'Playoff Brackets — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -24,7 +24,7 @@ $bracketDetails = [];
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('playoffBrackets', 3600, []);
@@ -81,4 +81,4 @@ function rotc_seed_label(?array $side, array $franchises): string {
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

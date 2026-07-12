@@ -12,7 +12,7 @@
 $page_title = 'Transactions — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -23,7 +23,7 @@ $rows = [];
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('transactions', 900, ['TRANS_TYPE' => $filter, 'COUNT' => 100]);
@@ -72,4 +72,4 @@ $typeOptions = ['DEFAULT' => 'Roster Moves', '*' => 'All (incl. league setup)', 
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

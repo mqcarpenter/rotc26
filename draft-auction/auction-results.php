@@ -16,7 +16,7 @@
 $page_title = 'Auction Results — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -26,7 +26,7 @@ $results = [];
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('auctionResults', 900, []);
@@ -73,4 +73,4 @@ if (!$fetchError) {
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

@@ -11,7 +11,7 @@
 $page_title = 'Who Should I Start? — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -23,7 +23,7 @@ $week = max(1, (int) ($_GET['week'] ?? 1));
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
     $franchises = mfl_franchises();
     if (!$franchiseId && $franchises) $franchiseId = array_key_first($franchises);
@@ -84,4 +84,4 @@ function rotc_qs4(array $overrides): string {
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

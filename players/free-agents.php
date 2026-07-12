@@ -31,7 +31,7 @@
 $page_title = 'Free Agents — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -57,8 +57,8 @@ $dir = ($_GET['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
-    require_once __DIR__ . '/includes/player-hover.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
 
     $params = $posFilter ? ['POSITION' => $posFilter] : [];
     $faRaw = mfl_cached_get('freeAgents', 900, $params); // 15 min -- waiver activity changes this
@@ -187,6 +187,7 @@ function rotc_sort_link(string $col, string $label, string $sort, string $dir): 
         <div style="overflow-x:auto;">
         <table class="data-table">
           <thead><tr>
+            <th></th>
             <?php foreach ($SORTABLE as $col => $meta): ?>
               <th><?= rotc_sort_link($col, $meta['label'], $sort, $dir) ?></th>
             <?php endforeach; ?>
@@ -194,6 +195,7 @@ function rotc_sort_link(string $col, string $label, string $sort, string $dir): 
           <tbody>
             <?php foreach ($rows as $i => $r): ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
+                <td><?= rotc_team_logo_img($r['team']) ?></td>
                 <td><?= rotc_player_hover_span($r['name'], $r['pd'], ['2025 Total' => $r['pts2025'] !== '' ? $r['pts2025'] . ' pts' : '', 'Wk 1 Proj' => $r['proj'] !== '' ? $r['proj'] . ' pts' : '', 'Bye Week' => $r['bye'], 'Wk 1 Opp' => $r['opp']]) ?></td>
                 <td><?= htmlspecialchars($r['position']) ?></td>
                 <td><?= htmlspecialchars($r['team']) ?></td>
@@ -205,7 +207,7 @@ function rotc_sort_link(string $col, string $label, string $sort, string $dir): 
               </tr>
             <?php endforeach; ?>
             <?php if (!$rows): ?>
-              <tr><td colspan="8">No free agents found.</td></tr>
+              <tr><td colspan="9">No free agents found.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -226,4 +228,4 @@ function rotc_sort_link(string $col, string $label, string $sort, string $dir): 
 
 <?php if (!$fetchError) rotc_player_hover_widget(); ?>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

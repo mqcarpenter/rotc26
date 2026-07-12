@@ -17,7 +17,7 @@
 $page_title = 'Points Allowed by Position — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 ?>
 
 <div class="home-grid">
@@ -30,4 +30,4 @@ include __DIR__ . '/templates/header.php';
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

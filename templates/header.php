@@ -15,27 +15,40 @@
 $current_tab = $current_tab ?? 'main';
 $is_logged_in = $is_logged_in ?? false;
 
-// Auto-detect the base path so links and asset tags work whether this
-// lives at the domain root or in a subfolder like /manage/. This was the
-// cause of the broken CSS/logo/nav-link references on the first deploy —
-// every path was hardcoded as root-relative ("/assets/...") which only
-// works if the site sits at the domain root.
-$base = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+// Site-root base path, computed from where THIS file (templates/header.php)
+// physically lives on disk, not from the currently-executing script's own
+// path. That distinction matters now that pages are foldered by nav
+// section (scores/, transactions/, players/, draft-auction/, league/,
+// franchise/) -- dirname(SCRIPT_NAME) would give a different (wrong)
+// answer for every page depending which subfolder it sits in, breaking
+// the CSS link, the nav logo, and every nav href. templates/ never moves
+// relative to the site root, so walking up one level from __DIR__ always
+// finds the real root regardless of how deep the calling page is.
+$siteRootFs = rtrim(str_replace('\\', '/', dirname(__DIR__)), '/');
+$docRoot    = rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+$base = ($docRoot !== '' && strpos($siteRootFs, $docRoot) === 0)
+    ? substr($siteRootFs, strlen($docRoot))
+    : '';
 if ($base === '.') $base = '';
 
 // SEASON ROLLOVER: same reminder as the original rotc-header.html —
 // find-and-replace the /2026/ path segment in these URLs once a year.
 $mfl = 'https://www42.myfantasyleague.com/2026';
+// Pages are foldered by which nav section they belong to (scores/,
+// transactions/, players/, draft-auction/, league/, franchise/) instead
+// of all sitting flat in the site root -- purely an organizational
+// change, matches this menu 1:1. Update BOTH the folder a page lives in
+// and its href here together, or a link goes stale.
 $nav_items = [
   'Scores' => ['wide' => true, 'sub' => [
     ['Live Scoring', "$mfl/ajax_ls?L=67102"],
-    ['Standings', "$base/standings"],
-    ['Weekly Results', "$base/weekly-results"],
-    ['Weekly Summary', "$base/weekly-summary"],
-    ['Power Rank', "$base/power-rank"],
-    ['Starting Lineups', "$base/starting-lineups"],
-    ['Fantasy Schedule', "$base/fantasy-schedule"],
-    ['Playoff Brackets', "$base/playoff-brackets"],
+    ['Standings', "$base/scores/standings"],
+    ['Weekly Results', "$base/scores/weekly-results"],
+    ['Weekly Summary', "$base/scores/weekly-summary"],
+    ['Power Rank', "$base/scores/power-rank"],
+    ['Starting Lineups', "$base/scores/starting-lineups"],
+    ['Fantasy Schedule', "$base/scores/fantasy-schedule"],
+    ['Playoff Brackets', "$base/scores/playoff-brackets"],
     ['NFL Schedule', "$mfl/pro_schedule?L=67102"],
     ['Fantasy Previews', "$mfl/options?L=67102&O=207"],
     ['Fantasy Recaps', "$mfl/options?L=67102&O=177"],
@@ -43,46 +56,46 @@ $nav_items = [
   'Transactions' => ['wide' => false, 'sub' => [
     ['Add/Drops', "$mfl/add_drop?L=67102"],
     ['Submit Lineup', "$mfl/options?L=67102&O=02"],
-    ['Rosters', "$base/rosters"],
-    ['Transactions', "$base/transactions"],
-    ['Trades', "$base/trades"],
+    ['Rosters', "$base/transactions/rosters"],
+    ['Transactions', "$base/transactions/transactions"],
+    ['Trades', "$base/transactions/trades"],
     ['Taxi Squad', "$mfl/options?L=67102&O=98"],
   ]],
   'Players' => ['wide' => true, 'sub' => [
-    ['Top Performers / Player Stats', "$base/top-performers"],
-    ['Projected Stats', "$base/projected-stats"],
+    ['Top Performers / Player Stats', "$base/players/top-performers"],
+    ['Projected Stats', "$base/players/projected-stats"],
     ['Fantasy Depth Charts', "$mfl/depth_chart?L=67102"],
-    ['Top Adds/Drops/Starters', "$base/top-adds-drops-starters"],
-    ['Points Allowed - By Position', "$base/points-allowed"],
-    ['Who Should I Start?', "$base/who-should-i-start"],
-    ['Complete Free Agent Listing', "$base/free-agents"],
-    ['NFL Injury Report', "$base/injury-report"],
+    ['Top Adds/Drops/Starters', "$base/players/top-adds-drops-starters"],
+    ['Points Allowed - By Position', "$base/players/points-allowed"],
+    ['Who Should I Start?', "$base/players/who-should-i-start"],
+    ['Complete Free Agent Listing', "$base/players/free-agents"],
+    ['NFL Injury Report', "$base/players/injury-report"],
     ['Player News', "$mfl/news_articles?L=67102&P=*"],
   ]],
   'Draft & Auction' => ['wide' => false, 'sub' => [
-    ['Draft Results', "$base/draft-results"],
-    ['ADP Report', "$base/adp-report"],
+    ['Draft Results', "$base/draft-auction/draft-results"],
+    ['ADP Report', "$base/draft-auction/adp-report"],
     ['Select Keepers', "$mfl/options?L=67102&O=144"],
-    ['Keepers', "$base/keepers"],
-    ['Auction Results', "$base/auction-results"],
+    ['Keepers', "$base/draft-auction/keepers"],
+    ['Auction Results', "$base/draft-auction/auction-results"],
     ['Auction Bid', "$mfl/options?L=67102&O=43"],
-    ['AAV Report', "$base/aav-report"],
+    ['AAV Report', "$base/draft-auction/aav-report"],
     ['All Reports', "$mfl/all_reports?L=67102"],
   ]],
   'League' => ['wide' => true, 'sub' => [
-    ['League Calendar', "$base/league-calendar"],
-    ['League Rules', "$base/league-rules"],
+    ['League Calendar', "$base/league/league-calendar"],
+    ['League Rules', "$base/league/league-rules"],
     ['Accounting', "$mfl/accounting_report?L=67102"],
-    ['Franchise Information', "$base/franchise-information"],
-    ['Franchise Summary', "$base/franchise-summary"],
-    ['NFL Pool Results', "$base/standings#nfl-pool"],
-    ['Fantasy Pool Results', "$base/standings#fantasy-pool"],
-    ['Survivor Pool', "$base/standings#survivor-pool"],
+    ['Franchise Information', "$base/league/franchise-information"],
+    ['Franchise Summary', "$base/league/franchise-summary"],
+    ['NFL Pool Results', "$base/scores/standings#nfl-pool"],
+    ['Fantasy Pool Results', "$base/scores/standings#fantasy-pool"],
+    ['Survivor Pool', "$base/scores/standings#survivor-pool"],
     ['League Champions', "$mfl/options?L=67102&O=194"],
     ['Franchise Setup', "$mfl/csetup?L=67102&C=FRANCHISE"],
   ]],
   'Franchise' => ['wide' => false, 'sub' => [
-    ['Trade Bait', "$base/trade-bait"],
+    ['Trade Bait', "$base/franchise/trade-bait"],
     ['My Links', "$mfl/edit_my_links?L=67102"],
   ]],
   'Help' => ['wide' => false, 'sub' => [
@@ -96,12 +109,17 @@ $nav_items = [
 // see the WhatsApp icon in the nav bar). Kept out of $nav_items now that
 // there's no Social tree to attach it to.
 
+// Label + href per tab -- href defaults to "$base/$slug" (unchanged
+// behavior for main/auction/gameday/season-deets, none of which have a
+// real page yet), except 'standings' which now needs the scores/
+// subfolder since standings.php moved there with the rest of the
+// Scores-section pages.
 $tabs = [
-  'main'          => 'Main',
-  'auction'       => 'Auction',
-  'gameday'       => 'Gameday',
-  'standings'     => 'Standings',
-  'season-deets'  => 'Season Deets',
+  'main'          => ['label' => 'Main',         'href' => "$base/main"],
+  'auction'       => ['label' => 'Auction',       'href' => "$base/auction"],
+  'gameday'       => ['label' => 'Gameday',       'href' => "$base/gameday"],
+  'standings'     => ['label' => 'Standings',     'href' => "$base/scores/standings"],
+  'season-deets'  => ['label' => 'Season Deets',  'href' => "$base/season-deets"],
 ];
 ?>
 <!DOCTYPE html>
@@ -174,9 +192,9 @@ $tabs = [
 
 <div class="tab-bar">
   <ul>
-    <?php foreach ($tabs as $slug => $label): ?>
+    <?php foreach ($tabs as $slug => $tab): ?>
       <li class="<?= $slug === $current_tab ? 'current' : '' ?>">
-        <a href="<?= $base ?>/<?= $slug ?>"><?= htmlspecialchars($label) ?></a>
+        <a href="<?= htmlspecialchars($tab['href']) ?>"><?= htmlspecialchars($tab['label']) ?></a>
       </li>
     <?php endforeach; ?>
   </ul>

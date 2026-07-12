@@ -32,11 +32,19 @@
  *
  * Sortable: each franchise's table sorts independently (client-side --
  * no server round-trip needed for ~25 rows). Click a header to sort,
- * click again to flip direction. Each table sits in its own
- * overflow-x:auto wrapper so a long "Acquired" value (e.g. "2025 Trade
- * w/ Grindhouse Zombies") scrolls horizontally on a narrow card instead
- * of getting silently clipped -- same pattern already used on
- * free-agents.php / auction-results.php for wide tables.
+ * click again to flip direction.
+ *
+ * Responsive: cards use minmax(min(100%,380px),1fr) so a card never
+ * demands more width than the viewport has, and each table still sits
+ * in an overflow-x:auto wrapper as a safety net. The real fix for
+ * clipped Acquired text, though, was shortening the label itself --
+ * "2025 Trade w/ Flaming Chankla Chuckers" (39 chars) was blowing the
+ * whole table out to ~570px regardless of card width. Acquired now
+ * uses a 2-digit year and the franchise ABBREV instead of full name
+ * (e.g. "'25 Trade: KRYPTON"), which fits comfortably.
+ *
+ * First column is the player's NFL team logo (ESPN's public CDN, see
+ * rotc_team_logo_img() in includes/player-hover.php).
  *
  * Hover card: see includes/player-hover.php for the shared widget.
  */
@@ -44,7 +52,7 @@
 $page_title = 'Rosters — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -60,8 +68,8 @@ $tradeByFranchisePlayer = [];   // "franchise|player" => "YYYY|Franchise Name"
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
-    require_once __DIR__ . '/includes/player-hover.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('rosters', 1800, []);
@@ -131,11 +139,11 @@ if (!$fetchError) {
             $f2GaveUp = array_filter(explode(',', $t['franchise2_gave_up'] ?? ''));
             foreach ($f1GaveUp as $pid) {
                 if ($f2 === '') continue;
-                $tradeByFranchisePlayer[$f2 . '|' . $pid] = $tradeYear . '|' . ($franchises[$f1]['name'] ?? $f1);
+                $tradeByFranchisePlayer[$f2 . '|' . $pid] = $tradeYear . '|' . ($franchises[$f1]['abbrev'] ?? $f1);
             }
             foreach ($f2GaveUp as $pid) {
                 if ($f1 === '') continue;
-                $tradeByFranchisePlayer[$f1 . '|' . $pid] = $tradeYear . '|' . ($franchises[$f2]['name'] ?? $f2);
+                $tradeByFranchisePlayer[$f1 . '|' . $pid] = $tradeYear . '|' . ($franchises[$f2]['abbrev'] ?? $f2);
             }
         }
     }
@@ -150,17 +158,27 @@ $STATUS_LABEL = ['ROSTER' => 'Active', 'INJURED_RESERVE' => 'IR', 'TAXI_SQUAD' =
 function rotc_acquired_label(string $franchiseId, string $playerId, string $drafted, array $auctionMap, array $draftMap, array $tradeMap): string {
     if ($drafted !== '') return $drafted; // raw keeper slot label, e.g. "K1" -- no reinterpretation
     $key = $franchiseId . '|' . $playerId;
+    // Kept deliberately short (2-digit year, franchise ABBREV not full
+    // name) -- these tables sit in a multi-column card grid, and a full
+    // franchise name here ("2025 Trade w/ Flaming Chankla Chuckers")
+    // was blowing the table width out past its card, forcing the whole
+    // page into horizontal-scroll hell. Round(), player names etc still
+    // use full data -- this is specifically about a column that has to
+    // fit next to five others in ~360px.
     if (isset($auctionMap[$key])) {
         [$year, $bid] = explode('|', $auctionMap[$key], 2);
-        return $bid !== '' ? "$year Auction – \$$bid" : "$year Auction";
+        $yy = substr($year, -2);
+        return $bid !== '' ? "'$yy Auction \$$bid" : "'$yy Auction";
     }
     if (isset($draftMap[$key])) {
         [$year, $round] = explode('|', $draftMap[$key], 2);
-        return $round !== '' ? "$year Draft – Rd $round" : "$year Draft";
+        $yy = substr($year, -2);
+        return $round !== '' ? "'$yy Rd " . (int) $round : "'$yy Draft";
     }
     if (isset($tradeMap[$key])) {
-        [$year, $fromName] = explode('|', $tradeMap[$key], 2);
-        return "$year Trade w/ $fromName";
+        [$year, $fromAbbrev] = explode('|', $tradeMap[$key], 2);
+        $yy = substr($year, -2);
+        return "'$yy Trade: $fromAbbrev";
     }
     return 'Waiver/FA';
 }
@@ -175,7 +193,7 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
         <h2 class="card-title">Rosters</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:-6px;">Click a column header to sort. Hover a player's name for details.</p>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;">
           <?php foreach ($franchises as $id => $f): $roster = $rosters[$id] ?? []; ?>
             <div style="border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-width:0;">
               <h3 style="margin:0 0 8px;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;"><?= htmlspecialchars($f['name']) ?></h3>
@@ -186,6 +204,7 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
                 <table class="data-table rotc-sortable" style="width:100%;">
                   <thead>
                     <tr>
+                      <th></th>
                       <th data-sort="text">Player</th>
                       <th data-sort="text">Pos</th>
                       <th data-sort="num">2025 Pts</th>
@@ -206,12 +225,13 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
                       $name = $pd['name'] ?? ('Player #' . $p['id']);
                     ?>
                       <tr>
-                        <td style="white-space:nowrap;"><?= rotc_player_hover_span($name, $pd, ['2025 Total' => $pts2025 !== '' ? $pts2025 . ' pts' : '', 'Bye Week' => $bye, 'Roster Status' => $status]) ?></td>
+                        <td><?= rotc_team_logo_img($team) ?></td>
+                        <td><?= rotc_player_hover_span($name, $pd, ['2025 Total' => $pts2025 !== '' ? $pts2025 . ' pts' : '', 'Bye Week' => $bye, 'Roster Status' => $status]) ?></td>
                         <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
                         <td data-value="<?= $pts2025 !== '' ? htmlspecialchars($pts2025) : -1 ?>"><?= htmlspecialchars($pts2025) ?></td>
                         <td data-value="<?= $bye !== '' ? htmlspecialchars($bye) : -1 ?>"><?= htmlspecialchars($bye) ?></td>
                         <td><?= htmlspecialchars($status) ?></td>
-                        <td style="white-space:nowrap;"><?= htmlspecialchars($acquired) ?></td>
+                        <td><?= htmlspecialchars($acquired) ?></td>
                       </tr>
                     <?php endforeach; ?>
                   </tbody>
@@ -272,4 +292,4 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
 
 <?php if (!$fetchError) rotc_player_hover_widget(); ?>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

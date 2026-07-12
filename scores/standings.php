@@ -29,15 +29,15 @@
 $page_title = 'Standings — Return of the Champions XXVI';
 $current_tab = 'standings';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
-    require_once __DIR__ . '/includes/helmets.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/helmets.php';
 
     $franchises = mfl_franchises();
     $divisions  = mfl_divisions_conferences();
@@ -215,4 +215,4 @@ function rotc_pick_value(array $weekRow): string {
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

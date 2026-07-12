@@ -1,32 +1,33 @@
 <?php
 /**
- * projected-stats.php
- * Weekly projected fantasy points, all rostered/free-agent players.
- * Matches Players -> Projected Stats. TYPE=projectedScores returns
- * {playerScore:[{id,score}], week} for a given week — league-agnostic
- * except for scoring rules (uses league's own scoring since L= is
- * included), joined against TYPE=players for name/position/team.
+ * top-performers.php
+ * Weekly/YTD actual fantasy points. Matches Players -> Top Performers
+ * / Player Stats. TYPE=playerScores returns {playerScore:[{id,score}]}
+ * for a given week or W=YTD, joined against TYPE=players. No games
+ * have been played yet this preseason, so this will show "no data"
+ * until Week 1 actually happens — that's expected, not a bug.
  */
 
-$page_title = 'Projected Stats — Return of the Champions XXVI';
+$page_title = 'Top Performers — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
 
-$week = max(1, (int) ($_GET['week'] ?? 1));
+$weekParam = $_GET['week'] ?? 'YTD';
 $posFilter = $_GET['pos'] ?? '';
 $positions = ['QB', 'RB', 'WR', 'TE', 'DT', 'DE', 'LB', 'CB', 'S'];
 
 $rows = [];
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
-    $raw = mfl_cached_get('projectedScores', 3600, ['W' => $week, 'COUNT' => 200]);
-    $list = mfl_normalize_list($raw['projectedScores']['playerScore'] ?? null);
+    $raw = mfl_cached_get('playerScores', 1800, ['W' => $weekParam, 'COUNT' => 200]);
+    $list = mfl_normalize_list($raw['playerScores']['playerScore'] ?? null);
+    $list = array_values(array_filter($list, fn($r) => !empty($r['id']) && $r['score'] !== ''));
     $ids = array_column($list, 'id');
 
     $players = [];
@@ -49,7 +50,7 @@ if (!$fetchError) {
     }
 }
 
-function rotc_qs2(array $overrides): string {
+function rotc_qs3(array $overrides): string {
     $params = array_merge($_GET, $overrides);
     return htmlspecialchars('?' . http_build_query($params));
 }
@@ -58,28 +59,29 @@ function rotc_qs2(array $overrides): string {
 <div class="home-grid">
   <main class="home-main" style="width:100%;">
     <?php if ($fetchError): ?>
-      <div class="card"><p>Projected stats aren't available right now — check back soon.</p></div>
+      <div class="card"><p>Player stats aren't available right now — check back soon.</p></div>
     <?php else: ?>
       <div class="card">
-        <h2 class="card-title">Projected Stats — Week <?= $week ?></h2>
+        <h2 class="card-title">Top Performers <?= $weekParam === 'YTD' ? '(Season)' : '(Week ' . htmlspecialchars($weekParam) . ')' ?></h2>
 
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:8px 0 16px;">
-          <div style="display:flex;gap:6px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a href="<?= rotc_qs3(['week' => 'YTD']) ?>" style="padding:4px 9px;border-radius:6px;border:1px solid var(--line);font-size:13px;<?= $weekParam === 'YTD' ? 'background:var(--ink);color:var(--on-ink);' : '' ?>">Season</a>
             <?php for ($w = 1; $w <= 18; $w++): ?>
-              <a href="<?= rotc_qs2(['week' => $w]) ?>" style="padding:4px 9px;border-radius:6px;border:1px solid var(--line);font-size:13px;<?= $week === $w ? 'background:var(--ink);color:var(--on-ink);' : '' ?>"><?= $w ?></a>
+              <a href="<?= rotc_qs3(['week' => $w]) ?>" style="padding:4px 9px;border-radius:6px;border:1px solid var(--line);font-size:13px;<?= (string)$weekParam === (string)$w ? 'background:var(--ink);color:var(--on-ink);' : '' ?>"><?= $w ?></a>
             <?php endfor; ?>
           </div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px;">
-          <a href="<?= rotc_qs2(['pos' => '']) ?>" style="padding:5px 10px;border-radius:999px;border:1px solid var(--line);<?= $posFilter === '' ? 'background:var(--ink);color:var(--on-ink);' : '' ?>">All</a>
+          <a href="<?= rotc_qs3(['pos' => '']) ?>" style="padding:5px 10px;border-radius:999px;border:1px solid var(--line);<?= $posFilter === '' ? 'background:var(--ink);color:var(--on-ink);' : '' ?>">All</a>
           <?php foreach ($positions as $pos): ?>
-            <a href="<?= rotc_qs2(['pos' => $pos]) ?>" style="padding:5px 10px;border-radius:999px;border:1px solid var(--line);<?= $posFilter === $pos ? 'background:var(--ink);color:var(--on-ink);' : '' ?>"><?= $pos ?></a>
+            <a href="<?= rotc_qs3(['pos' => $pos]) ?>" style="padding:5px 10px;border-radius:999px;border:1px solid var(--line);<?= $posFilter === $pos ? 'background:var(--ink);color:var(--on-ink);' : '' ?>"><?= $pos ?></a>
           <?php endforeach; ?>
         </div>
 
         <div style="overflow-x:auto;">
         <table class="data-table">
-          <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>NFL Team</th><th>Proj. Pts</th></tr></thead>
+          <thead><tr><th>#</th><th>Player</th><th>Pos</th><th>NFL Team</th><th>Pts</th></tr></thead>
           <tbody>
             <?php foreach ($rows as $i => $r): ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
@@ -91,7 +93,7 @@ function rotc_qs2(array $overrides): string {
               </tr>
             <?php endforeach; ?>
             <?php if (!$rows): ?>
-              <tr><td colspan="5">No projections available for this week yet.</td></tr>
+              <tr><td colspan="5">No games played yet — check back once the season kicks off.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -101,4 +103,4 @@ function rotc_qs2(array $overrides): string {
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

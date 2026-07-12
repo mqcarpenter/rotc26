@@ -11,7 +11,7 @@
 $page_title = 'Top Adds / Drops / Starters — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -24,7 +24,7 @@ $typeMap = ['adds' => 'topAdds', 'drops' => 'topDrops', 'starters' => 'topStarte
 $rows = [];
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
     $raw = mfl_cached_get($typeMap[$active], 1800, ['COUNT' => 50], false);
     $list = mfl_normalize_list($raw[$typeMap[$active]]['player'] ?? null);
@@ -88,4 +88,4 @@ if (!$fetchError) {
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>

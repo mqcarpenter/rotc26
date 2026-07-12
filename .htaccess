@@ -20,9 +20,18 @@
 RewriteEngine On
 RewriteRule ^(templates|includes)/ - [F,L]
 
-# Clean URLs for the tab bar: /standings -> standings.php, etc. Only
-# kicks in when no real file/directory matches the request, so
-# /assets/mfl26.css and /api/matchup-ticker.php are untouched.
+# Clean URLs, foldered by nav section: /transactions/rosters ->
+# transactions/rosters.php, /scores/standings -> scores/standings.php,
+# etc. Checked before the single-segment rule below since a request
+# only matches one of the two patterns.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-z0-9-]+)/([a-z0-9-]+)/?$ $1/$2.php [L,QSA]
+
+# Clean URLs for the tab bar and index.php-adjacent top-level pages:
+# /standings -> standings.php, etc. Only kicks in when no real
+# file/directory matches the request, so /assets/mfl26.css and
+# /api/matchup-ticker.php are untouched.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^([a-z0-9-]+)/?$ $1.php [L,QSA]

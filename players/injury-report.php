@@ -12,7 +12,7 @@
 $page_title = 'NFL Injury Report — Return of the Champions XXVI';
 $current_tab = '';
 
-include __DIR__ . '/templates/header.php';
+include __DIR__ . '/../templates/header.php';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
@@ -33,7 +33,7 @@ $NFL_TEAMS = [
 
 if (!$fetchError) {
     require_once $configPath;
-    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/mfl-api.php';
 
     $injuriesRaw = mfl_cached_get('injuries', 1800, [], false); // 30 min; not league-scoped, so no L param
     $injuries = mfl_normalize_list($injuriesRaw['injuries']['injury'] ?? null);
@@ -104,4 +104,4 @@ if (!$fetchError) {
   </main>
 </div>
 
-<?php include __DIR__ . '/templates/footer.php'; ?>
+<?php include __DIR__ . '/../templates/footer.php'; ?>
