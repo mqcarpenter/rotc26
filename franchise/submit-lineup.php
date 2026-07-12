@@ -79,7 +79,7 @@ if ($hasConfig) {
                 'STARTERS' => implode(',', $checked),
             ]);
             if ($resp === null) {
-                $result = ['ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.'];
+                $result = ['ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
             } elseif (isset($resp['error'])) {
                 $result = ['ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
             } else {

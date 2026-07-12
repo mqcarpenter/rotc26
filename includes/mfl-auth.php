@@ -186,9 +186,25 @@ function rotc_mfl_login(string $username, string $password): array {
  * Returns null only on a genuine transport failure (can't reach MFL) or
  * if the caller isn't logged in.
  */
+/**
+ * Diagnostic detail from the most recent rotc_mfl_authed_request()
+ * call that returned null -- curl-level error text, the actual HTTP
+ * status if it wasn't 200, or a snippet of a body that didn't parse as
+ * JSON. Every call site's generic "Could not reach MyFantasyLeague"
+ * message was a dead end with no way to tell WHY -- this exists so the
+ * real reason surfaces on the page instead of staying a black box.
+ */
+function rotc_mfl_last_error(): ?string {
+    return $GLOBALS['rotc_mfl_last_error'] ?? null;
+}
+
 function rotc_mfl_authed_request(string $command, string $type, array $params = [], bool $includeLeague = true, ?int $year = null): ?array {
     rotc_session_start();
-    if (!rotc_mfl_logged_in()) return null;
+    $GLOBALS['rotc_mfl_last_error'] = null;
+    if (!rotc_mfl_logged_in()) {
+        $GLOBALS['rotc_mfl_last_error'] = 'Not logged in.';
+        return null;
+    }
 
     $year = $year ?? (defined('MFL_YEAR') ? MFL_YEAR : (int) date('Y'));
     $fields = array_merge(['TYPE' => $type, 'JSON' => 1], $params);
@@ -197,15 +213,9 @@ function rotc_mfl_authed_request(string $command, string $type, array $params = 
     // League-scoped calls (rosters, lineup, tradeProposal, poolPicks,
     // etc.) go DIRECTLY to this league's real host (e.g.
     // www42.myfantasyleague.com, confirmed live via TYPE=league's own
-    // baseURL field) rather than to api.myfantasyleague.com. Bug found
-    // after a real login test: hitting api.myfantasyleague.com for a
-    // league-scoped call gets a 302 redirect to the real host, and
-    // curl's CURLOPT_COOKIE (a single header value set for the
-    // original request) is NOT reliably replayed to the redirected
-    // host -- so the redirected request arrives unauthenticated,
-    // which is exactly why rosters came back empty and the poolPicks
-    // submit failed. Going straight to the real host sidesteps the
-    // redirect (and the cookie loss) entirely. Non-league calls
+    // baseURL field) rather than to api.myfantasyleague.com, since a
+    // redirect from api.myfantasyleague.com to the real host was
+    // suspected of dropping the session cookie. Non-league calls
     // (myleagues) have no per-league host and correctly stay on
     // api.myfantasyleague.com per MFL's own docs.
     $host = ($includeLeague && defined('MFL_LEAGUE_ID')) ? rotc_mfl_league_host($year) : 'https://api.myfantasyleague.com';
@@ -220,14 +230,33 @@ function rotc_mfl_authed_request(string $command, string $type, array $params = 
         CURLOPT_COOKIE         => $_SESSION['rotc_mfl_cookie_name'] . '=' . rawurlencode($_SESSION['rotc_mfl_cookie_value']),
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_MAXREDIRS      => 3,
+        CURLOPT_SSL_VERIFYPEER => true,
     ]);
     $body = curl_exec($ch);
-    $ok = $body !== false && curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200;
+    $curlErrno = curl_errno($ch);
+    $curlError = curl_error($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    if (!$ok || !$body) return null;
+
+    if ($body === false || $curlErrno !== 0) {
+        $GLOBALS['rotc_mfl_last_error'] = "cURL error ({$curlErrno}): {$curlError} [host={$host}]";
+        return null;
+    }
+    if ($httpCode !== 200) {
+        $GLOBALS['rotc_mfl_last_error'] = "HTTP {$httpCode} from {$host}/{$year}/{$command}. Body: " . substr((string) $body, 0, 300);
+        return null;
+    }
+    if ($body === '') {
+        $GLOBALS['rotc_mfl_last_error'] = "Empty response from {$host}/{$year}/{$command}.";
+        return null;
+    }
 
     $data = json_decode($body, true);
-    return is_array($data) ? $data : null;
+    if (!is_array($data)) {
+        $GLOBALS['rotc_mfl_last_error'] = 'Response was not valid JSON: ' . substr((string) $body, 0, 300);
+        return null;
+    }
+    return $data;
 }
 
 /**

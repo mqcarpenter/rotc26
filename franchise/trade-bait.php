@@ -51,7 +51,7 @@ if (!$fetchError) {
                 if ($wants !== '') $params['IN_EXCHANGE_FOR'] = $wants;
                 $resp = rotc_mfl_authed_request('import', 'tradeBait', $params);
                 if ($resp === null) {
-                    $submitResult = ['ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.'];
+                    $submitResult = ['ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
                 } elseif (isset($resp['error'])) {
                     $submitResult = ['ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
                 } else {
