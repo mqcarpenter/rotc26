@@ -13,6 +13,22 @@
  * $is_logged_in (bool)  - controls LOGIN vs LOGOUT label
  */
 $current_tab = $current_tab ?? 'main';
+
+// Real login state, not a placeholder -- see includes/mfl-auth.php.
+// Loading this here (before any HTML output) rather than requiring
+// every calling page to do it means Login/Logout always reflects
+// reality even on pages that don't otherwise touch auth at all.
+$rotc_ownerUsername = null;
+$rotc_configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
+if (file_exists($rotc_configPath)) {
+    require_once $rotc_configPath;
+    require_once __DIR__ . '/../includes/mfl-auth.php';
+    rotc_session_start();
+    if (!isset($is_logged_in)) {
+        $is_logged_in = rotc_mfl_logged_in();
+    }
+    if ($is_logged_in) $rotc_ownerUsername = rotc_mfl_username();
+}
 $is_logged_in = $is_logged_in ?? false;
 
 // Site-root base path, computed from where THIS file (templates/header.php)
@@ -39,6 +55,23 @@ $mfl = 'https://www42.myfantasyleague.com/2026';
 // of all sitting flat in the site root -- purely an organizational
 // change, matches this menu 1:1. Update BOTH the folder a page lives in
 // and its href here together, or a link goes stale.
+// Franchise sub-item rows are [label, url, inactive]. 'inactive' (bool)
+// renders the item in a shadowy/disabled style (see .rotc-nav-inactive
+// in mfl26.css) while still listing it -- used for "Open an Auction",
+// which has no live auction running right now.
+//
+// Every Franchise action below that points at a local franchise/*.php
+// page is a REAL write action against MFL (submits/drops/trades/picks
+// actually go through), gated behind login.php -- see
+// includes/mfl-auth.php. "Make a Draft Pick" and "Open an Auction"
+// still point at MFL directly: confirmed live against MFL's own Import
+// API reference (api_info?STATE=details&CCAT=import) that live
+// draft-pick and live-auction-bid actions are NOT part of the
+// documented import API at all (only bulk post-hoc draftResults /
+// auctionResults imports exist, meant for loading an already-completed
+// offline draft, not live picks) -- those only happen through MFL's
+// own live draft/auction room, so there's no real write action to
+// build here even though the site now has real login.
 $nav_items = [
   'Scores' => ['wide' => true, 'sub' => [
     ['Live Scoring', "$base/scores/live-scoring"],
@@ -53,13 +86,15 @@ $nav_items = [
     ['Fantasy Previews', "$mfl/options?L=67102&O=207"],
     ['Fantasy Recaps', "$base/scores/weekly-recap-article"],
   ]],
-  'Transactions' => ['wide' => false, 'sub' => [
-    ['Add/Drops', "$mfl/add_drop?L=67102"],
-    ['Submit Lineup', "$mfl/options?L=67102&O=02"],
-    ['Rosters', "$base/transactions/rosters"],
-    ['Transactions', "$base/transactions/transactions"],
-    ['Trades', "$base/transactions/trades"],
-    ['Taxi Squad', "$mfl/options?L=67102&O=98"],
+  'Franchise' => ['wide' => true, 'sub' => [
+    ['Submit Lineup', "$base/franchise/submit-lineup.php"],
+    ['Trade Bait', "$base/franchise/trade-bait"],
+    ['Make a Draft Pick', "$mfl/options?L=67102&O=52"],
+    ['Open an Auction', "$mfl/options?L=67102&O=44", true],
+    ['Offer a Trade', "$base/franchise/offer-trade.php"],
+    ['Drop a Player', "$base/franchise/drop-player.php"],
+    ['Make a Pool Pick', "$base/franchise/pool-pick.php"],
+    ['Make a Survivor Pick', "$base/franchise/survivor-pick.php"],
   ]],
   'Players' => ['wide' => true, 'sub' => [
     ['Top Performers / Player Stats', "$base/players/top-performers"],
@@ -81,21 +116,26 @@ $nav_items = [
     ['Auction Bid', "$mfl/options?L=67102&O=43"],
     ['AAV Report', "$base/draft-auction/aav-report"],
   ]],
-  'League' => ['wide' => true, 'sub' => [
+  'League' => ['wide' => false, 'sub' => [
     ['League Calendar', "$base/league/league-calendar"],
     ['League Rules', "$base/league/league-rules"],
-    ['Accounting', "$mfl/accounting_report?L=67102"],
     ['Franchise Information', "$base/league/franchise-information"],
-    ['Franchise Summary', "$base/league/franchise-summary"],
-    ['NFL Pool Results', "$base/scores/standings#nfl-pool"],
-    ['Fantasy Pool Results', "$base/scores/standings#fantasy-pool"],
-    ['Survivor Pool', "$base/scores/standings#survivor-pool"],
     ['League Champions', "$mfl/options?L=67102&O=194"],
     ['Franchise Setup', "$mfl/csetup?L=67102&C=FRANCHISE"],
   ]],
-  'Franchise' => ['wide' => false, 'sub' => [
-    ['Trade Bait', "$base/franchise/trade-bait"],
-    ['My Links', "$mfl/edit_my_links?L=67102"],
+  // Formerly "Transactions" -- renamed to "Reports" and swapped to
+  // Franchise's old spot in the menu order per Matteo's request.
+  // NFL Pool / Pick 'Em / Survivor results moved here from League;
+  // Accounting and Franchise Summary were dropped altogether (explicit
+  // removal request); Add/Drops folded into Franchise -> Drop a Player;
+  // Taxi Squad and My Links dropped altogether too.
+  'Reports' => ['wide' => false, 'sub' => [
+    ['Transactions Report', "$base/transactions/transactions"],
+    ['Rosters Report', "$base/transactions/rosters"],
+    ['Trades', "$base/transactions/trades"],
+    ['Nfl Pool Results', "$base/scores/standings#nfl-pool"],
+    ["Pick 'Em Results", "$base/scores/standings#fantasy-pool"],
+    ['Survivor Results', "$base/scores/standings#survivor-pool"],
   ]],
 ];
 // "Email to Entire League" was a Social submenu item -- Social was removed
@@ -151,14 +191,16 @@ $tabs = [
               <?php $cols = array_chunk($item['sub'], (int) ceil(count($item['sub']) / 2)); ?>
               <?php foreach ($cols as $col): ?>
                 <ul class="rotc-sub-col">
-                  <?php foreach ($col as [$subLabel, $subUrl]): ?>
-                    <li><a href="<?= htmlspecialchars($subUrl) ?>"><?= htmlspecialchars($subLabel) ?></a></li>
+                  <?php foreach ($col as $subRow): ?>
+                    <?php $subInactive = !empty($subRow[2]); ?>
+                    <li><a href="<?= htmlspecialchars($subRow[1]) ?>"<?= $subInactive ? ' class="rotc-nav-inactive"' : '' ?>><?= htmlspecialchars($subRow[0]) ?></a></li>
                   <?php endforeach; ?>
                 </ul>
               <?php endforeach; ?>
             <?php else: ?>
-              <?php foreach ($item['sub'] as [$subLabel, $subUrl]): ?>
-                <li><a href="<?= htmlspecialchars($subUrl) ?>"><?= htmlspecialchars($subLabel) ?></a></li>
+              <?php foreach ($item['sub'] as $subRow): ?>
+                <?php $subInactive = !empty($subRow[2]); ?>
+                <li><a href="<?= htmlspecialchars($subRow[1]) ?>"<?= $subInactive ? ' class="rotc-nav-inactive"' : '' ?>><?= htmlspecialchars($subRow[0]) ?></a></li>
               <?php endforeach; ?>
             <?php endif; ?>
           </ul>
@@ -171,13 +213,9 @@ $tabs = [
       </li>
       <li class="rotc-item rotc-login">
         <?php if ($is_logged_in): ?>
-          <a class="rotc-top" href="<?= $mfl ?>/logout?L=67102">Logout</a>
+          <a class="rotc-top" href="<?= $base ?>/logout.php" title="Log out<?= $rotc_ownerUsername ? ' (' . htmlspecialchars($rotc_ownerUsername) . ')' : '' ?>">Logout<?= $rotc_ownerUsername ? ' (' . htmlspecialchars($rotc_ownerUsername) . ')' : '' ?></a>
         <?php else: ?>
-          <!-- Source only had a hardcoded Logout link (MFL rendered "Guest
-               (Login)" separately, outside this module). No real login URL
-               was in the markup Matteo shared, so this points at the league
-               home for now — swap for MFL's actual login URL if different. -->
-          <a class="rotc-top" href="<?= $mfl ?>/home/67102">Login</a>
+          <a class="rotc-top" href="<?= $base ?>/login.php">Login</a>
         <?php endif; ?>
       </li>
     </ul>

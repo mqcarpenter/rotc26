@@ -392,3 +392,47 @@ a:hover{ color:var(--accent); }
 .rotc-trending-name{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
 .rotc-trending-pos{ color:var(--muted); flex:0 0 auto; }
 .rotc-trending-pct{ color:var(--accent); font-weight:700; flex:0 0 auto; }
+
+/* Owner login (login.php) + Franchise action pages (franchise/submit-
+   lineup.php, drop-player.php, offer-trade.php, survivor-pick.php,
+   pool-pick.php, trade-bait.php's submit form) -- shared form chrome
+   so every write-action page looks/feels consistent. See
+   includes/mfl-auth.php for the real login this all sits on top of. */
+.rotc-login-main{ width:100%; max-width:440px; margin:0 auto; }
+.rotc-login-blurb{ font-size:13px; color:var(--muted); margin-top:0; line-height:1.5; }
+.rotc-login-error{ color:#b3261e; font-weight:600; background:#fbe9e7; border:1px solid #f3c8c2; border-radius:8px; padding:10px 12px; }
+.rotc-login-success{ color:#1b5e20; font-weight:600; background:#e8f5e9; border:1px solid #c3e6c5; border-radius:8px; padding:10px 12px; }
+.rotc-login-form{ display:flex; flex-direction:column; gap:10px; }
+.rotc-login-form label{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+.rotc-login-form input[type="text"],
+.rotc-login-form input[type="password"]{ padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; }
+
+.rotc-btn{ align-self:flex-start; padding:9px 18px; border-radius:8px; background:var(--accent); color:var(--on-ink); border:none; font-weight:700; font-size:14px; cursor:pointer; font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.03em; }
+.rotc-btn:hover{ opacity:.9; }
+.rotc-btn-danger{ background:#b3261e; }
+
+.rotc-inline-form{ display:flex; align-items:center; gap:8px; margin:10px 0 14px; font-size:13px; }
+.rotc-inline-form select{ padding:6px 8px; border:1px solid var(--line); border-radius:8px; }
+
+.rotc-lineup-form{ display:flex; flex-direction:column; gap:14px; }
+.rotc-lineup-table{ width:100%; border-collapse:collapse; font-size:13px; }
+.rotc-lineup-table th{ text-align:left; text-transform:uppercase; font-size:11px; letter-spacing:.04em; color:var(--muted); border-bottom:1px solid var(--line); padding:6px 8px; }
+.rotc-lineup-table td{ padding:6px 8px; border-bottom:1px solid var(--line); }
+.rotc-lineup-table tr:hover td{ background:var(--sand); }
+
+.rotc-trade-columns{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:700px){ .rotc-trade-columns{ grid-template-columns:1fr; } }
+.rotc-trade-col-head{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-size:14px; margin:0 0 8px; }
+.rotc-trade-player{ display:block; padding:4px 0; font-size:13px; }
+.rotc-trade-bait-players{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:2px 12px; }
+
+.rotc-pool-matchup{ display:flex; align-items:center; gap:14px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+.rotc-pool-matchup span{ flex:0 0 110px; font-weight:700; }
+.rotc-pool-matchup label{ display:flex; align-items:center; gap:4px; }
+
+/* "Open an Auction" -- listed in the Franchise menu per Matteo's call
+   even while inactive (no live auction running), styled shadowy/muted
+   rather than removed so owners know it exists without it looking
+   like a normal live link. */
+a.rotc-nav-inactive{ color:#8a7a6c99 !important; font-style:italic; cursor:default; }
+a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; }
