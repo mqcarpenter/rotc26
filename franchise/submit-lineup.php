@@ -35,10 +35,30 @@ $players = [];
 $week = 1;
 $checked = [];
 
+// Section order + which raw MFL position codes fall into each --
+// combines DT+DE into one "DL" section and CB+S into one "DB" section
+// per Matteo's request, matching how this league's own starting
+// lineup requirements group them (confirmed live via TYPE=league's
+// starters block: "DT+DE" and "CB+S" are single combined slot types).
+const ROTC_LINEUP_SECTIONS = ['QB', 'RB', 'WR', 'TE', 'DL', 'LB', 'DB'];
+const ROTC_LINEUP_POS_BUCKET = [
+    'QB' => 'QB', 'RB' => 'RB', 'WR' => 'WR', 'TE' => 'TE',
+    'DT' => 'DL', 'DE' => 'DL', 'LB' => 'LB', 'CB' => 'DB', 'S' => 'DB',
+];
+
+$posByPlayerId = [];
+$injByPlayerId = [];
+$byeByTeam = [];
+$oppByTeam = [];
+$projById = [];
+$startPctById = [];
+$posRankById = [];
+
 if ($hasConfig) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/mfl-auth.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
     rotc_require_login($pageBase);
 
     $franchiseId = rotc_mfl_franchise_id();
@@ -96,6 +116,71 @@ if ($hasConfig) {
         }
     }
 
+    // --- Extra columns: opponent, injury, bye, projected points,
+    // position rank, percent started. Each pulled from the same MFL
+    // export types already used elsewhere in this project (injury-
+    // report.php, projected-stats.php, top-adds-drops-starters.php,
+    // rosters.php's bye-week column) so the field names below are all
+    // previously confirmed live, not new guesses.
+
+    // Full (unfiltered) player database, just for id -> raw position,
+    // needed to bucket the whole league-wide projected-scores pool by
+    // position for the POS RANK column below. Cached a full day like
+    // every other unfiltered TYPE=players pull in this codebase.
+    $allPlayersRaw = mfl_cached_get('players', 86400, [], false);
+    foreach (mfl_normalize_list($allPlayersRaw['players']['player'] ?? null) as $p) {
+        if (!empty($p['id'])) $posByPlayerId[$p['id']] = $p['position'] ?? '';
+    }
+
+    $injRaw = mfl_cached_get('injuries', 1800, [], false);
+    foreach (mfl_normalize_list($injRaw['injuries']['injury'] ?? null) as $inj) {
+        if (!empty($inj['id'])) $injByPlayerId[$inj['id']] = $inj['status'] ?? '';
+    }
+
+    $byeRaw = mfl_cached_get('nflByeWeeks', 86400, [], false);
+    foreach (mfl_normalize_list($byeRaw['nflByeWeeks']['team'] ?? null) as $t) {
+        if (!empty($t['id'])) $byeByTeam[$t['id']] = $t['bye_week'] ?? '';
+    }
+
+    $schedRaw = mfl_cached_get('nflSchedule', 3600, ['W' => $week], false);
+    foreach (mfl_normalize_list($schedRaw['nflSchedule']['matchup'] ?? null) as $m) {
+        $teams = mfl_normalize_list($m['team'] ?? null);
+        if (count($teams) !== 2) continue;
+        [$t1, $t2] = $teams;
+        if (!empty($t1['id']) && !empty($t2['id'])) {
+            $oppByTeam[$t1['id']] = ['opp' => $t2['id'], 'home' => ($t1['isHome'] ?? '0') === '1'];
+            $oppByTeam[$t2['id']] = ['opp' => $t1['id'], 'home' => ($t2['isHome'] ?? '0') === '1'];
+        }
+    }
+
+    // League-scored projections for the whole pool (COUNT=3000, same
+    // ceiling used for full-pool playerScores pulls elsewhere in this
+    // project) -- doubles as both "this roster player's own projected
+    // points" AND the full pool POS RANK is computed against.
+    $projRaw = mfl_cached_get('projectedScores', 3600, ['W' => $week, 'COUNT' => 3000]);
+    $posPool = array_fill_keys(ROTC_LINEUP_SECTIONS, []);
+    foreach (mfl_normalize_list($projRaw['projectedScores']['playerScore'] ?? null) as $row) {
+        if (empty($row['id'])) continue;
+        $projById[$row['id']] = $row['score'] ?? null;
+        $bucket = ROTC_LINEUP_POS_BUCKET[$posByPlayerId[$row['id']] ?? ''] ?? null;
+        if ($bucket !== null) $posPool[$bucket][] = ['id' => $row['id'], 'score' => (float) ($row['score'] ?? 0)];
+    }
+    foreach ($posPool as $bucket => $list) {
+        usort($list, fn($a, $b) => $b['score'] <=> $a['score']);
+        foreach ($list as $i => $row) { $posRankById[$row['id']] = $i + 1; }
+    }
+
+    // Site-wide "percent of MFL leagues starting this player" --
+    // league-agnostic, same type used on top-adds-drops-starters.php.
+    // Only players started in >=1% of all MFL leagues are returned at
+    // all, so plenty of legitimate bench/depth players simply won't
+    // have an entry -- shown as "--" rather than 0%, which would imply
+    // something MFL didn't actually say.
+    $startRaw = mfl_cached_get('topStarters', 1800, ['COUNT' => 3000], false);
+    foreach (mfl_normalize_list($startRaw['topStarters']['player'] ?? null) as $row) {
+        if (!empty($row['id'])) $startPctById[$row['id']] = $row['percent'] ?? null;
+    }
+
     // NOTE: not attempting to pre-check "already starting" players --
     // the exact status string TYPE=rosters uses for an already-set
     // starter hasn't been confirmed live (only "ROSTER" for a bench
@@ -146,26 +231,78 @@ if ($hasConfig) {
 
         <?php if (!$roster): ?>
           <p>No roster found for Week <?= (int) $week ?>.</p>
-        <?php else: ?>
+        <?php else:
+          // Group into sections (QB, RB, WR, TE, DL, LB, DB), in that
+          // fixed order, no sorting within a section -- roster order as
+          // returned by MFL. Anything with a position code outside the
+          // known set (shouldn't happen for a startable roster spot,
+          // but better to show it than silently drop a player) falls
+          // into a trailing "Other" section instead of disappearing.
+          $sectioned = array_fill_keys(ROTC_LINEUP_SECTIONS, []);
+          $sectioned['Other'] = [];
+          foreach ($roster as $p) {
+              $rawPos = $players[$p['id']]['position'] ?? '';
+              $bucket = ROTC_LINEUP_POS_BUCKET[$rawPos] ?? null;
+              $sectioned[$bucket ?? 'Other'][] = $p;
+          }
+        ?>
           <form method="post" class="rotc-lineup-form">
             <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
             <input type="hidden" name="week" value="<?= (int) $week ?>">
+            <div style="overflow-x:auto;">
             <table class="rotc-lineup-table">
-              <thead><tr><th>Start</th><th>Player</th><th>Pos</th><th>Team</th></tr></thead>
+              <thead><tr>
+                <th>Start</th><th></th><th>Player</th><th>Pos</th>
+                <th>Week <?= (int) $week ?> Opp</th><th>Inj</th><th>Bye</th>
+                <th>Proj Pts</th><th>Pos Rank</th><th>% Start</th>
+              </tr></thead>
               <tbody>
-                <?php foreach ($roster as $p):
-                  $pd = $players[$p['id']] ?? [];
-                  $isChecked = in_array($p['id'], $checked, true);
+                <?php foreach ($sectioned as $sectionName => $sectionRoster):
+                  if (!$sectionRoster) continue;
                 ?>
-                  <tr>
-                    <td><input type="checkbox" name="starters[]" value="<?= htmlspecialchars($p['id']) ?>"<?= $isChecked ? ' checked' : '' ?>></td>
-                    <td><?= htmlspecialchars($pd['name'] ?? ('Player #' . $p['id'])) ?></td>
-                    <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
-                    <td><?= htmlspecialchars($pd['team'] ?? '') ?></td>
+                  <tr class="rotc-lineup-section-row">
+                    <td colspan="10"><?= htmlspecialchars($sectionName) ?></td>
                   </tr>
+                  <?php foreach ($sectionRoster as $p):
+                    $pd = $players[$p['id']] ?? [];
+                    $team = $pd['team'] ?? '';
+                    $isChecked = in_array($p['id'], $checked, true);
+                    $opp = $oppByTeam[$team] ?? null;
+                    $onBye = !empty($byeByTeam[$team]) && (string) $byeByTeam[$team] === (string) $week;
+                    $oppDisplay = $onBye ? 'BYE' : ($opp ? ($opp['home'] ? 'vs ' : '@ ') . $opp['opp'] : '--');
+                    $injStatus = $injByPlayerId[$p['id']] ?? '';
+                    $bye = $byeByTeam[$team] ?? '';
+                    $proj = $projById[$p['id']] ?? null;
+                    $posRank = $posRankById[$p['id']] ?? null;
+                    $startPct = $startPctById[$p['id']] ?? null;
+                    $statLines = [
+                        'Position'  => $pd['position'] ?? '',
+                        'Team'      => $team,
+                        'Week ' . $week . ' Opp' => $oppDisplay,
+                        'Injury'    => $injStatus,
+                        'Bye Week'  => $bye,
+                        'Proj Pts'  => $proj !== null ? number_format((float) $proj, 2) : '',
+                        'Pos Rank'  => $posRank !== null ? ('#' . $posRank) : '',
+                        '% Start'   => $startPct !== null ? ($startPct . '%') : '',
+                    ];
+                  ?>
+                    <tr>
+                      <td><input type="checkbox" name="starters[]" value="<?= htmlspecialchars($p['id']) ?>"<?= $isChecked ? ' checked' : '' ?>></td>
+                      <td><?= rotc_team_logo_img($team) ?></td>
+                      <td><?= rotc_player_hover_span($pd['name'] ?? ('Player #' . $p['id']), $pd, $statLines) ?></td>
+                      <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
+                      <td><?= htmlspecialchars($oppDisplay) ?></td>
+                      <td><?= htmlspecialchars($injStatus ?: '--') ?></td>
+                      <td><?= htmlspecialchars($bye !== '' ? (string) $bye : '--') ?></td>
+                      <td><?= $proj !== null ? htmlspecialchars(number_format((float) $proj, 2)) : '--' ?></td>
+                      <td><?= $posRank !== null ? '#' . (int) $posRank : '--' ?></td>
+                      <td><?= $startPct !== null ? htmlspecialchars((string) $startPct) . '%' : '--' ?></td>
+                    </tr>
+                  <?php endforeach; ?>
                 <?php endforeach; ?>
               </tbody>
             </table>
+            </div>
             <button type="submit" class="rotc-btn">Submit Lineup for Week <?= (int) $week ?></button>
           </form>
         <?php endif; ?>
@@ -173,4 +310,5 @@ if ($hasConfig) {
     </div>
   </main>
 </div>
+<?php if ($hasConfig) rotc_player_hover_widget(); ?>
 <?php include __DIR__ . '/../templates/footer.php'; ?>

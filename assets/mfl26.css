@@ -445,3 +445,10 @@ a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; }
 .rotc-franchise-action-desc{ font-size:12px; color:var(--muted); }
 a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-title,
 a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a7a6c99 !important; }
+
+/* Submit Lineup table (franchise/submit-lineup.php) -- section header
+   rows double as the horizontal divider between position groups (QB,
+   RB, WR, TE, DL, LB, DB), via a heavier top border + module-head
+   background rather than a separate <hr>. */
+.rotc-lineup-section-row td{ background:var(--module-head); color:var(--module-head-text); font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.05em; font-size:12px; font-weight:700; padding:6px 8px; border-top:2px solid var(--ink); }
+.rotc-lineup-table td, .rotc-lineup-table th{ white-space:nowrap; }
