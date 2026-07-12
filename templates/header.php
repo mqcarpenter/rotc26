@@ -58,7 +58,6 @@ $nav_items = [
     ['Complete Free Agent Listing', "$base/free-agents"],
     ['NFL Injury Report', "$base/injury-report"],
     ['Player News', "$mfl/news_articles?L=67102&P=*"],
-    ['Player Search', "$base/player-search"],
   ]],
   'Draft & Auction' => ['wide' => false, 'sub' => [
     ['Draft Results', "$mfl/options?L=67102&O=17"],
