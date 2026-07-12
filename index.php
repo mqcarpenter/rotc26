@@ -2,22 +2,64 @@
 /**
  * index.php — the front page.
  *
- * Layout: hero carousel + report cards in the main column,
- * Smack Feed / Videos tabs in the sidebar. Matches the reference
- * screenshot: no banner image, carousel is the hero, muted tab
- * bar, two-column body below it.
- *
- * Every data array here ($slides, $matchups, $smack_items, and
- * the report card content below) is a placeholder. The real
- * version pulls standings/matchups from the MFL API and news
- * from the WordPress REST API. Wire those in once this layout
- * is approved — see the TODOs inline.
+ * Layout: hero carousel, then Fantasy Recap (interactive hero+list
+ * hub) and Final NFL Scores in the main column; Smack Feed / Top
+ * Adds-Drops tabs in the sidebar. The old "Monday Report" and
+ * "Fantasy Preview" placeholder cards were removed per Matteo's call
+ * -- neither was ever wired to real data (Monday Report had no data
+ * source at all; Preview would've hit the same "MFL doesn't expose
+ * this via API" wall the old Recap card did before it was rebuilt).
  */
 
 $page_title = 'Return of the Champions XXVI';
 $current_tab = 'main';
 
 include __DIR__ . '/templates/header.php';
+
+$configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
+$hasConfig = file_exists($configPath);
+
+// Recap + Final NFL Scores share the same auto-detected "most recently
+// completed week" so the two agree with each other -- see
+// rotc_current_recap_week() in includes/weekly-recap.php.
+$recap = null;
+$nflGames = [];
+$recapYear = 2025;
+$recapWeek = 17;
+
+if ($hasConfig) {
+    require_once $configPath;
+    require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/includes/weekly-recap.php'; // also pulls in helmets.php + player-hover.php
+    require_once __DIR__ . '/includes/trending-players.php';
+
+    $current = rotc_current_recap_week((int) MFL_YEAR);
+    if ($current) {
+        $recapYear = $current['year'];
+        $recapWeek = $current['week'];
+    }
+    // else: nothing has completed yet this season (preseason) --
+    // $recapYear/$recapWeek stay on the 2025 Week 17 placeholder above
+    // so the page still has real data to render.
+
+    $recap = rotc_weekly_recap_article($recapYear, $recapWeek);
+
+    $nflRaw = mfl_cached_get_year('nflSchedule', $recapYear, 1800, ['W' => $recapWeek], false);
+    $nflGames = mfl_normalize_list($nflRaw['nflSchedule']['matchup'] ?? null);
+
+    $trending_adds = rotc_fetch_trending('topAdds', 15);
+    $trending_drops = rotc_fetch_trending('topDrops', 15);
+}
+
+const ROTC_HOME_NFL_ABBR = [
+    'ARI' => 'ARI', 'ATL' => 'ATL', 'BAL' => 'BAL', 'BUF' => 'BUF', 'CAR' => 'CAR',
+    'CHI' => 'CHI', 'CIN' => 'CIN', 'CLE' => 'CLE', 'DAL' => 'DAL', 'DEN' => 'DEN',
+    'DET' => 'DET', 'GBP' => 'GB', 'HOU' => 'HOU', 'IND' => 'IND', 'JAC' => 'JAX',
+    'KCC' => 'KC', 'LAC' => 'LAC', 'LAR' => 'LAR', 'LVR' => 'LV', 'MIA' => 'MIA',
+    'MIN' => 'MIN', 'NEP' => 'NE', 'NOS' => 'NO', 'NYG' => 'NYG', 'NYJ' => 'NYJ',
+    'PHI' => 'PHI', 'PIT' => 'PIT', 'SEA' => 'SEA', 'SFO' => 'SF', 'TBB' => 'TB',
+    'TEN' => 'TEN', 'WAS' => 'WAS',
+];
 ?>
 
 <div class="home-grid">
@@ -28,40 +70,9 @@ include __DIR__ . '/templates/header.php';
     if ($fetchedSlides) { $slides = $fetchedSlides; }
     include __DIR__ . '/templates/hero-carousel.php';
     ?>
-    <div class="card">
-      <h2 class="card-title">Monday Report</h2>
-      <p>Monday Report will be displayed on Mondays during the season for head-to-head leagues.</p>
-      <!-- TODO: pull from MFL API weeklyResults / live scoring during game days -->
-    </div>
 
     <div class="card">
       <h2 class="card-title">Fantasy Recap</h2>
-      <?php
-      require_once __DIR__ . '/includes/weekly-recap.php'; // also pulls in helmets.php + player-hover.php
-      $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
-      $recap = null;
-      if (file_exists($configPath)) {
-          require_once $configPath;
-          require_once __DIR__ . '/includes/mfl-api.php';
-          // Auto-advances every week: rotc_current_recap_week() finds
-          // the most recently COMPLETED week from real NFL kickoff
-          // timestamps, rolling over ~4 hours after that week's last
-          // game ends (Monday Night Football finishing around
-          // midnight ET means this naturally lands early Tuesday
-          // morning without hardcoding a day of the week anywhere).
-          $current = rotc_current_recap_week((int) MFL_YEAR);
-          if ($current) {
-              $recap = rotc_weekly_recap_article($current['year'], $current['week']);
-          } else {
-              // PLACEHOLDER: no week of the current season has
-              // completed yet (preseason, or before Week 1 kicks off)
-              // -- show 2025's Week 17 (last season's finale) so the
-              // hub still has real data to render instead of sitting
-              // empty all summer.
-              $recap = rotc_weekly_recap_article(2025, 17);
-          }
-      }
-      ?>
       <?php if ($recap): ?>
         <?php include __DIR__ . '/templates/weekly-recap-hub.php'; ?>
       <?php else: ?>
@@ -70,13 +81,36 @@ include __DIR__ . '/templates/header.php';
     </div>
 
     <div class="card">
-      <h2 class="card-title">Fantasy Preview &mdash; Game of the Week</h2>
-      <p>Coming up in a Week 1 Return of the Champions XXVI intra-divisional battle&hellip;</p>
-      <!-- TODO: pull from WordPress REST API preview post type -->
+      <h2 class="card-title">Final NFL Scores <span style="font-size:12px;font-weight:400;text-transform:none;color:var(--muted);">&mdash; Week <?= htmlspecialchars($recapWeek) ?>, <?= htmlspecialchars($recapYear) ?></span> <a href="<?= $base ?>/scores/nfl-schedule" style="font-size:12px;font-weight:400;text-transform:none;">Full schedule &rarr;</a></h2>
+      <?php if (!$nflGames): ?>
+        <p style="color:var(--muted);font-size:13px;">No NFL scores available for this week yet.</p>
+      <?php else: ?>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px;">
+          <?php foreach ($nflGames as $g):
+            $teams = mfl_normalize_list($g['team'] ?? null);
+            $away = null; $home = null;
+            foreach ($teams as $t) { if (($t['isHome'] ?? '0') === '1') $home = $t; else $away = $t; }
+            if (!$away || !$home) continue;
+            $hasScore = ($away['score'] ?? '') !== '' || ($home['score'] ?? '') !== '';
+          ?>
+            <div style="border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                <?= rotc_team_logo_img($away['id'] ?? null, 20) ?>
+                <span style="font-size:13px;"><?= htmlspecialchars(ROTC_HOME_NFL_ABBR[$away['id'] ?? ''] ?? ($away['id'] ?? '?')) ?></span>
+                <strong style="font-family:'Roboto Condensed',sans-serif;"><?= htmlspecialchars($hasScore ? ($away['score'] ?? '0') : '-') ?></strong>
+              </div>
+              <span style="color:var(--muted);font-size:11px;">FINAL</span>
+              <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                <strong style="font-family:'Roboto Condensed',sans-serif;"><?= htmlspecialchars($hasScore ? ($home['score'] ?? '0') : '-') ?></strong>
+                <span style="font-size:13px;"><?= htmlspecialchars(ROTC_HOME_NFL_ABBR[$home['id'] ?? ''] ?? ($home['id'] ?? '?')) ?></span>
+                <?= rotc_team_logo_img($home['id'] ?? null, 20) ?>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
     </div>
   </main>
-
-  <?php if ($recap) rotc_player_hover_widget(); ?>
 
   <aside class="home-sidebar">
     <?php
@@ -87,5 +121,7 @@ include __DIR__ . '/templates/header.php';
     ?>
   </aside>
 </div>
+
+<?php if ($recap) rotc_player_hover_widget(); ?>
 
 <?php include __DIR__ . '/templates/footer.php'; ?>

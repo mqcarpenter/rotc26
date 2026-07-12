@@ -186,7 +186,7 @@ function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $we
     $opener = rotc_recap_pick_phrase($seed . '-opener', ['openers']);
     $p1 = ($opener !== '' ? htmlspecialchars($opener) . ' ' : '') . rotc_recap_side_paragraph($winner, $resultLead, $week);
 
-    $p2 = rotc_recap_side_paragraph($loser, htmlspecialchars($loser['name'] . ' couldn\u{2019}t quite complete the comeback.'), $week);
+    $p2 = rotc_recap_side_paragraph($loser, htmlspecialchars($loser['name'] . " couldn\u{2019}t quite complete the comeback."), $week);
 
     $colorLines = rotc_recap_pick_phrases($seed . '-color', ROTC_RECAP_COLOR_CATEGORIES, 2);
     $p3 = $colorLines ? implode(' ', array_map('htmlspecialchars', $colorLines)) : null;

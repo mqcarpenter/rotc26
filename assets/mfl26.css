@@ -381,3 +381,14 @@ a:hover{ color:var(--accent); }
 .rotc-recap-list-score{ font-size:12px; color:var(--muted); }
 @media (max-width:900px){ .rotc-recap-hub-wrap{ grid-template-columns:1fr; } }
 @media (max-width:600px){ .rotc-recap-hero{ flex-direction:column; align-items:flex-start; } .rotc-recap-hero-helmet{ width:110px; height:110px; } .rotc-recap-headline{ font-size:22px; } }
+
+/* Sidebar "Top Adds/Drops" tab (templates/sidefeed.php, replacing the
+   dead Videos tab) -- compact trending-player rows: logo, hoverable
+   name, position, trend percent. */
+.rotc-trending-group{ padding:6px 14px 10px; }
+.rotc-trending-heading{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.05em; font-size:11px; color:var(--muted); margin:6px 0 4px; }
+.rotc-trending-row{ display:flex; align-items:center; gap:6px; padding:4px 0; border-bottom:1px dashed var(--line); font-size:12px; }
+.rotc-trending-row:last-child{ border-bottom:0; }
+.rotc-trending-name{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.rotc-trending-pos{ color:var(--muted); flex:0 0 auto; }
+.rotc-trending-pct{ color:var(--accent); font-weight:700; flex:0 0 auto; }
