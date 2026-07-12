@@ -58,8 +58,6 @@ $nav_items = [
     ['Complete Free Agent Listing', "$mfl/reports?L=67102&R=FULLFA"],
     ['NFL Injury Report', "$mfl/injury?L=67102"],
     ['Player News', "$mfl/news_articles?L=67102&P=*"],
-    ['My Player News', "$mfl/news_articles?L=67102&MYNEWS=1"],
-    ['Get Projection Sources', 'http://subscribe.myfantasyleague.com/'],
     ['Player Search', "$mfl/player_search?L=67102"],
   ]],
   'Draft & Auction' => ['wide' => false, 'sub' => [
