@@ -51,6 +51,15 @@
  * First column is the player's NFL team logo (ESPN's public CDN, see
  * rotc_team_logo_img() in includes/player-hover.php).
  *
+ * Roster-full flair: TYPE=league returns rosterSize (confirmed live,
+ * "27" for this league) -- each franchise's header shows FULL (27/27)
+ * or, if under the cap, "N/27 -- X OPEN". When a roster is under the
+ * cap, blank "open roster slot" filler rows are appended so every
+ * franchise's card renders the same height (rosterSize rows) instead
+ * of shorter cards looking broken/truncated next to full ones. Every
+ * roster is full as of this writing, so this mostly won't be visible
+ * until someone's roster actually has an opening.
+ *
  * Hover card: see includes/player-hover.php for the shared widget.
  */
 
@@ -77,6 +86,13 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/player-hover.php';
 
     $franchises = mfl_franchises();
+
+    // League-wide roster cap, so the header can flair FULL vs. how many
+    // slots are open. Confirmed live: TYPE=league returns rosterSize as
+    // a plain integer string ("27" for this league).
+    $leagueRaw = mfl_cached_get('league', 86400);
+    $rosterSize = (int) ($leagueRaw['league']['rosterSize'] ?? 0);
+
     $raw = mfl_cached_get('rosters', 1800, []);
     $allIds = [];
     foreach (mfl_normalize_list($raw['rosters']['franchise'] ?? null) as $fr) {
@@ -199,9 +215,21 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
         <p style="color:var(--muted);font-size:13px;margin-top:-6px;">Click a column header to sort. Hover a player's name for details.</p>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;">
-          <?php foreach ($franchises as $id => $f): $roster = $rosters[$id] ?? []; ?>
+          <?php foreach ($franchises as $id => $f):
+            $roster = $rosters[$id] ?? [];
+            $filledCount = count($roster);
+            $openSlots = $rosterSize > 0 ? max(0, $rosterSize - $filledCount) : 0;
+            $isFull = $rosterSize > 0 && $openSlots === 0;
+          ?>
             <div style="border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-width:0;">
-              <h3 style="margin:0 0 8px;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;"><?= htmlspecialchars($f['name']) ?></h3>
+              <h3 style="margin:0 0 8px;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <span><?= htmlspecialchars($f['name']) ?></span>
+                <?php if ($rosterSize > 0): ?>
+                  <span style="font-size:11px;letter-spacing:.04em;padding:3px 8px;border-radius:999px;text-transform:none;font-weight:600;<?= $isFull ? 'background:#1e4d2b;color:#fff;' : 'background:#8a4b12;color:#fff;' ?>">
+                    <?= $isFull ? "FULL ({$filledCount}/{$rosterSize})" : "{$filledCount}/{$rosterSize} - {$openSlots} OPEN" ?>
+                  </span>
+                <?php endif; ?>
+              </h3>
               <?php if (!$roster): ?>
                 <p style="color:var(--muted);font-size:13px;">No players rostered.</p>
               <?php else: ?>
@@ -248,6 +276,12 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
                         <td><?= htmlspecialchars($acquired) ?></td>
                       </tr>
                     <?php endforeach; ?>
+                    <?php for ($slot = 0; $slot < $openSlots; $slot++): ?>
+                      <tr class="rotc-filler-row" style="color:var(--muted);">
+                        <td></td>
+                        <td colspan="6" style="font-style:italic;">&mdash; open roster slot &mdash;</td>
+                      </tr>
+                    <?php endfor; ?>
                   </tbody>
                 </table>
                 </div>
@@ -277,6 +311,15 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
         var tbody = table.querySelector('tbody');
         var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
         rows.sort(function (a, b) {
+          // Open-slot filler rows have no real data -- always sink to
+          // the bottom regardless of sort column/direction, never
+          // shuffle to the top just because "" sorts first.
+          var aFiller = a.classList.contains('rotc-filler-row');
+          var bFiller = b.classList.contains('rotc-filler-row');
+          if (aFiller && bFiller) return 0;
+          if (aFiller) return 1;
+          if (bFiller) return -1;
+
           var ca = a.children[colIndex], cb = b.children[colIndex];
           var av, bv;
           if (type === 'num') {

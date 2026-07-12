@@ -109,7 +109,7 @@ $nav_items = [
 // subfolder since standings.php moved there with the rest of the
 // Scores-section pages.
 $tabs = [
-  'main'          => ['label' => 'Main',         'href' => "$base/main"],
+  'main'          => ['label' => 'Main',         'href' => $base !== '' ? $base . '/' : '/'],
   'auction'       => ['label' => 'Auction',       'href' => "$base/auction"],
   'gameday'       => ['label' => 'Gameday',       'href' => "$base/gameday"],
   'standings'     => ['label' => 'Standings',     'href' => "$base/scores/standings"],
