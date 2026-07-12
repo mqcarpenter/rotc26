@@ -37,6 +37,7 @@ $fetchError = !file_exists($configPath);
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/includes/helmets.php';
 
     $franchises = mfl_franchises();
     $divisions  = mfl_divisions_conferences();
@@ -105,7 +106,8 @@ function rotc_pick_value(array $weekRow): string {
             <?php foreach ($rows as $i => $row): $f = $franchises[$row['id']] ?? ['name' => $row['id'], 'icon' => '']; ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td>
-                  <?php if (!empty($f['icon'])): ?><img src="<?= htmlspecialchars($f['icon']) ?>" alt="" width="24" height="24" style="vertical-align:middle;border-radius:4px;margin-right:6px;"><?php endif; ?>
+                  <?php $helmet = rotc_helmet_src($row['id']); ?>
+                  <?php if ($helmet): ?><img src="<?= htmlspecialchars($helmet) ?>" alt="" width="26" height="26" style="vertical-align:middle;border-radius:50%;margin-right:8px;<?= rotc_helmet_flip($row['id']) ? 'transform:scaleX(-1);' : '' ?>"><?php endif; ?>
                   <?= htmlspecialchars($f['name']) ?>
                 </td>
                 <td><?= htmlspecialchars($row['h2hwlt'] ?? '') ?></td>

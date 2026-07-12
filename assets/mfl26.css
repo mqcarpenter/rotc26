@@ -142,7 +142,7 @@ a:hover{ color:var(--accent); }
 .rotc-item:hover .rotc-top{ color:var(--paper); border-bottom-color:var(--accent); }
 .rotc-login{ margin-left:0; }
 .rotc-login .rotc-top{ color:var(--accent); }
-.rotc-sub{ list-style:none; margin:0; padding:6px; position:absolute; top:calc(100% + 6px); left:0; width:240px; max-width:90vw; background:var(--card); border:1px solid var(--line); box-shadow:0 8px 20px rgba(42,24,16,.18); display:none; z-index:10000; box-sizing:border-box; overflow:hidden; }
+.rotc-sub{ list-style:none; margin:0; padding:6px; position:absolute; top:100%; left:0; width:240px; max-width:90vw; background:var(--card); border:1px solid var(--line); box-shadow:0 8px 20px rgba(42,24,16,.18); display:none; z-index:10000; box-sizing:border-box; overflow:hidden; }
 .rotc-sub a{ overflow-wrap:break-word; word-break:break-word; display:block; padding:7px 10px; font-size:13px; color:var(--ink-2); }
 .rotc-item:hover .rotc-sub{ display:block; }
 .rotc-item.wide:hover .rotc-sub{ display:flex; }
