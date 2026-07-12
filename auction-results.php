@@ -2,10 +2,15 @@
 /**
  * auction-results.php
  * Matches Draft & Auction -> Auction Results. TYPE=auctionResults.
- * Confirmed live this returns an error ("Auction has not been setup
- * yet.") right now -- the 2026 auction hasn't happened. mfl_fetch()
- * already treats any {"error":...} payload as null, so this page's
- * empty-state handling covers that case automatically.
+ * When the current year's auction hasn't happened yet, MFL returns an
+ * error ("Auction has not been setup yet."); mfl_fetch() already
+ * treats any {"error":...} payload as null, so the empty-state
+ * handling below covers that case automatically.
+ *
+ * Winning bid field is `winningBid` (confirmed via a live 2025 season
+ * auctionResults test call -- {"franchise":...,"player":...,
+ * "winningBid":"15.00",...}). An earlier version of this page guessed
+ * `price`/`amount`, which don't exist on this record; fixed here.
  */
 
 $page_title = 'Auction Results — Return of the Champions XXVI';
@@ -56,7 +61,7 @@ if (!$fetchError) {
                 <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                   <td><?= htmlspecialchars($franchises[$r['franchise'] ?? '']['name'] ?? ($r['franchise'] ?? '')) ?></td>
                   <td><?= htmlspecialchars($pd['name'] ?? ('Player #' . ($r['player'] ?? ''))) ?></td>
-                  <td>$<?= htmlspecialchars($r['price'] ?? $r['amount'] ?? '') ?></td>
+                  <td>$<?= htmlspecialchars($r['winningBid'] ?? '') ?></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>

@@ -58,6 +58,7 @@ $dir = ($_GET['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/includes/player-hover.php';
 
     $params = $posFilter ? ['POSITION' => $posFilter] : [];
     $faRaw = mfl_cached_get('freeAgents', 900, $params); // 15 min -- waiver activity changes this
@@ -68,7 +69,7 @@ if (!$fetchError) {
     // chunked at 150 ids per MFL API call, each chunk cached an hour.
     $players = [];
     foreach (array_chunk($allIds, 150) as $chunk) {
-        $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk)], false);
+        $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk), 'DETAILS' => 1], false);
         foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
             $players[$p['id']] = $p;
         }
@@ -114,6 +115,7 @@ if (!$fetchError) {
         if (!$p) continue;
         $team = $p['team'] ?? '';
         $allRows[] = [
+            'pd'       => $p,
             'name'     => $p['name'] ?? ('Player #' . $id),
             'position' => $p['position'] ?? '',
             'team'     => $team,
@@ -192,7 +194,7 @@ function rotc_sort_link(string $col, string $label, string $sort, string $dir): 
           <tbody>
             <?php foreach ($rows as $i => $r): ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                <td><?= htmlspecialchars($r['name']) ?></td>
+                <td><?= rotc_player_hover_span($r['name'], $r['pd'], ['2025 Total' => $r['pts2025'] !== '' ? $r['pts2025'] . ' pts' : '', 'Wk 1 Proj' => $r['proj'] !== '' ? $r['proj'] . ' pts' : '', 'Bye Week' => $r['bye'], 'Wk 1 Opp' => $r['opp']]) ?></td>
                 <td><?= htmlspecialchars($r['position']) ?></td>
                 <td><?= htmlspecialchars($r['team']) ?></td>
                 <td><?= htmlspecialchars($r['status']) ?></td>
@@ -221,5 +223,7 @@ function rotc_sort_link(string $col, string $label, string $sort, string $dir): 
     <?php endif; ?>
   </main>
 </div>
+
+<?php if (!$fetchError) rotc_player_hover_widget(); ?>
 
 <?php include __DIR__ . '/templates/footer.php'; ?>

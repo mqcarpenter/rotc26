@@ -5,26 +5,28 @@
  * returns every franchise's full roster in one call. Matches MFL's own
  * Rosters page columns exactly: PLAYER, 2025 PTS, BYE, ACQUIRED.
  *
- * "Acquired" is the rosters API's own `drafted` field -- confirmed
- * live against MFL's own Rosters report, values like "K1"/"K2"/"K3"
- * mean the player was kept, and the number is the round the keeper
- * cost counts as. Blank means the player wasn't a kept player (regular
- * draft/auction/waiver acquisition -- MFL's own page doesn't
- * distinguish further, so neither does this one).
+ * "Acquired" detail, in priority order:
+ *   1. rosters API's own `drafted` field ("K1"/"K2"/"K3") -- confirmed
+ *      live against MFL's own Rosters report -- means the player was
+ *      kept, number is the round the keeper cost counts as.
+ *   2. TYPE=auctionResults for the current + prior year -- if the
+ *      player was won at auction by this franchise, shows the year
+ *      and winning bid. Confirmed live (2025 season) this returns real
+ *      {franchise, player, winningBid} data.
+ *   3. TYPE=transactions (TRANS_TYPE=TRADE) for the current + prior
+ *      year -- confirmed live these include structured player ids in
+ *      franchise1_gave_up / franchise2_gave_up, so a trade acquisition
+ *      can be matched and shows who it came from.
+ *   4. Fallback "Waiver/FA" -- MFL's own Rosters page doesn't
+ *      distinguish waiver adds from free agent adds either, and the
+ *      API has no separate "add" transaction history exposed here, so
+ *      this is the honest floor rather than a guess.
  *
  * Sortable: each franchise's table sorts independently (client-side --
  * no server round-trip needed for ~25 rows). Click a header to sort,
  * click again to flip direction.
  *
- * Hover card: shows a photo + bio summary on hovering a player's name.
- * Photo comes from ESPN's public headshot CDN keyed by the espn_id
- * MFL's players API (DETAILS=1) cross-references -- verified this
- * resolves to a real photo. Bio fields (height/weight/college/age) are
- * biographical data, not the raw in-game NFL stats MFL's own terms of
- * service forbid exposing (see includes/mfl-api.php notes elsewhere on
- * this project) -- this card intentionally sticks to bio + this site's
- * own fantasy scoring data (2025 total, bye), nothing that would cross
- * that licensing line.
+ * Hover card: see includes/player-hover.php for the shared widget.
  */
 
 $page_title = 'Rosters — Return of the Champions XXVI';
@@ -40,10 +42,13 @@ $rosters = [];
 $players = [];
 $byeByTeam = [];
 $prevPtsById = [];
+$auctionByFranchisePlayer = []; // "franchise|player" => "YYYY|$bid"
+$tradeByFranchisePlayer = [];   // "franchise|player" => "YYYY|Franchise Name"
 
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/includes/player-hover.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('rosters', 1800, []);
@@ -69,15 +74,70 @@ if (!$fetchError) {
     foreach (mfl_normalize_list($prevYearRaw['playerScores']['playerScore'] ?? null) as $row) {
         if (!empty($row['id'])) $prevPtsById[$row['id']] = $row['score'] ?? '';
     }
+
+    // Auction history -- current + prior year. Current year's auction
+    // hasn't happened yet as of this writing (confirmed live on
+    // auction-results.php), so this is mostly prior-year data today,
+    // but checking both keeps this correct once a new auction runs.
+    // Later year wins if a player somehow shows in both (shouldn't
+    // happen, but favor the more recent acquisition just in case).
+    foreach ([(int) MFL_YEAR - 1, (int) MFL_YEAR] as $auctionYear) {
+        $auctionRaw = mfl_cached_get_year('auctionResults', $auctionYear, 21600, []);
+        foreach (mfl_normalize_list($auctionRaw['auctionResults']['auctionUnit']['auction'] ?? null) as $a) {
+            if (empty($a['franchise']) || empty($a['player'])) continue;
+            $key = $a['franchise'] . '|' . $a['player'];
+            $bid = $a['winningBid'] ?? '';
+            $auctionByFranchisePlayer[$key] = $auctionYear . '|' . $bid;
+        }
+    }
+
+    // Trade history -- current + prior year. Each TRADE transaction
+    // lists player ids each side gave up (franchise1_gave_up /
+    // franchise2_gave_up); the players in franchise1's give-up list
+    // went TO franchise2, and vice versa. Confirmed live this data is
+    // structured player ids, not free text.
+    foreach ([(int) MFL_YEAR - 1, (int) MFL_YEAR] as $tradeYear) {
+        $tradeRaw = mfl_cached_get_year('transactions', $tradeYear, 21600, ['TRANS_TYPE' => 'TRADE']);
+        foreach (mfl_normalize_list($tradeRaw['transactions']['transaction'] ?? null) as $t) {
+            if (($t['type'] ?? '') !== 'TRADE') continue;
+            $f1 = $t['franchise'] ?? '';
+            $f2 = $t['franchise2'] ?? '';
+            $f1GaveUp = array_filter(explode(',', $t['franchise1_gave_up'] ?? ''));
+            $f2GaveUp = array_filter(explode(',', $t['franchise2_gave_up'] ?? ''));
+            foreach ($f1GaveUp as $pid) {
+                if ($f2 === '') continue;
+                $tradeByFranchisePlayer[$f2 . '|' . $pid] = $tradeYear . '|' . ($franchises[$f1]['name'] ?? $f1);
+            }
+            foreach ($f2GaveUp as $pid) {
+                if ($f1 === '') continue;
+                $tradeByFranchisePlayer[$f1 . '|' . $pid] = $tradeYear . '|' . ($franchises[$f2]['name'] ?? $f2);
+            }
+        }
+    }
 }
 
 $STATUS_LABEL = ['ROSTER' => 'Active', 'INJURED_RESERVE' => 'IR', 'TAXI_SQUAD' => 'Taxi'];
 
-function rotc_espn_photo(?array $pd): ?string {
-    if (!$pd || empty($pd['espn_id'])) return null;
-    return 'https://a.espncdn.com/i/headshots/nfl/players/full/' . $pd['espn_id'] . '.png';
+/**
+ * Builds the Acquired column text for one roster row. See the
+ * priority order documented in the file header.
+ */
+function rotc_acquired_label(string $franchiseId, string $playerId, string $drafted, array $auctionMap, array $tradeMap): string {
+    if ($drafted !== '') {
+        $round = ltrim($drafted, 'Kk');
+        return $round !== '' ? "Kept (Rd $round)" : 'Kept';
+    }
+    $key = $franchiseId . '|' . $playerId;
+    if (isset($auctionMap[$key])) {
+        [$year, $bid] = explode('|', $auctionMap[$key], 2);
+        return $bid !== '' ? "$year Auction – \$$bid" : "$year Auction";
+    }
+    if (isset($tradeMap[$key])) {
+        [$year, $fromName] = explode('|', $tradeMap[$key], 2);
+        return "$year Trade w/ $fromName";
+    }
+    return 'Waiver/FA';
 }
-
 ?>
 
 <div class="home-grid">
@@ -112,30 +172,14 @@ function rotc_espn_photo(?array $pd): ?string {
                       $pd = $players[$p['id']] ?? null;
                       $team = $pd['team'] ?? '';
                       $status = $STATUS_LABEL[$p['status'] ?? ''] ?? ($p['status'] ?? '');
-                      $acquired = $p['drafted'] ?? '';
+                      $drafted = $p['drafted'] ?? '';
+                      $acquired = rotc_acquired_label((string) $id, (string) $p['id'], (string) $drafted, $auctionByFranchisePlayer, $tradeByFranchisePlayer);
                       $pts2025 = $prevPtsById[$p['id']] ?? '';
                       $bye = $byeByTeam[$team] ?? '';
-                      $photo = rotc_espn_photo($pd);
-
-                      $cardBits = [];
-                      if (!empty($pd['position'])) $cardBits[] = htmlspecialchars($pd['position']);
-                      if (!empty($team)) $cardBits[] = htmlspecialchars($team);
-                      if (!empty($pd['college'])) $cardBits[] = htmlspecialchars($pd['college']);
-                      if (!empty($pd['height'])) $cardBits[] = htmlspecialchars($pd['height']) . '"';
-                      if (!empty($pd['weight'])) $cardBits[] = htmlspecialchars($pd['weight']) . ' lbs';
+                      $name = $pd['name'] ?? ('Player #' . $p['id']);
                     ?>
                       <tr>
-                        <td>
-                          <span class="rotc-player-hover"
-                                data-name="<?= htmlspecialchars($pd['name'] ?? ('Player #' . $p['id'])) ?>"
-                                data-photo="<?= htmlspecialchars($photo ?? '') ?>"
-                                data-bio="<?= htmlspecialchars(implode(' · ', $cardBits)) ?>"
-                                data-pts="<?= htmlspecialchars($pts2025) ?>"
-                                data-bye="<?= htmlspecialchars($bye) ?>"
-                                data-status="<?= htmlspecialchars($status) ?>">
-                            <?= htmlspecialchars($pd['name'] ?? ('Player #' . $p['id'])) ?>
-                          </span>
-                        </td>
+                        <td><?= rotc_player_hover_span($name, $pd, ['2025 Total' => $pts2025 !== '' ? $pts2025 . ' pts' : '', 'Bye Week' => $bye, 'Roster Status' => $status]) ?></td>
                         <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
                         <td data-value="<?= $pts2025 !== '' ? htmlspecialchars($pts2025) : -1 ?>"><?= htmlspecialchars($pts2025) ?></td>
                         <td data-value="<?= $bye !== '' ? htmlspecialchars($bye) : -1 ?>"><?= htmlspecialchars($bye) ?></td>
@@ -154,19 +198,8 @@ function rotc_espn_photo(?array $pd): ?string {
   </main>
 </div>
 
-<div id="rotc-player-card" style="display:none;position:fixed;z-index:999;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 12px 28px rgba(0,0,0,.22);padding:12px;width:220px;pointer-events:none;">
-  <img id="rotc-pc-photo" src="" alt="" style="width:100%;height:140px;object-fit:cover;border-radius:8px;background:var(--sand);display:none;">
-  <div id="rotc-pc-name" style="font-weight:700;font-family:'Roboto Condensed',sans-serif;margin-top:8px;"></div>
-  <div id="rotc-pc-bio" style="color:var(--muted);font-size:12px;margin-top:2px;"></div>
-  <div id="rotc-pc-stats" style="font-size:13px;margin-top:8px;border-top:1px solid var(--line);padding-top:8px;"></div>
-</div>
-
 <script>
 (function () {
-  // Sortable tables: click a header to sort that table by that column,
-  // click again to flip direction. Numeric columns use the data-value
-  // attribute (blank stats sort last, not as zero); text columns sort
-  // on cell text directly.
   document.querySelectorAll('.rotc-sortable').forEach(function (table) {
     var headers = table.querySelectorAll('thead th');
     headers.forEach(function (th, colIndex) {
@@ -206,47 +239,9 @@ function rotc_espn_photo(?array $pd): ?string {
       });
     });
   });
-
-  // Hover card: photo + bio + this site's own fantasy scoring data.
-  var card = document.getElementById('rotc-player-card');
-  var photo = document.getElementById('rotc-pc-photo');
-  var nameEl = document.getElementById('rotc-pc-name');
-  var bioEl = document.getElementById('rotc-pc-bio');
-  var statsEl = document.getElementById('rotc-pc-stats');
-
-  document.querySelectorAll('.rotc-player-hover').forEach(function (el) {
-    el.style.cursor = 'default';
-    el.style.borderBottom = '1px dotted var(--muted)';
-    el.addEventListener('mouseenter', function (e) {
-      nameEl.textContent = el.dataset.name || '';
-      bioEl.textContent = el.dataset.bio || '';
-      var pts = el.dataset.pts, bye = el.dataset.bye, status = el.dataset.status;
-      var lines = [];
-      if (pts) lines.push('2025 Total: <strong>' + pts + ' pts</strong>');
-      if (bye) lines.push('Bye Week: <strong>' + bye + '</strong>');
-      if (status) lines.push('Roster Status: <strong>' + status + '</strong>');
-      statsEl.innerHTML = lines.join('<br>');
-      if (el.dataset.photo) {
-        photo.src = el.dataset.photo;
-        photo.style.display = 'block';
-        photo.onerror = function () { photo.style.display = 'none'; };
-      } else {
-        photo.style.display = 'none';
-      }
-      card.style.display = 'block';
-    });
-    el.addEventListener('mousemove', function (e) {
-      var x = e.clientX + 16, y = e.clientY + 16;
-      if (x + 236 > window.innerWidth) x = e.clientX - 236;
-      if (y + 260 > window.innerHeight) y = e.clientY - 260;
-      card.style.left = x + 'px';
-      card.style.top = y + 'px';
-    });
-    el.addEventListener('mouseleave', function () {
-      card.style.display = 'none';
-    });
-  });
 })();
 </script>
+
+<?php if (!$fetchError) rotc_player_hover_widget(); ?>
 
 <?php include __DIR__ . '/templates/footer.php'; ?>

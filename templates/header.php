@@ -83,18 +83,7 @@ $nav_items = [
   ]],
   'Franchise' => ['wide' => false, 'sub' => [
     ['Trade Bait', "$base/trade-bait"],
-    ['My Watch List', "$mfl/options?L=67102&O=178"],
-    ['My Scratchpad', "$mfl/options?L=67102&O=234"],
     ['My Links', "$mfl/edit_my_links?L=67102"],
-  ]],
-  'Social' => ['wide' => false, 'sub' => [
-    ['Message Board', "$mfl/options?L=67102&O=28"],
-    ['League Chat', "javascript:chat_window('$mfl/chat?L=67102&COUNT=40');"],
-    ['League Articles', "$mfl/options?L=67102&O=73"],
-    ['League Polls', "$mfl/options?L=67102&O=69"],
-    ['Trash-Talk Videos', "$mfl/options?L=67102&O=244"],
-    ['Email to Commissioner', 'mailto:commish@returnofthechampions.com?Subject=Return%20of%20the%20Champions%20XXVI%20%2867102%29'],
-    ['Send Text Message to League', "$mfl/options?L=67102&O=218"],
   ]],
   'Help' => ['wide' => false, 'sub' => [
     ['MFL Community Forums', 'https://www.fantasysharks.com/forum/viewforum.php?f=501'],
@@ -102,10 +91,10 @@ $nav_items = [
     ['Refer A Friend And Save!', "$mfl/options?L=67102&O=167"],
   ]],
 ];
-// "Email to Entire League" carries every owner's email in one mailto — kept
-// out of the array above and appended separately so it's easy to spot/edit,
-// since it's the one link with real personal data baked in.
-$nav_items['Social']['sub'][] = ['Email to Entire League', 'mailto:mqcarpenter@gmail.com,commish@returnofthechampions.com,jtdoubleo8@gmail.com,walters.alun@yahoo.ca,wbradford76@gmail.com,michael.mundon@gmail.com,gene.coronado@gmail.com,thahallway@gmail.com,Crawdadvet@yahoo.com,cbrydonsmith@gmail.com,timbruntx@hotmail.com,asmyth18@gmail.com,barry.huff@gmail.com,gtturner97@gmail.com,Jjmcm08@gmail.com,dbuckley3@yahoo.com?subject=Return%20of%20the%20Champions%20XXVI%20%2867102%29'];
+// "Email to Entire League" was a Social submenu item -- Social was removed
+// per Matteo's request (moving league comms to the WhatsApp group instead,
+// see the WhatsApp icon in the nav bar). Kept out of $nav_items now that
+// there's no Social tree to attach it to.
 
 $tabs = [
   'main'          => 'Main',
@@ -163,6 +152,11 @@ $tabs = [
           </ul>
         </li>
       <?php endforeach; ?>
+      <li class="rotc-item rotc-whatsapp">
+        <a class="rotc-top rotc-whatsapp-link" href="https://chat.whatsapp.com/HaQkAJiqi90IEmhnoqhlBr" target="_blank" rel="noopener" title="Join the league WhatsApp group" aria-label="Join the league WhatsApp group">
+          <svg viewBox="0 0 32 32" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M16.004 3C9.376 3 4 8.373 4 15c0 2.315.646 4.478 1.768 6.32L4 29l7.86-1.717A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3zm6.99 16.845c-.297.836-1.47 1.53-2.412 1.73-.642.135-1.48.243-4.302-.924-3.61-1.494-5.933-5.156-6.115-5.394-.176-.238-1.464-1.95-1.464-3.72s.914-2.64 1.24-3.003c.297-.33.652-.412.87-.412.218 0 .436.002.626.011.2.01.47-.076.735.561.297.703.965 2.34 1.05 2.51.088.17.147.37.03.6-.117.23-.176.373-.35.574-.176.202-.37.45-.53.605-.176.17-.36.354-.155.694.206.34.916 1.51 1.966 2.446 1.35 1.204 2.49 1.577 2.83 1.755.34.176.54.147.74-.089.2-.235.85-.99 1.078-1.33.23-.34.46-.283.77-.17.31.117 1.98.933 2.32 1.102.34.17.564.253.647.394.083.14.083.813-.214 1.65z"/></svg>
+        </a>
+      </li>
       <li class="rotc-item rotc-login">
         <?php if ($is_logged_in): ?>
           <a class="rotc-top" href="<?= $mfl ?>/logout?L=67102">Logout</a>

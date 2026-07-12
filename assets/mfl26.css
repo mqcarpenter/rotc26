@@ -133,6 +133,15 @@ a:hover{ color:var(--accent); }
 .rotc-bar{ display:flex; align-items:center; gap:28px; max-width:none; margin:0; padding:0 20px; height:62px; }
 .rotc-brand{ display:flex; align-items:center; text-decoration:none; flex:0 0 auto; }
 .rotc-nav .rotc-brand .rotc-logo{ height:36px !important; width:auto !important; max-height:36px !important; max-width:140px !important; object-fit:contain; display:block; }
+
+/* WhatsApp icon nav item -- replaces the old Social dropdown tree.
+   Uses .rotc-top for consistent hover/padding but isn't a dropdown, so
+   the mobile ::after "+" indicator (added for every .rotc-top at the
+   mobile breakpoint below) needs to be suppressed on this one item. */
+.rotc-whatsapp-link{ display:flex; align-items:center; justify-content:center; padding:20px 4px; color:rgba(253,251,247,.82); }
+.rotc-whatsapp-link:hover{ color:#25D366; }
+.rotc-whatsapp-link::after{ content:none !important; }
+
 .rotc-burger{ display:none; }
 .rotc-burger-btn{ display:none; margin-left:auto; color:var(--paper); font-size:26px; line-height:1; cursor:pointer; user-select:none; }
 .rotc-menu{ list-style:none; display:flex; align-items:center; justify-content:space-between; flex:1; gap:10px; margin:0; padding:0; }
