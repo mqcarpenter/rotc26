@@ -97,11 +97,6 @@ $nav_items = [
     ['Trade Bait', "$base/franchise/trade-bait"],
     ['My Links', "$mfl/edit_my_links?L=67102"],
   ]],
-  'Help' => ['wide' => false, 'sub' => [
-    ['MFL Community Forums', 'https://www.fantasysharks.com/forum/viewforum.php?f=501'],
-    ['Follow Us On Twitter', 'https://twitter.com/MyFantasyLeague'],
-    ['Refer A Friend And Save!', "$mfl/options?L=67102&O=167"],
-  ]],
 ];
 // "Email to Entire League" was a Social submenu item -- Social was removed
 // per Matteo's request (moving league comms to the WhatsApp group instead,
