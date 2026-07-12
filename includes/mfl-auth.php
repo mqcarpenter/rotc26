@@ -254,27 +254,32 @@ function rotc_mfl_authed_request(string $command, string $type, array $params = 
     $data = json_decode($body, true);
     if (is_array($data)) return $data;
 
-    // Confirmed live: a rejected import (e.g. a lineup that doesn't
-    // meet position requirements) comes back as XML with an <error>
-    // root EVEN THOUGH JSON=1 was passed -- unlike every export call,
-    // MFL doesn't honor JSON=1 for this kind of import rejection. Fall
-    // back to parsing it as XML rather than treating it as a transport
-    // failure, since it's actually a normal, meaningful rejection the
-    // owner needs to see (e.g. "You must select at least 2 DT+DE").
-    if (stripos(ltrim((string) $body), '<?xml') === 0 || stripos(ltrim((string) $body), '<error') === 0) {
+    // Confirmed live: EVERY import response comes back as XML
+    // regardless of JSON=1 -- both a rejection ("<error>Error(s)
+    // submitting lineup: ...</error>") AND a plain success
+    // ("<status>OK</status>") were seen live, so this has to handle
+    // both shapes, not just the error one.
+    if (stripos(ltrim((string) $body), '<?xml') === 0 || stripos(ltrim((string) $body), '<') === 0) {
         libxml_use_internal_errors(true);
         $xml = simplexml_load_string($body);
-        if ($xml !== false && $xml->getName() === 'error') {
-            // The error text itself contains literal "<br/>" separators
-            // (MFL joins multiple validation failures with them) --
-            // turn those into real newlines rather than showing the
-            // raw tag text once this gets htmlspecialchars()'d for
-            // display.
-            $text = trim((string) $xml);
-            $text = preg_replace('/\s*<br\s*\/?>\s*/i', "
+        if ($xml !== false) {
+            if ($xml->getName() === 'error') {
+                // The error text itself contains literal "<br/>"
+                // separators (MFL joins multiple validation failures
+                // with them) -- turn those into real newlines rather
+                // than showing the raw tag text once this gets
+                // htmlspecialchars()'d for display.
+                $text = trim((string) $xml);
+                $text = preg_replace('/\s*<br\s*\/?>\s*/i', "
 ", $text);
-            $GLOBALS['rotc_mfl_last_error'] = $text;
-            return ['error' => $text];
+                $GLOBALS['rotc_mfl_last_error'] = $text;
+                return ['error' => $text];
+            }
+            // Any other XML root (<status>OK</status> being the one
+            // confirmed live so far) is a success -- return it as a
+            // plain array with no 'error' key so every call site's
+            // existing "no error key means success" check just works.
+            return ['status' => trim((string) $xml)];
         }
     }
 
