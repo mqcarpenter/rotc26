@@ -54,6 +54,44 @@ $rows = [];
 $players = [];
 
 /**
+ * Splits the raw pipe-delimited "added|dropped" transaction string
+ * into player id lists. Shared by rotc_txn_details() (the Details
+ * column) and rotc_txn_type_badge() (the Type column) so both agree on
+ * what actually happened in a FREE_AGENT-type row instead of each
+ * re-parsing it separately.
+ */
+function rotc_txn_parse_added_dropped(array $t): array {
+    $raw = (string) ($t['transaction'] ?? '');
+    $sides = explode('|', $raw, 2);
+    return [
+        'added'   => array_filter(explode(',', $sides[0] ?? '')),
+        'dropped' => array_filter(explode(',', $sides[1] ?? '')),
+    ];
+}
+
+/**
+ * Pill label + CSS class for the Type column. FREE_AGENT isn't
+ * exclusively a drop -- confirmed via MFL's own import docs that
+ * fcfsWaiver (the call behind every FREE_AGENT-type row here) accepts
+ * ADD and DROP independently or together in one instant move -- so
+ * this looks at what the row's own added/dropped lists actually
+ * contain rather than assuming every FREE_AGENT row is a drop. The
+ * only case seen live so far (Matteo's own test) was a pure drop.
+ */
+function rotc_txn_type_badge(array $t): array {
+    $type = $t['type'] ?? '';
+    if ($type === 'FREE_AGENT') {
+        $parsed = rotc_txn_parse_added_dropped($t);
+        if ($parsed['added'] && $parsed['dropped']) return ['label' => 'ADD/DROP', 'class' => 'rotc-pill-swap'];
+        if ($parsed['dropped']) return ['label' => 'DROP', 'class' => 'rotc-pill-drop'];
+        if ($parsed['added']) return ['label' => 'ADD', 'class' => 'rotc-pill-add'];
+        return ['label' => $type ?: '--', 'class' => ''];
+    }
+    if ($type === 'TRADE') return ['label' => 'TRADE', 'class' => 'rotc-pill-trade'];
+    return ['label' => $type ?: '--', 'class' => ''];
+}
+
+/**
  * Human-readable Details text for one transaction row.
  */
 function rotc_txn_details(array $t, array $players, array $franchises): string {
@@ -79,9 +117,9 @@ function rotc_txn_details(array $t, array $players, array $franchises): string {
     // "added|dropped" shape described in the file header comment.
     $raw = (string) ($t['transaction'] ?? '');
     if ($raw === '') return '--';
-    $sides = explode('|', $raw, 2);
-    $added = array_filter(explode(',', $sides[0] ?? ''));
-    $dropped = array_filter(explode(',', $sides[1] ?? ''));
+    $parsed = rotc_txn_parse_added_dropped($t);
+    $added = $parsed['added'];
+    $dropped = $parsed['dropped'];
     $franchiseName = $franchises[$t['franchise'] ?? '']['name'] ?? ($t['franchise'] ?? 'This team');
     $parts = [];
     if ($added) $parts[] = 'Added: ' . htmlspecialchars(implode(', ', array_map($nameOf, $added)));
@@ -151,10 +189,10 @@ $typeOptions = ['DEFAULT' => 'Roster Moves', '*' => 'All (incl. league setup)', 
           <table class="data-table">
             <thead><tr><th>Date</th><th>Type</th><th>Franchise</th><th>Details</th></tr></thead>
             <tbody>
-              <?php foreach ($rows as $i => $t): ?>
+              <?php foreach ($rows as $i => $t): $badge = rotc_txn_type_badge($t); ?>
                 <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                   <td><?= htmlspecialchars(date('M j, Y g:i a', (int) ($t['timestamp'] ?? 0))) ?></td>
-                  <td><?= htmlspecialchars($t['type'] ?? '') ?></td>
+                  <td><span class="rotc-txn-pill <?= htmlspecialchars($badge['class']) ?>"><?= htmlspecialchars($badge['label']) ?></span></td>
                   <td><?= htmlspecialchars($franchises[$t['franchise'] ?? '']['name'] ?? ($t['franchise'] ?? '')) ?></td>
                   <td><?= rotc_txn_details($t, $players, $franchises) ?></td>
                 </tr>
