@@ -51,7 +51,7 @@ $nav_items = [
     ['Playoff Brackets', "$base/scores/playoff-brackets"],
     ['NFL Schedule', "$base/scores/nfl-schedule"],
     ['Fantasy Previews', "$mfl/options?L=67102&O=207"],
-    ['Fantasy Recaps', "$mfl/options?L=67102&O=177"],
+    ['Fantasy Recaps', "$base/scores/weekly-recap-article"],
   ]],
   'Transactions' => ['wide' => false, 'sub' => [
     ['Add/Drops', "$mfl/add_drop?L=67102"],

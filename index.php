@@ -54,6 +54,7 @@ include __DIR__ . '/templates/header.php';
       ?>
       <?php if ($recap): ?>
         <?php include __DIR__ . '/templates/weekly-recap-hub.php'; ?>
+        <p style="margin-top:14px;"><a href="<?= $base ?>/scores/weekly-recap-article?year=<?= $recap['year'] ?>&week=<?= $recap['week'] ?>" style="font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;font-size:13px;letter-spacing:.03em;">Read the full Week <?= htmlspecialchars($recap['week']) ?> recap &rarr;</a></p>
       <?php else: ?>
         <p>No recap available yet.</p>
       <?php endif; ?>
