@@ -60,13 +60,13 @@ $nav_items = [
     ['Player News', "$mfl/news_articles?L=67102&P=*"],
   ]],
   'Draft & Auction' => ['wide' => false, 'sub' => [
-    ['Draft Results', "$mfl/options?L=67102&O=17"],
-    ['ADP Report', "$mfl/reports?L=67102&R=ADP"],
+    ['Draft Results', "$base/draft-results"],
+    ['ADP Report', "$base/adp-report"],
     ['Select Keepers', "$mfl/options?L=67102&O=144"],
-    ['Keepers', "$mfl/options?L=67102&O=187"],
-    ['Auction Results', "$mfl/options?L=67102&O=44"],
+    ['Keepers', "$base/keepers"],
+    ['Auction Results', "$base/auction-results"],
     ['Auction Bid', "$mfl/options?L=67102&O=43"],
-    ['AAV Report', "$mfl/reports?L=67102&R=AAV"],
+    ['AAV Report', "$base/aav-report"],
     ['All Reports', "$mfl/all_reports?L=67102"],
   ]],
   'League' => ['wide' => true, 'sub' => [
