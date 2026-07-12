@@ -258,6 +258,8 @@ if (!$fetchError) {
       </div>
     <?php else: ?>
 
+    <p style="font-size:11px;color:#999;">[debug] recentSeason=<?php echo var_export($recentSeason, true); ?> | season_wins rows=<?php echo count($data['season_wins']); ?> | season_wins seasons=<?php echo implode(',', array_map(fn($r) => $r['season'], $data['season_wins'])); ?></p>
+
     <div class="rotc-history-layout">
       <nav class="rotc-history-nav" aria-label="Records categories">
         <button type="button" class="active" data-target="hist-single-game">Single Game</button>
