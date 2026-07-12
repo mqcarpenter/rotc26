@@ -19,6 +19,7 @@ $weeks = [];
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/includes/mfl-api.php';
+    require_once __DIR__ . '/includes/helmets.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('schedule', 3600, []);
@@ -48,11 +49,20 @@ if (!$fetchError) {
                 $teams = mfl_normalize_list($m['franchise'] ?? null);
                 $away = null; $home = null;
                 foreach ($teams as $t) { if (($t['isHome'] ?? '0') === '1') $home = $t; else $away = $t; }
+                $awayId = $away['id'] ?? ''; $homeId = $home['id'] ?? '';
+                $awayHelmet = $awayId ? rotc_helmet_src($awayId, 'right') : null;
+                $homeHelmet = $homeId ? rotc_helmet_src($homeId, 'left') : null;
               ?>
                 <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                  <td><?= htmlspecialchars($franchises[$away['id'] ?? '']['name'] ?? ($away['id'] ?? '?')) ?></td>
+                  <td>
+                    <?php if ($awayHelmet): ?><img src="<?= htmlspecialchars($awayHelmet) ?>" alt="" width="26" height="26" style="vertical-align:middle;border-radius:50%;margin-right:8px;<?= rotc_helmet_flip($awayId, 'right') ? 'transform:scaleX(-1);' : '' ?>"><?php endif; ?>
+                    <?= htmlspecialchars($franchises[$awayId]['name'] ?? ($awayId ?: '?')) ?>
+                  </td>
                   <td style="text-align:center;color:var(--muted);">at</td>
-                  <td><?= htmlspecialchars($franchises[$home['id'] ?? '']['name'] ?? ($home['id'] ?? '?')) ?></td>
+                  <td>
+                    <?php if ($homeHelmet): ?><img src="<?= htmlspecialchars($homeHelmet) ?>" alt="" width="26" height="26" style="vertical-align:middle;border-radius:50%;margin-right:8px;<?= rotc_helmet_flip($homeId, 'left') ? 'transform:scaleX(-1);' : '' ?>"><?php endif; ?>
+                    <?= htmlspecialchars($franchises[$homeId]['name'] ?? ($homeId ?: '?')) ?>
+                  </td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
