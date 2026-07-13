@@ -19,15 +19,29 @@ $current_tab = $current_tab ?? 'main';
 // every calling page to do it means Login/Logout always reflects
 // reality even on pages that don't otherwise touch auth at all.
 $rotc_ownerUsername = null;
+$rotc_ownerHelmetUrl = null;
 $rotc_configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 if (file_exists($rotc_configPath)) {
     require_once $rotc_configPath;
+    require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/mfl-auth.php';
     rotc_session_start();
     if (!isset($is_logged_in)) {
         $is_logged_in = rotc_mfl_logged_in();
     }
-    if ($is_logged_in) $rotc_ownerUsername = rotc_mfl_username();
+    if ($is_logged_in) {
+        $rotc_ownerUsername = rotc_mfl_username();
+        // Franchise id is normally already cached in session by
+        // rotc_require_login() on action pages, but header.php renders on
+        // every page (including ones that never call that), so resolve it
+        // here too if it isn't set yet -- needed to look up the owner's
+        // team helmet icon for the nav pill.
+        $rotc_ownerFranchiseId = rotc_mfl_franchise_id() ?? rotc_mfl_resolve_franchise_id();
+        if ($rotc_ownerFranchiseId) {
+            $rotc_ownerFranchises = mfl_franchises();
+            $rotc_ownerHelmetUrl = $rotc_ownerFranchises[$rotc_ownerFranchiseId]['icon'] ?? null;
+        }
+    }
 }
 $is_logged_in = $is_logged_in ?? false;
 
@@ -218,7 +232,12 @@ $tabs = [
       </li>
       <li class="rotc-item rotc-login">
         <?php if ($is_logged_in): ?>
-          <a class="rotc-top" href="<?= $base ?>/logout.php" title="<?= $rotc_ownerUsername ? 'Logged in as ' . htmlspecialchars($rotc_ownerUsername) : '' ?>">Logout</a>
+          <a class="rotc-top rotc-coach-pill" href="<?= $base ?>/logout.php" title="<?= $rotc_ownerUsername ? 'Logged in as ' . htmlspecialchars($rotc_ownerUsername) . ' — click to log out' : 'Click to log out' ?>">
+            <?php if ($rotc_ownerHelmetUrl): ?>
+              <img src="<?= htmlspecialchars($rotc_ownerHelmetUrl) ?>" alt="" class="rotc-coach-pill-helmet">
+            <?php endif; ?>
+            <span>Coach engaged</span>
+          </a>
         <?php else: ?>
           <a class="rotc-top" href="<?= $base ?>/login.php">Login</a>
         <?php endif; ?>

@@ -174,6 +174,22 @@ a:hover{ color:var(--accent); }
 .rotc-item:hover .rotc-top{ color:var(--paper); border-bottom-color:var(--accent); }
 .rotc-login{ margin-left:0; }
 .rotc-login .rotc-top{ color:var(--accent); }
+.rotc-coach-pill{
+  display:flex; align-items:center; gap:8px;
+  padding:8px 16px !important;
+  border-radius:999px;
+  background:var(--accent);
+  color:var(--on-ink) !important;
+  border-bottom:none !important;
+  text-transform:none;
+  letter-spacing:normal;
+  font-weight:600;
+}
+.rotc-coach-pill:hover{ background:#c8481a; color:var(--on-ink) !important; }
+.rotc-coach-pill-helmet{ width:22px; height:22px; border-radius:50%; object-fit:cover; background:var(--paper); flex:none; }
+@media (max-width:900px){
+  .rotc-coach-pill{ padding:10px 16px !important; }
+}
 .rotc-sub{ list-style:none; margin:0; padding:6px; position:absolute; top:100%; left:0; width:240px; max-width:90vw; background:var(--card); border:1px solid var(--line); box-shadow:0 8px 20px rgba(42,24,16,.18); display:none; z-index:10000; box-sizing:border-box; overflow:hidden; }
 .rotc-sub a{ overflow-wrap:break-word; word-break:break-word; display:block; padding:7px 10px; font-size:13px; color:var(--ink-2); }
 .rotc-item:hover .rotc-sub{ display:block; }
