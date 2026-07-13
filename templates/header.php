@@ -153,11 +153,10 @@ $nav_items = [
 // behavior for main/auction/gameday, neither of which have a real page
 // yet), except 'standings' which now needs the scores/ subfolder since
 // standings.php moved there with the rest of the Scores-section pages.
-// 'season-deets' removed per Matteo's request -- unneeded, never had a
-// real page behind it.
+// 'season-deets' and 'auction' removed per Matteo's request -- unneeded,
+// neither ever had a real page behind it (no auction.php exists).
 $tabs = [
   'main'          => ['label' => 'Main',         'href' => $base !== '' ? $base . '/' : '/'],
-  'auction'       => ['label' => 'Auction',       'href' => "$base/auction"],
   'gameday'       => ['label' => 'Gameday',       'href' => "$base/gameday"],
   'standings'     => ['label' => 'Standings',     'href' => "$base/scores/standings"],
 ];
