@@ -154,7 +154,7 @@ function rotc_trade_player_names(array $ids, array $players): string {
 ?>
 <div class="home-grid">
   <main class="home-main" style="width:100%;">
-    <?php if ($hasConfig && ($pendingIncoming || $pendingOutgoing || $pendingFetchFailed)): ?>
+    <?php if ($hasConfig): ?>
       <div class="card">
         <h2 class="card-title">Pending Trade Offers</h2>
         <?php if ($pendingFetchFailed): $mflHomeUrl = rotc_mfl_league_host((int) MFL_YEAR) . '/' . MFL_YEAR . '/home/' . MFL_LEAGUE_ID; ?>

@@ -25,6 +25,7 @@ if (file_exists($rotc_configPath)) {
     require_once $rotc_configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/mfl-auth.php';
+    require_once __DIR__ . '/../includes/helmets.php';
     rotc_session_start();
     if (!isset($is_logged_in)) {
         $is_logged_in = rotc_mfl_logged_in();
@@ -35,11 +36,14 @@ if (file_exists($rotc_configPath)) {
         // rotc_require_login() on action pages, but header.php renders on
         // every page (including ones that never call that), so resolve it
         // here too if it isn't set yet -- needed to look up the owner's
-        // team helmet icon for the nav pill.
+        // team helmet for the nav pill.
         $rotc_ownerFranchiseId = rotc_mfl_franchise_id() ?? rotc_mfl_resolve_franchise_id();
         if ($rotc_ownerFranchiseId) {
-            $rotc_ownerFranchises = mfl_franchises();
-            $rotc_ownerHelmetUrl = $rotc_ownerFranchises[$rotc_ownerFranchiseId]['icon'] ?? null;
+            // Use the site's own custom helmet art (includes/helmets.php),
+            // not MFL's raw franchise 'icon' field -- that's just whatever
+            // small image each owner happened to upload on MFL itself, not
+            // necessarily a helmet, and not guaranteed to even be set.
+            $rotc_ownerHelmetUrl = rotc_helmet_src($rotc_ownerFranchiseId);
         }
     }
 }
