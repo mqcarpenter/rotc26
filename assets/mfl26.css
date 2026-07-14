@@ -202,7 +202,12 @@ a:hover{ color:var(--accent); }
   .rotc-bar{ flex-wrap:wrap; height:auto; padding:10px 16px; }
   .rotc-burger-btn{ display:block; }
   .rotc-menu{ flex-direction:column; align-items:stretch; gap:0; width:100%; display:none; padding-top:6px; }
-  .rotc-burger:checked ~ .rotc-bar .rotc-menu{ display:flex; }
+  /* .rotc-menu is a direct sibling of #rotc-burger inside .rotc-bar,
+     not nested inside a second .rotc-bar sibling -- the old selector
+     (.rotc-burger:checked ~ .rotc-bar .rotc-menu) could never match
+     anything in the real DOM, so the checkbox toggled but nothing
+     ever appeared. This targets .rotc-menu directly. */
+  .rotc-burger:checked ~ .rotc-menu{ display:flex; }
   .rotc-item{ position:static; }
   .rotc-top{ padding:12px 4px; border-bottom:1px solid rgba(255,255,255,.12); }
   .rotc-item:hover .rotc-top{ border-bottom-color:rgba(255,255,255,.12); }
