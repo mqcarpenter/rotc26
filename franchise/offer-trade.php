@@ -31,6 +31,7 @@ if ($hasConfig) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/mfl-auth.php';
+    require_once __DIR__ . '/../includes/helmets.php';
     rotc_require_login($pageBase);
 
     $franchiseId = rotc_mfl_franchise_id();
@@ -38,31 +39,43 @@ if ($hasConfig) {
     unset($franchises[$franchiseId]);
 
     // Pending trades involving this owner -- TYPE=pendingTrades. Confirmed
-    // live via ?debug=1 dump: the list lives at pendingTrades.pendingTrade
-    // (not .trade), franchises are 'offeringteam'/'offeredto' (not
-    // franchise1/franchise2), and MFL already hands back a full
-    // human-readable 'description' string per trade -- using that directly
-    // instead of reconstructing one from will_give_up/will_receive player
-    // id lists, which is simpler and can't drift out of sync with MFL's
-    // own wording.
+    // live via a ?debug=1 dump: the list lives at
+    // pendingTrades.pendingTrade (not .trade), franchises are
+    // 'offeringteam'/'offeredto' (not franchise1/franchise2), and
+    // will_give_up / will_receive (comma-separated MFL player ids, from
+    // the OFFERING team's point of view: what THEY give up / what THEY'D
+    // receive) are real and confirmed -- also has a 'trade_id' and a
+    // ready-made 'description' string, kept as a fallback tooltip below.
     $pendingIncoming = [];
     $pendingOutgoing = [];
+    $pendingPlayerIds = [];
     $pendingResp = rotc_mfl_authed_request('export', 'pendingTrades');
     $pendingFetchFailed = ($pendingResp === null || isset($pendingResp['error']));
     if (!$pendingFetchFailed) {
         foreach (mfl_normalize_list($pendingResp['pendingTrades']['pendingTrade'] ?? null) as $t) {
-            $offeringTeam = (string) ($t['offeringteam'] ?? '');
-            $offeredTo    = (string) ($t['offeredto'] ?? '');
+            $offeringTeam   = (string) ($t['offeringteam'] ?? '');
+            $offeredTo      = (string) ($t['offeredto'] ?? '');
+            $offererGivesUp = array_values(array_filter(explode(',', (string) ($t['will_give_up'] ?? ''))));
+            $offererGets    = array_values(array_filter(explode(',', (string) ($t['will_receive'] ?? ''))));
+            $pendingPlayerIds = array_merge($pendingPlayerIds, $offererGivesUp, $offererGets);
+
             $row = [
+                'trade_id'    => $t['trade_id'] ?? null,
                 'description' => $t['description'] ?? '',
                 'comments'    => $t['comments'] ?? '',
                 'expires'     => $t['expires'] ?? null,
             ];
             if ($offeredTo === $franchiseId) {
-                $row['from'] = $offeringTeam;
+                // Offered to me: what the offering team gives up is what
+                // I'd receive; what they'd receive is what I give up.
+                $row['from']    = $offeringTeam;
+                $row['receive'] = $offererGivesUp;
+                $row['give_up'] = $offererGets;
                 $pendingIncoming[] = $row;
             } elseif ($offeringTeam === $franchiseId) {
-                $row['to'] = $offeredTo;
+                $row['to']      = $offeredTo;
+                $row['give_up'] = $offererGivesUp;
+                $row['receive'] = $offererGets;
                 $pendingOutgoing[] = $row;
             }
         }
@@ -105,7 +118,7 @@ if ($hasConfig) {
     $myRosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $franchiseId]);
     $myRoster = mfl_normalize_list($myRosterResp['rosters']['franchise']['player'] ?? null);
 
-    $allIds = array_column($myRoster, 'id');
+    $allIds = array_merge(array_column($myRoster, 'id'), $pendingPlayerIds);
 
     if ($targetId !== '') {
         $theirRosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $targetId]);
@@ -131,33 +144,61 @@ function rotc_trade_roster_list(array $roster, array $players, string $fieldName
     }
 }
 
+/** "Marks, Woody (RB, HOU), Fannin, Harold (TE, CLE)" for a pending-trade side. */
+function rotc_trade_player_names(array $ids, array $players): string {
+    if (!$ids) return 'nothing';
+    $parts = [];
+    foreach ($ids as $id) {
+        $pd = $players[$id] ?? [];
+        $name = $pd['name'] ?? ('Player #' . $id);
+        $meta = trim(($pd['position'] ?? '') . ' ' . ($pd['team'] ?? ''));
+        $parts[] = $meta !== '' ? "$name ($meta)" : $name;
+    }
+    return implode(', ', $parts);
+}
+
 ?>
 <div class="home-grid">
   <main class="home-main" style="width:100%;">
     <?php if ($hasConfig): ?>
       <div class="card">
         <h2 class="card-title">Pending Trade Offers</h2>
-        <?php if ($pendingFetchFailed): $mflHomeUrl = rotc_mfl_league_host((int) MFL_YEAR) . '/' . MFL_YEAR . '/home/' . MFL_LEAGUE_ID; ?>
+        <?php $mflHomeUrl = rotc_mfl_league_host((int) MFL_YEAR) . '/' . MFL_YEAR . '/home/' . MFL_LEAGUE_ID; ?>
+        <?php if ($pendingFetchFailed): ?>
           <p>Couldn't check MyFantasyLeague for pending trades right now — check your <a href="<?= htmlspecialchars($mflHomeUrl) ?>" target="_blank" rel="noopener">MFL trade block</a> directly if you're expecting one.</p>
         <?php else: ?>
           <?php if ($pendingIncoming): ?>
             <h3 class="rotc-trade-col-head">Offered to you</h3>
-            <?php foreach ($pendingIncoming as $t): ?>
+            <?php foreach ($pendingIncoming as $t):
+              $fromName = $franchises[$t['from']]['name'] ?? ('Franchise #' . $t['from']);
+              $fromHelmet = rotc_helmet_src($t['from']);
+            ?>
               <div class="rotc-pending-trade">
-                <p><strong><?= htmlspecialchars($franchises[$t['from']]['name'] ?? ('Franchise #' . $t['from'])) ?></strong> wants to trade:</p>
-                <p><?= htmlspecialchars($t['description']) ?></p>
-                <?php if (!empty($t['comments'])): ?><p><em>"<?= htmlspecialchars($t['comments']) ?>"</em></p><?php endif; ?>
+                <div class="rotc-pending-trade-head">
+                  <?php if ($fromHelmet): ?><img src="<?= htmlspecialchars($fromHelmet) ?>" alt="" class="rotc-pending-trade-helmet"><?php endif; ?>
+                  <strong><?= htmlspecialchars($fromName) ?></strong>
+                </div>
+                <p><span class="rotc-pending-trade-label">They give you</span> <?= htmlspecialchars(rotc_trade_player_names($t['receive'], $players)) ?></p>
+                <p><span class="rotc-pending-trade-label">You give up</span> <?= htmlspecialchars(rotc_trade_player_names($t['give_up'], $players)) ?></p>
+                <?php if (!empty($t['comments'])): ?><p class="rotc-login-blurb">"<?= htmlspecialchars($t['comments']) ?>"</p><?php endif; ?>
                 <?php if (!empty($t['expires'])): ?><p class="rotc-login-blurb">Expires <?= htmlspecialchars(date('M j, Y g:i a', (int) $t['expires'])) ?></p><?php endif; ?>
-                <p class="rotc-login-blurb">Accept or reject this from your MFL trade block — that part isn't handled on this site yet.</p>
+                <a class="rotc-btn rotc-btn-small" href="<?= htmlspecialchars($mflHomeUrl) ?>" target="_blank" rel="noopener">Respond on MFL</a>
               </div>
             <?php endforeach; ?>
           <?php endif; ?>
           <?php if ($pendingOutgoing): ?>
             <h3 class="rotc-trade-col-head">Sent by you, awaiting response</h3>
-            <?php foreach ($pendingOutgoing as $t): ?>
+            <?php foreach ($pendingOutgoing as $t):
+              $toName = $franchises[$t['to']]['name'] ?? ('Franchise #' . $t['to']);
+              $toHelmet = rotc_helmet_src($t['to']);
+            ?>
               <div class="rotc-pending-trade">
-                <p>To <strong><?= htmlspecialchars($franchises[$t['to']]['name'] ?? ('Franchise #' . $t['to'])) ?></strong>:</p>
-                <p><?= htmlspecialchars($t['description']) ?></p>
+                <div class="rotc-pending-trade-head">
+                  <?php if ($toHelmet): ?><img src="<?= htmlspecialchars($toHelmet) ?>" alt="" class="rotc-pending-trade-helmet"><?php endif; ?>
+                  <span>To <strong><?= htmlspecialchars($toName) ?></strong></span>
+                </div>
+                <p><span class="rotc-pending-trade-label">You give up</span> <?= htmlspecialchars(rotc_trade_player_names($t['give_up'], $players)) ?></p>
+                <p><span class="rotc-pending-trade-label">You receive</span> <?= htmlspecialchars(rotc_trade_player_names($t['receive'], $players)) ?></p>
                 <?php if (!empty($t['expires'])): ?><p class="rotc-login-blurb">Expires <?= htmlspecialchars(date('M j, Y g:i a', (int) $t['expires'])) ?></p><?php endif; ?>
               </div>
             <?php endforeach; ?>
