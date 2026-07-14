@@ -82,6 +82,8 @@ if ($hasConfig) {
         }
     }
 
+    $pendingDebugRaw = json_encode($pendingResp, JSON_PRETTY_PRINT);
+
     $targetId = (string) ($_POST['offeredto'] ?? $_GET['to'] ?? '');
     if ($targetId !== '' && !isset($franchises[$targetId])) $targetId = '';
 
@@ -157,6 +159,10 @@ function rotc_trade_player_names(array $ids, array $players): string {
     <?php if ($hasConfig): ?>
       <div class="card">
         <h2 class="card-title">Pending Trade Offers</h2>
+        <?php if (!empty($_GET['debug'])): ?>
+          <pre style="font-size:11px; white-space:pre-wrap; background:#f0f0f0; border:1px solid #ccc; padding:10px; overflow-x:auto; margin-bottom:14px;">DEBUG raw pendingTrades response:
+<?= htmlspecialchars($pendingDebugRaw ?: 'null') ?></pre>
+        <?php endif; ?>
         <?php if ($pendingFetchFailed): $mflHomeUrl = rotc_mfl_league_host((int) MFL_YEAR) . '/' . MFL_YEAR . '/home/' . MFL_LEAGUE_ID; ?>
           <p>Couldn't check MyFantasyLeague for pending trades right now — check your <a href="<?= htmlspecialchars($mflHomeUrl) ?>" target="_blank" rel="noopener">MFL trade block</a> directly if you're expecting one.</p>
         <?php else: ?>
