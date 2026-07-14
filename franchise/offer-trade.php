@@ -38,38 +38,45 @@ if ($hasConfig) {
     $franchises = mfl_franchises();
     unset($franchises[$franchiseId]);
 
-    // Respond to an existing pending trade (accept/reject) -- separate POST
-    // branch from the "offer a new trade" one below, distinguished by the
-    // respond_trade_id field so the two forms never collide.
+    // Accept an existing pending trade -- separate POST branch from the
+    // "offer a new trade" one below, distinguished by the respond_trade_id
+    // field so the two forms never collide.
     //
-    // BEST-GUESS, UNCONFIRMED: creating a trade (TYPE=tradeProposal with
-    // OFFEREDTO/WILL_GIVE_UP/WILL_RECEIVE/COMMENTS) is confirmed live --
-    // that's what the form below already does successfully. MFL's
-    // accept/reject-an-EXISTING-trade mechanism is NOT confirmed: their own
-    // api_info test pages return blank content when fetched (gated behind a
-    // login session), and no third-party reference documents the exact
-    // parameters either. This guesses TRADE_ID + RESPOND=accept/reject on
-    // the same TYPE=tradeProposal import call. Whatever MFL actually sends
-    // back -- success or a real <error> message -- is surfaced directly on
-    // the page by design, so one live test tells us immediately whether
-    // this is right, and if not, exactly what MFL expects instead.
+    // BEST-GUESS, PARTIALLY CONFIRMED: a first live attempt with just
+    // TRADE_ID + a guessed RESPOND flag came back "Missing WILL_GIVE_UP
+    // parameter" -- confirming MFL's tradeProposal import validates
+    // WILL_GIVE_UP/WILL_RECEIVE even when responding to an existing
+    // TRADE_ID, not just when creating a fresh proposal. Now resubmitting
+    // the SAME give-up/receive player lists the pending trade already
+    // specifies (from this responder's side), tied to TRADE_ID, which is
+    // the standard way these trade-proposal-style APIs represent "I agree
+    // to these exact terms." Still unconfirmed until tested live again.
+    //
+    // Reject is NOT attempted here at all. The same error came back for a
+    // guessed reject action, meaning this import type has no lightweight
+    // "just reject" flag -- and guessing further risks resubmitting terms
+    // that MFL could read as an ACCEPT of something the owner meant to
+    // decline, which is a real mistake, not just a failed request. Reject
+    // stays "Respond on MFL" only until the real mechanism is confirmed.
     $respondResult = null;
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['respond_trade_id'])) {
         if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
             $respondResult = ['ok' => false, 'error' => 'Your session expired -- reload the page and try again.'];
         } else {
             $respondTradeId = (string) $_POST['respond_trade_id'];
-            $respondAction = ($_POST['respond_action'] ?? '') === 'accept' ? 'accept' : 'reject';
+            $respondGiveUp  = array_filter((array) ($_POST['respond_give_up'] ?? []));
+            $respondReceive = array_filter((array) ($_POST['respond_receive'] ?? []));
             $resp = rotc_mfl_authed_request('import', 'tradeProposal', [
-                'TRADE_ID' => $respondTradeId,
-                'RESPOND'  => $respondAction,
+                'TRADE_ID'     => $respondTradeId,
+                'WILL_GIVE_UP' => implode(',', $respondGiveUp),
+                'WILL_RECEIVE' => implode(',', $respondReceive),
             ]);
             if ($resp === null) {
                 $respondResult = ['ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
             } elseif (isset($resp['error'])) {
                 $respondResult = ['ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
             } else {
-                $respondResult = ['ok' => true, 'action' => $respondAction, 'raw' => is_array($resp) ? ($resp['status'] ?? json_encode($resp)) : (string) $resp];
+                $respondResult = ['ok' => true, 'action' => 'accept', 'raw' => is_array($resp) ? ($resp['status'] ?? json_encode($resp)) : (string) $resp];
             }
         }
     }
@@ -201,9 +208,9 @@ function rotc_trade_player_names(array $ids, array $players): string {
         <h2 class="card-title">Pending Trade Offers</h2>
         <?php if ($respondResult): ?>
           <?php if ($respondResult['ok']): ?>
-            <p class="rotc-login-success">Trade <?= htmlspecialchars($respondResult['action']) ?>ed. MFL says: "<?= htmlspecialchars($respondResult['raw']) ?>"</p>
+            <p class="rotc-login-success">Trade accepted. MFL says: "<?= htmlspecialchars($respondResult['raw']) ?>"</p>
           <?php else: ?>
-            <p class="rotc-login-error">That didn't go through: <?= nl2br(htmlspecialchars($respondResult['error'])) ?><br>The Accept/Reject buttons here use a best-guess API call that hasn't been confirmed against MFL's docs yet — use "Respond on MFL" below instead, and let me know what error you saw so it can be fixed.</p>
+            <p class="rotc-login-error">That didn't go through: <?= nl2br(htmlspecialchars($respondResult['error'])) ?><br>The Accept button here uses a best-guess API call that hasn't been fully confirmed against MFL's docs yet — use "Respond on MFL" below instead, and let me know what error you saw so it can be fixed.</p>
           <?php endif; ?>
         <?php endif; ?>
         <?php $mflHomeUrl = rotc_mfl_league_host((int) MFL_YEAR) . '/' . MFL_YEAR . '/home/' . MFL_LEAGUE_ID; ?>
@@ -230,17 +237,12 @@ function rotc_trade_player_names(array $ids, array $players): string {
                     <form method="post">
                       <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
                       <input type="hidden" name="respond_trade_id" value="<?= htmlspecialchars($t['trade_id']) ?>">
-                      <input type="hidden" name="respond_action" value="accept">
+                      <?php foreach ($t['give_up'] as $pid): ?><input type="hidden" name="respond_give_up[]" value="<?= htmlspecialchars($pid) ?>"><?php endforeach; ?>
+                      <?php foreach ($t['receive'] as $pid): ?><input type="hidden" name="respond_receive[]" value="<?= htmlspecialchars($pid) ?>"><?php endforeach; ?>
                       <button type="submit" class="rotc-btn rotc-btn-small">Accept</button>
                     </form>
-                    <form method="post">
-                      <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
-                      <input type="hidden" name="respond_trade_id" value="<?= htmlspecialchars($t['trade_id']) ?>">
-                      <input type="hidden" name="respond_action" value="reject">
-                      <button type="submit" class="rotc-btn rotc-btn-small rotc-btn-danger">Reject</button>
-                    </form>
                   <?php endif; ?>
-                  <a class="rotc-btn rotc-btn-small rotc-btn-secondary" href="<?= htmlspecialchars($mflHomeUrl) ?>" target="_blank" rel="noopener">Respond on MFL</a>
+                  <a class="rotc-btn rotc-btn-small rotc-btn-secondary" href="<?= htmlspecialchars($mflHomeUrl) ?>" target="_blank" rel="noopener">Respond on MFL (accept or reject)</a>
                 </div>
               </div>
             <?php endforeach; ?>

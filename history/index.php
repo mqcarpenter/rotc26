@@ -249,6 +249,231 @@ if (!$fetchError) {
         ORDER BY pg.score DESC LIMIT 15
     ")->fetchAll();
 }
+
+// ------------------------------------------------------------------
+// HEAD TO HEAD -- lifetime records, closest games/blowouts, and
+// rivalries between any two franchises, sourced from the same
+// rotchist_mfl_games atomic log as everything else on this page.
+// ------------------------------------------------------------------
+require_once __DIR__ . '/../includes/helmets.php';
+
+$h2hFranchiseList = $db->query("SELECT id, current_name FROM rotchist_franchises ORDER BY current_name")->fetchAll();
+$h2hNamesById = [];
+foreach ($h2hFranchiseList as $f) { $h2hNamesById[(int) $f['id']] = $f['current_name']; }
+
+// Helmet art keys off the CURRENT season's MFL franchise id (see
+// includes/helmets.php), so resolve stable rotchist_franchises.id ->
+// this-season mfl_franchise_id once, using the most recent real season
+// already computed above ($recentSeason), falling back to the latest
+// season on record if that's somehow unset.
+$h2hHelmetSeason = $recentSeason ?? (int) $db->query("SELECT MAX(season) FROM rotchist_mfl_franchises")->fetchColumn();
+$h2hMflIdByFranchise = [];
+if ($h2hHelmetSeason) {
+    $stmt = $db->prepare("SELECT franchise_id, mfl_franchise_id FROM rotchist_mfl_franchises WHERE season = :season AND franchise_id IS NOT NULL");
+    $stmt->execute(['season' => $h2hHelmetSeason]);
+    foreach ($stmt->fetchAll() as $row) {
+        $h2hMflIdByFranchise[(int) $row['franchise_id']] = $row['mfl_franchise_id'];
+    }
+}
+
+function rotc_h2h_helmet(?int $franchiseId, array $mflIdMap): ?string {
+    if (!$franchiseId) return null;
+    $mflId = $mflIdMap[$franchiseId] ?? null;
+    return $mflId ? rotc_helmet_src($mflId) : null;
+}
+
+// Rivalries -- every unique pair that has ever played, canonicalized via
+// LEAST/GREATEST so a franchise pair only shows up once regardless of
+// which side was "franchise1" in a given game.
+$h2hRivalries = $db->query("
+    SELECT LEAST(franchise1_id, franchise2_id) AS fa, GREATEST(franchise1_id, franchise2_id) AS fb,
+           COUNT(*) AS games,
+           AVG(ABS(franchise1_score - franchise2_score)) AS avg_margin,
+           MAX(season) AS last_season
+    FROM rotchist_mfl_games
+    WHERE franchise1_id IS NOT NULL AND franchise2_id IS NOT NULL
+      AND franchise1_score IS NOT NULL AND franchise2_score IS NOT NULL
+    GROUP BY fa, fb
+")->fetchAll();
+
+usort($h2hRivalries, fn($a, $b) => (int) $b['games'] <=> (int) $a['games']);
+$h2hMostPlayed = array_slice($h2hRivalries, 0, 8);
+
+$h2hEligibleForClosest = array_values(array_filter($h2hRivalries, fn($r) => (int) $r['games'] >= 5));
+usort($h2hEligibleForClosest, fn($a, $b) => (float) $a['avg_margin'] <=> (float) $b['avg_margin']);
+$h2hClosestRivalries = array_slice($h2hEligibleForClosest, 0, 8);
+
+// A specific pairing, selected via ?teamA=..&teamB=.. on this same page.
+$h2hTeamA = isset($_GET['teamA']) && ctype_digit((string) $_GET['teamA']) ? (int) $_GET['teamA'] : null;
+$h2hTeamB = isset($_GET['teamB']) && ctype_digit((string) $_GET['teamB']) ? (int) $_GET['teamB'] : null;
+$h2hSelected = null;
+
+if ($h2hTeamA && $h2hTeamB && $h2hTeamA !== $h2hTeamB && isset($h2hNamesById[$h2hTeamA]) && isset($h2hNamesById[$h2hTeamB])) {
+    $stmt = $db->prepare("
+        SELECT season, week, is_playoff, franchise1_id, franchise1_score, franchise2_id, franchise2_score
+        FROM rotchist_mfl_games
+        WHERE ((franchise1_id = :a AND franchise2_id = :b) OR (franchise1_id = :b AND franchise2_id = :a))
+          AND franchise1_score IS NOT NULL AND franchise2_score IS NOT NULL
+        ORDER BY season, week
+    ");
+    $stmt->execute(['a' => $h2hTeamA, 'b' => $h2hTeamB]);
+    $h2hRows = $stmt->fetchAll();
+
+    if ($h2hRows) {
+        $aWins = 0; $bWins = 0; $ties = 0; $aPoints = 0.0; $bPoints = 0.0;
+        $meetings = [];
+        foreach ($h2hRows as $g) {
+            $aIsF1 = (int) $g['franchise1_id'] === $h2hTeamA;
+            $aScore = (float) ($aIsF1 ? $g['franchise1_score'] : $g['franchise2_score']);
+            $bScore = (float) ($aIsF1 ? $g['franchise2_score'] : $g['franchise1_score']);
+            $margin = round(abs($aScore - $bScore), 2);
+            if ($aScore > $bScore) $aWins++;
+            elseif ($bScore > $aScore) $bWins++;
+            else $ties++;
+            $aPoints += $aScore;
+            $bPoints += $bScore;
+            $meetings[] = [
+                'season' => (int) $g['season'], 'week' => (int) $g['week'], 'is_playoff' => (int) $g['is_playoff'],
+                'a_score' => $aScore, 'b_score' => $bScore, 'margin' => $margin,
+            ];
+        }
+
+        $closest = $meetings;
+        usort($closest, fn($x, $y) => $x['margin'] <=> $y['margin']);
+        $blowouts = $meetings;
+        usort($blowouts, fn($x, $y) => $y['margin'] <=> $x['margin']);
+
+        // Current streak (from most recent meeting backward).
+        $streakTeam = null; $streakLen = 0;
+        for ($i = count($meetings) - 1; $i >= 0; $i--) {
+            $m = $meetings[$i];
+            $winner = $m['a_score'] > $m['b_score'] ? 'a' : ($m['b_score'] > $m['a_score'] ? 'b' : null);
+            if ($i === count($meetings) - 1) { $streakTeam = $winner; $streakLen = $winner ? 1 : 0; continue; }
+            if ($winner !== null && $winner === $streakTeam) { $streakLen++; } else { break; }
+        }
+
+        $h2hSelected = [
+            'a_id' => $h2hTeamA, 'b_id' => $h2hTeamB,
+            'a_name' => $h2hNamesById[$h2hTeamA], 'b_name' => $h2hNamesById[$h2hTeamB],
+            'a_wins' => $aWins, 'b_wins' => $bWins, 'ties' => $ties,
+            'a_points' => round($aPoints, 2), 'b_points' => round($bPoints, 2),
+            'games' => count($meetings),
+            'meetings' => array_reverse($meetings),
+            'closest' => array_slice($closest, 0, 10),
+            'blowouts' => array_slice($blowouts, 0, 10),
+            'streak_team' => $streakTeam, 'streak_len' => $streakLen,
+        ];
+    }
+}
+
+/**
+ * Football-field-styled win/loss share bar: green turf, yard lines, end
+ * zones tinted with each team's helmet, a "line of scrimmage" marking the
+ * lifetime win-share split between two franchises.
+ */
+function rotc_h2h_field_bar(string $aName, ?string $aHelmet, int $aWins, string $bName, ?string $bHelmet, int $bWins, int $ties): void {
+    $total = max($aWins + $bWins + $ties, 1);
+    $aPct = $aWins / $total;
+    $splitX = 60 + $aPct * 880; // field runs x=60..940 between the end zones
+    ob_start();
+    ?>
+    <div class="rotc-h2h-field-wrap">
+      <svg viewBox="0 0 1000 170" class="rotc-h2h-field" preserveAspectRatio="none" role="img" aria-label="<?= htmlspecialchars($aName) ?> vs <?= htmlspecialchars($bName) ?> lifetime win share">
+        <defs>
+          <linearGradient id="rotcTurf" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2d6a35"/>
+            <stop offset="100%" stop-color="#1f4d27"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="1000" height="170" fill="url(#rotcTurf)"/>
+        <?php for ($i = 0; $i <= 10; $i++): $x = 60 + $i * 88; ?>
+          <line x1="<?= $x ?>" y1="20" x2="<?= $x ?>" y2="150" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2"/>
+        <?php endfor; ?>
+        <rect x="0" y="0" width="60" height="170" fill="#00000055"/>
+        <rect x="940" y="0" width="60" height="170" fill="#00000055"/>
+        <rect x="<?= min($splitX, 934) ?>" y="0" width="6" height="170" fill="#FDFBF7"/>
+        <?php if ($aHelmet): ?>
+          <image href="<?= htmlspecialchars($aHelmet) ?>" x="6" y="49" width="48" height="72" preserveAspectRatio="xMidYMid meet"/>
+        <?php endif; ?>
+        <?php if ($bHelmet): ?>
+          <image href="<?= htmlspecialchars($bHelmet) ?>" x="946" y="49" width="48" height="72" preserveAspectRatio="xMidYMid meet"/>
+        <?php endif; ?>
+        <text x="70" y="35" fill="#FDFBF7" font-size="22" font-weight="700" font-family="'Roboto Condensed',sans-serif"><?= $aWins ?></text>
+        <text x="930" y="35" fill="#FDFBF7" font-size="22" font-weight="700" font-family="'Roboto Condensed',sans-serif" text-anchor="end"><?= $bWins ?></text>
+        <?php if ($ties > 0): ?>
+          <text x="500" y="35" fill="#FDFBF7" font-size="13" font-family="'Roboto Condensed',sans-serif" text-anchor="middle"><?= $ties ?> tie<?= $ties === 1 ? '' : 's' ?></text>
+        <?php endif; ?>
+      </svg>
+      <div class="rotc-h2h-field-labels">
+        <div class="rotc-h2h-field-label"><strong><?= htmlspecialchars($aName) ?></strong><span><?= round($aPct * 100) ?>% of series</span></div>
+        <div class="rotc-h2h-field-label rotc-h2h-field-label-right"><strong><?= htmlspecialchars($bName) ?></strong><span><?= round((1 - $aPct) * 100) ?>% of series</span></div>
+      </div>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
+
+/** Minimalist bar chart of margin-of-victory per meeting, colored by winner, turf-toned. */
+function rotc_h2h_series_chart(array $meetings, string $aName, string $bName): void {
+    if (!$meetings) return;
+    $maxMargin = max(1.0, max(array_column($meetings, 'margin')));
+    $n = count($meetings);
+    $barGap = 6;
+    $chartWidth = max(600, $n * 40);
+    $barWidth = ($chartWidth - ($n - 1) * $barGap) / $n;
+    ob_start();
+    ?>
+    <div class="rotc-h2h-series-wrap">
+      <svg viewBox="0 0 <?= $chartWidth ?> 160" class="rotc-h2h-series" preserveAspectRatio="xMinYMid meet">
+        <line x1="0" y1="130" x2="<?= $chartWidth ?>" y2="130" stroke="var(--line)" stroke-width="1"/>
+        <?php foreach ($meetings as $i => $m):
+          $x = $i * ($barWidth + $barGap);
+          $h = 8 + ($m['margin'] / $maxMargin) * 100;
+          $y = 130 - $h;
+          $winnerA = $m['a_score'] > $m['b_score'];
+          $tie = $m['a_score'] === $m['b_score'];
+          $color = $tie ? 'var(--muted)' : ($winnerA ? 'var(--accent)' : 'var(--ink-2)');
+          $label = 'S' . $m['season'] . ' W' . $m['week'] . ($m['is_playoff'] ? ' (playoff)' : '') . ': ' . htmlspecialchars($aName) . ' ' . $m['a_score'] . ' - ' . htmlspecialchars($bName) . ' ' . $m['b_score'];
+        ?>
+          <rect x="<?= $x ?>" y="<?= $y ?>" width="<?= $barWidth ?>" height="<?= $h ?>" rx="2" fill="<?= $color ?>">
+            <title><?= $label ?></title>
+          </rect>
+          <text x="<?= $x + $barWidth / 2 ?>" y="146" font-size="9" fill="var(--muted)" text-anchor="middle" transform="rotate(90 <?= $x + $barWidth / 2 ?> 146)"><?= $m['season'] ?></text>
+        <?php endforeach; ?>
+      </svg>
+      <p class="rotc-login-blurb">Bar height = margin of victory. <span style="color:var(--accent);font-weight:700;">&#9632;</span> <?= htmlspecialchars($aName) ?> win &nbsp; <span style="color:var(--ink-2);font-weight:700;">&#9632;</span> <?= htmlspecialchars($bName) ?> win</p>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
+
+/** Rivalry leaderboard row list -- helmets + names + games + avg margin, linking into the selector above. */
+function rotc_h2h_rivalry_table(array $rows, array $namesById, array $mflIdMap, string $metricLabel, string $metricKey, string $suffix = ''): void {
+    if (!$rows) {
+        echo '<p>Not enough games played yet.</p>';
+        return;
+    }
+    echo '<div class="rotc-h2h-rivalry-list">';
+    foreach ($rows as $r) {
+        $aId = (int) $r['fa']; $bId = (int) $r['fb'];
+        $aName = $namesById[$aId] ?? ('Franchise #' . $aId);
+        $bName = $namesById[$bId] ?? ('Franchise #' . $bId);
+        $aHelmet = rotc_h2h_helmet($aId, $mflIdMap);
+        $bHelmet = rotc_h2h_helmet($bId, $mflIdMap);
+        $metric = $metricKey === 'avg_margin' ? number_format((float) $r[$metricKey], 1) : (int) $r[$metricKey];
+        echo '<a class="rotc-h2h-rivalry-row" href="?teamA=' . $aId . '&teamB=' . $bId . '#hist-h2h">';
+        echo '<span class="rotc-h2h-rivalry-team">';
+        if ($aHelmet) echo '<img src="' . htmlspecialchars($aHelmet) . '" alt="" class="rotc-h2h-mini-helmet">';
+        echo htmlspecialchars($aName) . '</span>';
+        echo '<span class="rotc-h2h-rivalry-vs">vs</span>';
+        echo '<span class="rotc-h2h-rivalry-team">';
+        if ($bHelmet) echo '<img src="' . htmlspecialchars($bHelmet) . '" alt="" class="rotc-h2h-mini-helmet">';
+        echo htmlspecialchars($bName) . '</span>';
+        echo '<span class="rotc-h2h-rivalry-metric">' . htmlspecialchars((string) $metric) . htmlspecialchars($suffix) . ' ' . htmlspecialchars($metricLabel) . '</span>';
+        echo '</a>';
+    }
+    echo '</div>';
+}
 ?>
 
 <div class="home-grid">
