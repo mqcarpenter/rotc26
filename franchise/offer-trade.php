@@ -38,6 +38,42 @@ if ($hasConfig) {
     $franchises = mfl_franchises();
     unset($franchises[$franchiseId]);
 
+    // Respond to an existing pending trade (accept/reject) -- separate POST
+    // branch from the "offer a new trade" one below, distinguished by the
+    // respond_trade_id field so the two forms never collide.
+    //
+    // BEST-GUESS, UNCONFIRMED: creating a trade (TYPE=tradeProposal with
+    // OFFEREDTO/WILL_GIVE_UP/WILL_RECEIVE/COMMENTS) is confirmed live --
+    // that's what the form below already does successfully. MFL's
+    // accept/reject-an-EXISTING-trade mechanism is NOT confirmed: their own
+    // api_info test pages return blank content when fetched (gated behind a
+    // login session), and no third-party reference documents the exact
+    // parameters either. This guesses TRADE_ID + RESPOND=accept/reject on
+    // the same TYPE=tradeProposal import call. Whatever MFL actually sends
+    // back -- success or a real <error> message -- is surfaced directly on
+    // the page by design, so one live test tells us immediately whether
+    // this is right, and if not, exactly what MFL expects instead.
+    $respondResult = null;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['respond_trade_id'])) {
+        if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $respondResult = ['ok' => false, 'error' => 'Your session expired -- reload the page and try again.'];
+        } else {
+            $respondTradeId = (string) $_POST['respond_trade_id'];
+            $respondAction = ($_POST['respond_action'] ?? '') === 'accept' ? 'accept' : 'reject';
+            $resp = rotc_mfl_authed_request('import', 'tradeProposal', [
+                'TRADE_ID' => $respondTradeId,
+                'RESPOND'  => $respondAction,
+            ]);
+            if ($resp === null) {
+                $respondResult = ['ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
+            } elseif (isset($resp['error'])) {
+                $respondResult = ['ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
+            } else {
+                $respondResult = ['ok' => true, 'action' => $respondAction, 'raw' => is_array($resp) ? ($resp['status'] ?? json_encode($resp)) : (string) $resp];
+            }
+        }
+    }
+
     // Pending trades involving this owner -- TYPE=pendingTrades. Confirmed
     // live via a ?debug=1 dump: the list lives at
     // pendingTrades.pendingTrade (not .trade), franchises are
@@ -163,6 +199,13 @@ function rotc_trade_player_names(array $ids, array $players): string {
     <?php if ($hasConfig): ?>
       <div class="card">
         <h2 class="card-title">Pending Trade Offers</h2>
+        <?php if ($respondResult): ?>
+          <?php if ($respondResult['ok']): ?>
+            <p class="rotc-login-success">Trade <?= htmlspecialchars($respondResult['action']) ?>ed. MFL says: "<?= htmlspecialchars($respondResult['raw']) ?>"</p>
+          <?php else: ?>
+            <p class="rotc-login-error">That didn't go through: <?= nl2br(htmlspecialchars($respondResult['error'])) ?><br>The Accept/Reject buttons here use a best-guess API call that hasn't been confirmed against MFL's docs yet — use "Respond on MFL" below instead, and let me know what error you saw so it can be fixed.</p>
+          <?php endif; ?>
+        <?php endif; ?>
         <?php $mflHomeUrl = rotc_mfl_league_host((int) MFL_YEAR) . '/' . MFL_YEAR . '/home/' . MFL_LEAGUE_ID; ?>
         <?php if ($pendingFetchFailed): ?>
           <p>Couldn't check MyFantasyLeague for pending trades right now — check your <a href="<?= htmlspecialchars($mflHomeUrl) ?>" target="_blank" rel="noopener">MFL trade block</a> directly if you're expecting one.</p>
@@ -182,7 +225,23 @@ function rotc_trade_player_names(array $ids, array $players): string {
                 <p><span class="rotc-pending-trade-label">You give up</span> <?= htmlspecialchars(rotc_trade_player_names($t['give_up'], $players)) ?></p>
                 <?php if (!empty($t['comments'])): ?><p class="rotc-login-blurb">"<?= htmlspecialchars($t['comments']) ?>"</p><?php endif; ?>
                 <?php if (!empty($t['expires'])): ?><p class="rotc-login-blurb">Expires <?= htmlspecialchars(date('M j, Y g:i a', (int) $t['expires'])) ?></p><?php endif; ?>
-                <a class="rotc-btn rotc-btn-small" href="<?= htmlspecialchars($mflHomeUrl) ?>" target="_blank" rel="noopener">Respond on MFL</a>
+                <div class="rotc-pending-trade-actions">
+                  <?php if (!empty($t['trade_id'])): ?>
+                    <form method="post">
+                      <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+                      <input type="hidden" name="respond_trade_id" value="<?= htmlspecialchars($t['trade_id']) ?>">
+                      <input type="hidden" name="respond_action" value="accept">
+                      <button type="submit" class="rotc-btn rotc-btn-small">Accept</button>
+                    </form>
+                    <form method="post">
+                      <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+                      <input type="hidden" name="respond_trade_id" value="<?= htmlspecialchars($t['trade_id']) ?>">
+                      <input type="hidden" name="respond_action" value="reject">
+                      <button type="submit" class="rotc-btn rotc-btn-small rotc-btn-danger">Reject</button>
+                    </form>
+                  <?php endif; ?>
+                  <a class="rotc-btn rotc-btn-small rotc-btn-secondary" href="<?= htmlspecialchars($mflHomeUrl) ?>" target="_blank" rel="noopener">Respond on MFL</a>
+                </div>
               </div>
             <?php endforeach; ?>
           <?php endif; ?>

@@ -428,6 +428,9 @@ a:hover{ color:var(--accent); }
 .rotc-btn-danger{ background:#b3261e; }
 a.rotc-btn{ display:inline-block; text-decoration:none; }
 .rotc-btn-small{ padding:6px 14px; font-size:12px; margin-top:6px; }
+.rotc-btn-secondary{ background:var(--ink-2); }
+.rotc-pending-trade-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.rotc-pending-trade-actions form{ margin:0; }
 
 .rotc-inline-form{ display:flex; align-items:center; gap:8px; margin:10px 0 14px; font-size:13px; }
 .rotc-inline-form select{ padding:6px 8px; border:1px solid var(--line); border-radius:8px; }
