@@ -511,6 +511,41 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
   font-weight:600;
 }
 .rotc-history-crown{ margin-right:2px; }
+
+/* ---- Head to Head ------------------------------------------- */
+.rotc-h2h-selector{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+.rotc-h2h-selector select{ padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; min-width:180px; }
+.rotc-h2h-selector-vs{ font-family:"Roboto Condensed", sans-serif; font-weight:700; text-transform:uppercase; color:var(--muted); font-size:13px; }
+
+.rotc-h2h-field-wrap{ margin:0 0 6px; }
+.rotc-h2h-field{ width:100%; height:auto; border-radius:10px; display:block; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+.rotc-h2h-field-labels{ display:flex; justify-content:space-between; margin-top:8px; }
+.rotc-h2h-field-label{ display:flex; flex-direction:column; font-size:13px; }
+.rotc-h2h-field-label strong{ font-size:15px; }
+.rotc-h2h-field-label span{ color:var(--muted); }
+.rotc-h2h-field-label-right{ align-items:flex-end; text-align:right; }
+.rotc-h2h-summary{ font-size:14px; color:var(--muted); margin:0 0 20px; }
+
+.rotc-h2h-series-wrap{ margin-bottom:20px; }
+.rotc-h2h-series{ width:100%; height:150px; display:block; }
+
+.rotc-h2h-rivalry-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:20px; }
+.rotc-h2h-rivalry-row{
+  display:flex; align-items:center; gap:10px;
+  padding:9px 14px; border:1px solid var(--line); border-radius:8px;
+  background:var(--card); text-decoration:none; color:var(--ink);
+  transition:background .15s ease, border-color .15s ease;
+}
+.rotc-h2h-rivalry-row:hover{ background:var(--sand); border-color:var(--accent); }
+.rotc-h2h-rivalry-team{ display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; flex:1; min-width:0; }
+.rotc-h2h-rivalry-team:last-of-type{ justify-content:flex-end; text-align:right; }
+.rotc-h2h-mini-helmet{ width:24px; height:24px; border-radius:50%; object-fit:cover; background:var(--paper); border:1px solid var(--line); flex:none; }
+.rotc-h2h-rivalry-vs{ font-size:11px; color:var(--muted); text-transform:uppercase; font-weight:700; flex:none; }
+.rotc-h2h-rivalry-metric{ font-size:12px; color:var(--muted); flex:none; white-space:nowrap; margin-left:8px; }
+@media (max-width:600px){
+  .rotc-h2h-rivalry-row{ flex-wrap:wrap; }
+  .rotc-h2h-rivalry-metric{ width:100%; margin-left:0; }
+}
 @media (max-width:800px){
   .rotc-history-layout{ flex-direction:column; }
   .rotc-history-nav{ position:static; flex-direction:row; flex-wrap:wrap; }

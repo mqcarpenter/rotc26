@@ -485,19 +485,21 @@ function rotc_h2h_rivalry_table(array $rows, array $namesById, array $mflIdMap, 
       </div>
     <?php else: ?>
 
+    <?php $h2hDefaultActive = ($h2hTeamA && $h2hTeamB); ?>
     <div class="rotc-history-layout">
       <nav class="rotc-history-nav" aria-label="Records categories">
-        <button type="button" class="active" data-target="hist-single-game">Single Game</button>
+        <button type="button" class="<?= $h2hDefaultActive ? '' : 'active' ?>" data-target="hist-single-game">Single Game</button>
         <button type="button" data-target="hist-single-season">Single Season</button>
         <button type="button" data-target="hist-career">Career</button>
         <button type="button" data-target="hist-postseason">Postseason</button>
         <button type="button" data-target="hist-milestones">Milestones</button>
+        <button type="button" class="<?= $h2hDefaultActive ? 'active' : '' ?>" data-target="hist-h2h">Head to Head</button>
         <button type="button" data-target="hist-players">Player Records</button>
       </nav>
 
       <div class="rotc-history-content">
 
-        <div class="card rotc-history-panel" id="hist-single-game">
+        <div class="card rotc-history-panel" id="hist-single-game"<?= $h2hDefaultActive ? ' hidden' : '' ?>>
           <h3>Most Points Scored</h3>
           <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'team_name' => 'Team', 'score' => 'Score'], $data['most_points'], 'No data yet.', $recentSeason); ?>
           <h3>Fewest Points Scored</h3>
@@ -546,6 +548,65 @@ function rotc_h2h_rivalry_table(array $rows, array $namesById, array $mflIdMap, 
           <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'player_name' => 'Player', 'position' => 'Pos', 'nfl_team' => 'NFL', 'fantasy_team' => 'Fantasy Team', 'score' => 'Score'], $data['top_player_games'], 'No data yet.', $recentSeason); ?>
           <h3>Top Individual Scores — Bench</h3>
           <?php rotchist_table(['season' => 'Season', 'week' => 'Week', 'player_name' => 'Player', 'position' => 'Pos', 'nfl_team' => 'NFL', 'fantasy_team' => 'Fantasy Team', 'score' => 'Score'], $data['top_player_games_bench'], 'No data yet.', $recentSeason); ?>
+        </div>
+
+        <div class="card rotc-history-panel" id="hist-h2h"<?= $h2hDefaultActive ? '' : ' hidden' ?>>
+          <h3>Compare Two Franchises</h3>
+          <form method="get" class="rotc-h2h-selector">
+            <select name="teamA">
+              <option value="">-- choose a team --</option>
+              <?php foreach ($h2hFranchiseList as $f): ?>
+                <option value="<?= (int) $f['id'] ?>"<?= $h2hTeamA === (int) $f['id'] ? ' selected' : '' ?>><?= htmlspecialchars($f['current_name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <span class="rotc-h2h-selector-vs">vs</span>
+            <select name="teamB">
+              <option value="">-- choose a team --</option>
+              <?php foreach ($h2hFranchiseList as $f): ?>
+                <option value="<?= (int) $f['id'] ?>"<?= $h2hTeamB === (int) $f['id'] ? ' selected' : '' ?>><?= htmlspecialchars($f['current_name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <button type="submit" class="rotc-btn rotc-btn-small">Compare</button>
+          </form>
+
+          <?php if ($h2hTeamA && $h2hTeamB && $h2hTeamA === $h2hTeamB): ?>
+            <p class="rotc-login-error">Pick two different teams.</p>
+          <?php elseif ($h2hTeamA && $h2hTeamB && !$h2hSelected): ?>
+            <p>These two franchises haven't played each other yet.</p>
+          <?php elseif ($h2hSelected): ?>
+            <?php
+              $selAHelmet = rotc_h2h_helmet($h2hSelected['a_id'], $h2hMflIdByFranchise);
+              $selBHelmet = rotc_h2h_helmet($h2hSelected['b_id'], $h2hMflIdByFranchise);
+            ?>
+            <h3>Lifetime Series</h3>
+            <?php rotc_h2h_field_bar($h2hSelected['a_name'], $selAHelmet, $h2hSelected['a_wins'], $h2hSelected['b_name'], $selBHelmet, $h2hSelected['b_wins'], $h2hSelected['ties']); ?>
+            <p class="rotc-h2h-summary">
+              <?= (int) $h2hSelected['games'] ?> all-time meetings &middot;
+              <?= htmlspecialchars($h2hSelected['a_name']) ?> <?= $h2hSelected['a_points'] ?> pts &ndash; <?= htmlspecialchars($h2hSelected['b_name']) ?> <?= $h2hSelected['b_points'] ?> pts
+              <?php if ($h2hSelected['streak_team']): ?>
+                &middot; <?= htmlspecialchars($h2hSelected['streak_team'] === 'a' ? $h2hSelected['a_name'] : $h2hSelected['b_name']) ?> has won <?= (int) $h2hSelected['streak_len'] ?> straight
+              <?php endif; ?>
+            </p>
+
+            <h3>Margin by Season</h3>
+            <?php rotc_h2h_series_chart($h2hSelected['meetings'], $h2hSelected['a_name'], $h2hSelected['b_name']); ?>
+
+            <?php $h2hCols = ['season' => 'Season', 'week' => 'Week', 'a_score' => $h2hSelected['a_name'], 'b_score' => $h2hSelected['b_name'], 'margin' => 'Margin']; ?>
+            <h3>Closest Games</h3>
+            <?php rotchist_table($h2hCols, $h2hSelected['closest']); ?>
+
+            <h3>Biggest Blowouts</h3>
+            <?php rotchist_table($h2hCols, $h2hSelected['blowouts']); ?>
+
+            <h3>All Meetings</h3>
+            <?php rotchist_table($h2hCols, $h2hSelected['meetings']); ?>
+          <?php endif; ?>
+
+          <h3>Rivalries — Most Games Played</h3>
+          <?php rotc_h2h_rivalry_table($h2hMostPlayed, $h2hNamesById, $h2hMflIdByFranchise, 'games played', 'games'); ?>
+
+          <h3>Rivalries — Closest Series (min. 5 games)</h3>
+          <?php rotc_h2h_rivalry_table($h2hClosestRivalries, $h2hNamesById, $h2hMflIdByFranchise, 'avg margin', 'avg_margin', ' pts'); ?>
         </div>
 
       </div>
