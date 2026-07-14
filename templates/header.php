@@ -149,18 +149,23 @@ $nav_items = [
   // Accounting and Franchise Summary were dropped altogether (explicit
   // removal request); Add/Drops folded into Franchise -> Drop a Player;
   // Taxi Squad and My Links dropped altogether too.
-  'Reports' => ['wide' => false, 'sub' => [
-    ['Transactions Report', "$base/transactions/transactions"],
-    ['Rosters Report', "$base/transactions/rosters"],
-    ['Trades', "$base/transactions/trades"],
+  // Reports is now a mega menu ('wide' => true, same treatment as
+  // Scores/Franchise/Players) with its options alphabetized -- both per
+  // Matteo's request once Historical Stats (formerly the standalone
+  // History nav item's "Records Hub") joined this menu and made it
+  // long enough to warrant it.
+  'Reports' => ['wide' => true, 'sub' => [
+    // Historical Stats: league history / all-time records, sourced from
+    // the rotchist_ database (see includes/rotchist-db.php) rather than
+    // the live MFL API. Formerly "Records Hub" under its own top-level
+    // "History" nav item.
+    ['Historical Stats', "$base/history/"],
     ['Nfl Pool Results', "$base/scores/standings#nfl-pool"],
     ["Pick 'Em Results", "$base/scores/standings#fantasy-pool"],
+    ['Rosters Report', "$base/transactions/rosters"],
     ['Survivor Results', "$base/scores/standings#survivor-pool"],
-    // Records Hub (league history / all-time records, sourced from the
-    // rotchist_ database -- see includes/rotchist-db.php) used to be its
-    // own top-level "History" nav item; folded into Reports per Matteo's
-    // request since it's another report, not a distinct section.
-    ['Records Hub', "$base/history/"],
+    ['Trades', "$base/transactions/trades"],
+    ['Transactions Report', "$base/transactions/transactions"],
   ]],
 ];
 // "Email to Entire League" was a Social submenu item -- Social was removed
