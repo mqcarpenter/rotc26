@@ -75,8 +75,9 @@ $mfl = 'https://www42.myfantasyleague.com/2026';
 // and its href here together, or a link goes stale.
 // Franchise sub-item rows are [label, url, inactive]. 'inactive' (bool)
 // renders the item in a shadowy/disabled style (see .rotc-nav-inactive
-// in mfl26.css) while still listing it -- used for "Open an Auction",
-// which has no live auction running right now.
+// in mfl26.css) while still listing it -- used for "Make a Draft Pick"
+// and "Open an Auction", neither of which is a live/active element
+// right now (no draft or auction currently running).
 //
 // Every Franchise action below that points at a local franchise/*.php
 // page is a REAL write action against MFL (submits/drops/trades/picks
@@ -89,7 +90,8 @@ $mfl = 'https://www42.myfantasyleague.com/2026';
 // auctionResults imports exist, meant for loading an already-completed
 // offline draft, not live picks) -- those only happen through MFL's
 // own live draft/auction room, so there's no real write action to
-// build here even though the site now has real login.
+// build here even though the site now has real login. Marked inactive
+// (not just linked to MFL) until an actual draft/auction is underway.
 $nav_items = [
   'Scores' => ['wide' => true, 'sub' => [
     ['Live Scoring', "$base/scores/live-scoring"],
@@ -107,7 +109,7 @@ $nav_items = [
   'Franchise' => ['wide' => true, 'sub' => [
     ['Submit Lineup', "$base/franchise/submit-lineup.php"],
     ['Trade Bait', "$base/franchise/trade-bait"],
-    ['Make a Draft Pick', "$mfl/options?L=67102&O=52"],
+    ['Make a Draft Pick', "$mfl/options?L=67102&O=52", true],
     ['Open an Auction', "$mfl/options?L=67102&O=44", true],
     ['Offer a Trade', "$base/franchise/offer-trade.php"],
     ['Drop a Player', "$base/franchise/drop-player.php"],
@@ -154,11 +156,10 @@ $nav_items = [
     ['Nfl Pool Results', "$base/scores/standings#nfl-pool"],
     ["Pick 'Em Results", "$base/scores/standings#fantasy-pool"],
     ['Survivor Results', "$base/scores/standings#survivor-pool"],
-  ]],
-  // New top-level section: league history / all-time records, sourced
-  // from the rotchist_ database (see includes/rotchist-db.php) rather
-  // than the live MFL API -- separate data source, separate nav item.
-  'History' => ['wide' => false, 'sub' => [
+    // Records Hub (league history / all-time records, sourced from the
+    // rotchist_ database -- see includes/rotchist-db.php) used to be its
+    // own top-level "History" nav item; folded into Reports per Matteo's
+    // request since it's another report, not a distinct section.
     ['Records Hub', "$base/history/"],
   ]],
 ];
