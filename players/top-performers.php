@@ -6,6 +6,13 @@
  * for a given week or W=YTD, joined against TYPE=players. No games
  * have been played yet this preseason, so this will show "no data"
  * until Week 1 actually happens — that's expected, not a bug.
+ *
+ * Year selector: mfl_cached_get_year() (not mfl_cached_get(), which is
+ * always MFL_YEAR) against any season back to 2004, the earliest year
+ * this league's own History section covers (see history/index.php).
+ * Player bio lookup (name/position/current NFL team) is NOT re-fetched
+ * per year -- TYPE=players is a current directory, not a historical
+ * roster, same assumption rosters.php's prior-year points column makes.
  */
 
 $page_title = 'Top Performers — Return of the Champions XXVI';
@@ -26,7 +33,10 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/player-hover.php';
 
-    $raw = mfl_cached_get('playerScores', 1800, ['W' => $weekParam, 'COUNT' => 200]);
+    $yearParam = (int) ($_GET['year'] ?? MFL_YEAR);
+    if ($yearParam < 2004 || $yearParam > (int) MFL_YEAR) $yearParam = (int) MFL_YEAR;
+
+    $raw = mfl_cached_get_year('playerScores', $yearParam, 1800, ['W' => $weekParam, 'COUNT' => 200]);
     $list = mfl_normalize_list($raw['playerScores']['playerScore'] ?? null);
     $list = array_values(array_filter($list, fn($r) => !empty($r['id']) && $r['score'] !== ''));
     $ids = array_column($list, 'id');
@@ -63,9 +73,17 @@ function rotc_qs3(array $overrides): string {
       <div class="card"><p>Player stats aren't available right now — check back soon.</p></div>
     <?php else: ?>
       <div class="card">
-        <h2 class="card-title">Top Performers <?= $weekParam === 'YTD' ? '(Season)' : '(Week ' . htmlspecialchars($weekParam) . ')' ?></h2>
+        <h2 class="card-title">Top Performers <?= htmlspecialchars((string) $yearParam) ?> <?= $weekParam === 'YTD' ? '(Season)' : '(Week ' . htmlspecialchars($weekParam) . ')' ?></h2>
 
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:8px 0 16px;">
+          <form method="get" style="margin:0;">
+            <?php foreach ($_GET as $k => $v): if ($k !== 'year'): ?><input type="hidden" name="<?= htmlspecialchars($k) ?>" value="<?= htmlspecialchars($v) ?>"><?php endif; endforeach; ?>
+            <select name="year" onchange="this.form.submit()" style="padding:4px 9px;border:1px solid var(--line);border-radius:6px;font-size:13px;">
+              <?php for ($y = (int) MFL_YEAR; $y >= 2004; $y--): ?>
+                <option value="<?= $y ?>"<?= $y === $yearParam ? ' selected' : '' ?>><?= $y ?></option>
+              <?php endfor; ?>
+            </select>
+          </form>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <a href="<?= rotc_qs3(['week' => 'YTD']) ?>" style="padding:4px 9px;border-radius:6px;border:1px solid var(--line);font-size:13px;<?= $weekParam === 'YTD' ? 'background:var(--ink);color:var(--on-ink);' : '' ?>">Season</a>
             <?php for ($w = 1; $w <= 18; $w++): ?>
