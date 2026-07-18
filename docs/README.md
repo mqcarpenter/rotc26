@@ -31,3 +31,16 @@ live sample (likely because this year's draft already happened), so its
 `draftPick` shape is assumed symmetric with `futureYearDraftPicks` rather than
 separately confirmed. Re-check via `?debug=assets` once a franchise actually
 holds an unspent current-year pick.
+
+## Accept/reject/revoke a pending trade -- `tradeResponse`, not `tradeProposal`
+
+Confirmed straight from the docs page (no live testing needed -- MFL states
+this explicitly): responding to an existing pending trade is a separate
+import type, `tradeResponse`, not a resubmission of `tradeProposal`. Params
+are just `TRADE_ID` + `RESPONSE` (`accept`/`reject`/`revoke`) and an optional
+`COMMENTS`. `revoke` is restricted by MFL to the trade's originator;
+`accept`/`reject` to its target -- enforced by MFL itself, not something this
+codebase needs to check. `offer-trade.php` originally guessed this could be
+done by resubmitting `tradeProposal` with the same give-up/receive lists,
+which was never more than partially confirmed and had no reject path at all;
+that's been replaced with the real `tradeResponse` call.
