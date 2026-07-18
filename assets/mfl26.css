@@ -201,7 +201,17 @@ a:hover{ color:var(--accent); }
 .rotc-item.wide .rotc-sub{ width:480px; }
 .rotc-sub-col{ list-style:none; margin:0; padding:0; flex:1 1 50%; min-width:0; }
 .rotc-item:nth-child(n+4) .rotc-sub{ left:auto; right:0; }
-.rotc-sub a:hover{ background:var(--sand); color:var(--accent); }
+/* (hover:hover) guard: iOS Safari (and touchscreens generally) treats the
+   FIRST tap on a link as simulating its :hover state rather than
+   following it, when that link has a :hover rule that changes its look --
+   a second tap is then needed to actually navigate. That's invisible on
+   desktop (real hover devices) but on a touchscreen it read as "the
+   submenu opens but its links don't respond to taps." Scoping these
+   :hover rules to real hover-capable pointers only means touch devices
+   never match them, so the first tap just navigates normally. */
+@media (hover:hover){
+  .rotc-sub a:hover{ background:var(--sand); color:var(--accent); }
+}
 @media (max-width:1100px){
   .rotc-bar{ flex-wrap:wrap; height:auto; padding:10px 16px; }
   .rotc-burger-btn{ display:block; }
@@ -224,6 +234,11 @@ a:hover{ color:var(--accent); }
   .rotc-item.wide .rotc-sub{ width:auto; }
   .rotc-sub-col{ flex:none; }
   .rotc-sub a{ color:var(--paper); }
+}
+/* Same (hover:hover) guard as above, mobile colors -- kept as its own
+   combined query rather than nested inside (max-width:1100px) above for
+   plain-CSS compatibility (no CSS nesting spec dependency). */
+@media (max-width:1100px) and (hover:hover){
   .rotc-sub a:hover{ background:rgba(224,83,27,.15); color:var(--accent); }
 }
 
