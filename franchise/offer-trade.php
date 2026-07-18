@@ -41,12 +41,9 @@ if ($hasConfig) {
     $franchises = mfl_franchises();
     unset($franchises[$franchiseId]);
 
-    // Raw dump of TYPE=assets -- MFL's api_info page documents this
-    // call's params but not its response shape (unlike most export
-    // types), so rotc_all_franchise_picks() below is a best-guess
-    // parse. Load this URL once while logged in and paste the output
-    // back if picks come out missing or mislabeled elsewhere on this
-    // page -- that confirms the real field names in one shot.
+    // Raw dump of TYPE=assets -- kept for spot-checking currentYearDraftPicks
+    // (still unconfirmed live, see rotc_all_franchise_picks()'s doc comment)
+    // and for re-verifying if MFL ever changes this shape.
     if (($_GET['debug'] ?? '') === 'assets') {
         header('Content-Type: text/plain');
         echo "My franchise: $franchiseId\n\n";
@@ -215,16 +212,23 @@ function rotc_trade_roster_list(array $roster, array $players, array $picks, str
 
 /**
  * All tradable DRAFT PICK assets for every franchise in the league, via
- * TYPE=assets. Player assets in that same response are ignored here --
- * rosters()/mfl_franchises() already cover players in the shape the
- * rest of this file expects.
+ * TYPE=assets. Player assets in that same response (a bare list of
+ * {id}) are ignored here -- rosters()/mfl_franchises() already cover
+ * players in the shape the rest of this file expects.
  *
- * BEST-GUESS, UNCONFIRMED: MFL's api_info page documents this call's
- * params but not its response shape. The field names read below
- * (type/year/round/pick/original_team) are inferred from the DP_/FP_ id
- * format documented under tradeProposal, not seen live yet. Check via
- * ?debug=assets and adjust the field names here if the real response
- * uses different keys.
+ * CONFIRMED live via ?debug=assets (2026-07-18): each franchise entry
+ * has currentYearDraftPicks.draftPick[] and futureYearDraftPicks.
+ * draftPick[] (NOT a flat "asset" list keyed by type, as originally
+ * guessed -- that field doesn't exist, which is why picks silently
+ * never showed up before this fix). Each draftPick already comes with
+ * a ready-to-submit id in its 'pick' field (e.g. "FP_0001_2027_1",
+ * matching the FP_ format documented under tradeProposal) and a
+ * ready-made human-readable 'description' (e.g. "Year 2027 Round 1
+ * Draft Pick from Angels of Harlem") -- no round/suffix formatting
+ * needed, MFL already did it. currentYearDraftPicks was empty for
+ * every franchise in the live sample (likely because this year's
+ * draft already happened), so its draftPick shape is assumed
+ * symmetric with futureYearDraftPicks rather than separately confirmed.
  *
  * Returns:
  *   'byFranchise' => [franchiseId => [pickId => label]] -- for building
@@ -247,28 +251,14 @@ function rotc_all_franchise_picks(array $franchises, string $myFranchiseId): arr
         $fid = (string) ($f['id'] ?? '');
         if ($fid === '') continue;
         $picks = [];
-        foreach (mfl_normalize_list($f['asset'] ?? null) as $a) {
-            $type = (string) ($a['type'] ?? '');
-            if (stripos($type, 'draft') === false || stripos($type, 'pick') === false) continue;
-
-            $year  = (string) ($a['year'] ?? '');
-            $round = (int) ($a['round'] ?? 0);
-            if ($round <= 0) continue;
-            $suffix = in_array($round % 100, [11, 12, 13], true) ? 'th' : (['th', 'st', 'nd', 'rd'][$round % 10] ?? 'th');
-            $roundLabel = $round . $suffix;
-
-            $isFuture = stripos($type, 'future') !== false || ($year !== '' && (int) $year !== (int) MFL_YEAR);
-            if ($isFuture) {
-                $origTeam  = (string) ($a['original_team'] ?? $a['original_franchise'] ?? $fid);
-                $id        = 'FP_' . str_pad($origTeam, 4, '0', STR_PAD_LEFT) . '_' . $year . '_' . $round;
-                $origLabel = ($origTeam === $fid) ? '' : (' (from ' . ($franchises[$origTeam]['abbrev'] ?? $origTeam) . ')');
-                $label     = trim("$year $roundLabel Round Pick") . $origLabel;
-            } else {
-                $pickNum = (int) ($a['pick'] ?? 0);
-                if ($pickNum <= 0) continue; // can't build a submittable DP_ id without it
-                $id    = 'DP_' . str_pad((string) ($round - 1), 2, '0', STR_PAD_LEFT) . '_' . str_pad((string) ($pickNum - 1), 2, '0', STR_PAD_LEFT);
-                $label = "$year $roundLabel Round Pick, Pick $pickNum";
-            }
+        $draftPicks = array_merge(
+            mfl_normalize_list($f['currentYearDraftPicks']['draftPick'] ?? null),
+            mfl_normalize_list($f['futureYearDraftPicks']['draftPick'] ?? null)
+        );
+        foreach ($draftPicks as $p) {
+            $id = (string) ($p['pick'] ?? '');
+            if ($id === '') continue;
+            $label = (string) ($p['description'] ?? $id);
             $picks[$id] = $label;
             $all[$id] = $label . ' (' . ($franchises[$fid]['abbrev'] ?? ($fid === $myFranchiseId ? 'you' : $fid)) . ')';
         }
