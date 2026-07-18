@@ -129,6 +129,10 @@ a:hover{ color:var(--accent); }
 .rotc-roster-table th{ font-size:10px; }
 .rotc-roster-table td:first-child{ padding:4px 2px; text-align:center; }
 
+/* Rule between position groups on the trade-offer give-up/receive tables. */
+.rotc-position-sep td{ padding:2px 0; border:none; }
+.rotc-position-sep hr{ border:none; border-top:1px solid var(--line); margin:4px 0; }
+
 
 @media (max-width:767px){
   .home-col{ display:block; width:100% !important; padding:0; }

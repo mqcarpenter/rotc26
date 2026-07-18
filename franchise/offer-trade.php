@@ -42,11 +42,31 @@ if ($hasConfig) {
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/mfl-auth.php';
     require_once __DIR__ . '/../includes/helmets.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
     rotc_require_login($pageBase);
 
     $franchiseId = rotc_mfl_franchise_id();
-    $franchises = mfl_franchises();
+    // Full franchise list kept separate from $franchises (below) -- the
+    // "who to trade with" dropdown needs my own franchise unset, but
+    // rotc_acquisition_maps()'s trade labels need every franchise
+    // (including mine) to resolve abbreviations correctly.
+    $allFranchises = mfl_franchises();
+    $franchises = $allFranchises;
     unset($franchises[$franchiseId]);
+
+    // Prior-season total points, same source/window as rosters.php's
+    // "$prevYear Pts" column -- the current season hasn't started yet, so
+    // last season's total is the meaningful "points to date" reference.
+    $prevYear = (int) MFL_YEAR - 1;
+    $prevPtsById = [];
+    $prevYearRaw = mfl_cached_get_year('playerScores', $prevYear, 86400, ['W' => 'YTD', 'COUNT' => 3000]);
+    foreach (mfl_normalize_list($prevYearRaw['playerScores']['playerScore'] ?? null) as $row) {
+        if (!empty($row['id'])) $prevPtsById[$row['id']] = $row['score'] ?? '';
+    }
+
+    // Acquisition history (auction/draft/trade) -- see rotc_acquisition_maps()
+    // in includes/mfl-api.php, shared with transactions/rosters.php.
+    $acqMaps = rotc_acquisition_maps($allFranchises);
 
     // Raw dump of TYPE=assets -- kept for spot-checking currentYearDraftPicks
     // (still unconfirmed live, see rotc_all_franchise_picks()'s doc comment)
@@ -196,16 +216,75 @@ if ($hasConfig) {
 
 include __DIR__ . '/../templates/header.php';
 
-function rotc_trade_roster_list(array $roster, array $players, array $picks, string $fieldName): void {
+/** Display order for position groups; anything else (PK, DEF, ...) sinks below these, alphabetically. */
+const ROTC_TRADE_POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'DE', 'DT', 'LB', 'CB', 'S'];
+
+/**
+ * Give-up/receive checkbox list for the new-offer form: players grouped
+ * by position (QB/RB/WR/TE/DE/DT/LB/CB/S in that order, anything else
+ * alphabetically after), alphabetical by name within each group, with a
+ * rule between groups. Same hover card as rosters.php
+ * (rotc_player_hover_span()/includes/player-hover.php), plus the same
+ * Pts/Acquired columns as that page. Draft picks (no position/points/
+ * acquisition of their own) are appended as their own group at the end.
+ */
+function rotc_trade_roster_list(array $roster, array $players, array $picks, string $fieldName, string $ownerFranchiseId, int $prevYear, array $prevPtsById, array $acqMaps): void {
+    [$auctionMap, $draftMap, $tradeMap] = $acqMaps;
+
+    $groups = [];
     foreach ($roster as $p) {
         $pd = $players[$p['id']] ?? [];
-        echo '<label class="rotc-trade-player"><input type="checkbox" name="' . htmlspecialchars($fieldName) . '[]" value="' . htmlspecialchars($p['id']) . '"> '
-            . htmlspecialchars($pd['name'] ?? ('Player #' . $p['id'])) . ' <span class="rotc-login-blurb" style="display:inline;">(' . htmlspecialchars($pd['position'] ?? '') . ' ' . htmlspecialchars($pd['team'] ?? '') . ')</span></label>';
+        $pos = strtoupper($pd['position'] ?? '');
+        $groups[$pos][] = ['p' => $p, 'pd' => $pd, 'name' => $pd['name'] ?? ('Player #' . $p['id'])];
     }
-    foreach ($picks as $pickId => $label) {
-        echo '<label class="rotc-trade-player"><input type="checkbox" name="' . htmlspecialchars($fieldName) . '[]" value="' . htmlspecialchars($pickId) . '"> '
-            . htmlspecialchars($label) . '</label>';
+    foreach ($groups as &$list) {
+        usort($list, function ($a, $b) { return strcasecmp($a['name'], $b['name']); });
     }
+    unset($list);
+
+    $orderedPositions = ROTC_TRADE_POSITION_ORDER;
+    $leftover = array_diff(array_keys($groups), $orderedPositions);
+    sort($leftover);
+    foreach ($leftover as $pos) { $orderedPositions[] = $pos; }
+    $orderedPositions = array_values(array_filter($orderedPositions, function ($pos) use ($groups) { return !empty($groups[$pos]); }));
+
+    echo '<div style="overflow-x:auto;"><table class="data-table rotc-roster-table">';
+    echo '<colgroup><col style="width:24px;"><col style="width:34%;"><col style="width:10%;"><col style="width:16%;"><col style="width:auto;"></colgroup>';
+    echo '<thead><tr><th></th><th>Player</th><th>Pos</th><th>' . $prevYear . ' Pts</th><th>Acquired</th></tr></thead><tbody>';
+
+    $firstGroup = true;
+    foreach ($orderedPositions as $pos) {
+        if (!$firstGroup) echo '<tr class="rotc-position-sep"><td colspan="5"><hr></td></tr>';
+        $firstGroup = false;
+        foreach ($groups[$pos] as $row) {
+            $p = $row['p']; $pd = $row['pd']; $name = $row['name'];
+            $pid = (string) $p['id'];
+            $pts = $prevPtsById[$pid] ?? '';
+            $drafted = (string) ($p['drafted'] ?? '');
+            $acquired = rotc_acquired_label($ownerFranchiseId, $pid, $drafted, $auctionMap, $draftMap, $tradeMap);
+            $checkboxId = htmlspecialchars($fieldName . '-' . $pid);
+            echo '<tr>';
+            echo '<td><input type="checkbox" id="' . $checkboxId . '" name="' . htmlspecialchars($fieldName) . '[]" value="' . htmlspecialchars($pid) . '"></td>';
+            echo '<td><label for="' . $checkboxId . '">' . rotc_player_hover_span($name, $pd, [$prevYear . ' Total' => $pts !== '' ? $pts . ' pts' : '', 'Acquired' => $acquired]) . '</label></td>';
+            echo '<td>' . htmlspecialchars($pd['position'] ?? '') . '</td>';
+            echo '<td>' . htmlspecialchars($pts) . '</td>';
+            echo '<td>' . htmlspecialchars($acquired) . '</td>';
+            echo '</tr>';
+        }
+    }
+
+    if ($picks) {
+        if (!$firstGroup) echo '<tr class="rotc-position-sep"><td colspan="5"><hr></td></tr>';
+        foreach ($picks as $pickId => $label) {
+            $checkboxId = htmlspecialchars($fieldName . '-' . $pickId);
+            echo '<tr>';
+            echo '<td><input type="checkbox" id="' . $checkboxId . '" name="' . htmlspecialchars($fieldName) . '[]" value="' . htmlspecialchars($pickId) . '"></td>';
+            echo '<td colspan="4"><label for="' . $checkboxId . '">' . htmlspecialchars($label) . '</label></td>';
+            echo '</tr>';
+        }
+    }
+
+    echo '</tbody></table></div>';
 }
 
 /**
@@ -405,11 +484,11 @@ function rotc_trade_asset_names(array $ids, array $players, array $pickLabels): 
             <div class="rotc-trade-columns">
               <div>
                 <h3 class="rotc-trade-col-head">You give up</h3>
-                <?php rotc_trade_roster_list($myRoster, $players, $myPicks, 'give_up'); ?>
+                <?php rotc_trade_roster_list($myRoster, $players, $myPicks, 'give_up', $franchiseId, $prevYear, $prevPtsById, $acqMaps); ?>
               </div>
               <div>
                 <h3 class="rotc-trade-col-head">You receive (from <?= htmlspecialchars($franchises[$targetId]['name'] ?? '') ?>)</h3>
-                <?php rotc_trade_roster_list($theirRoster, $players, $theirPicks, 'receive'); ?>
+                <?php rotc_trade_roster_list($theirRoster, $players, $theirPicks, 'receive', $targetId, $prevYear, $prevPtsById, $acqMaps); ?>
               </div>
             </div>
             <label for="rotc-trade-comments">Message (optional)</label>
@@ -421,4 +500,5 @@ function rotc_trade_asset_names(array $ids, array $players, array $pickLabels): 
     </div>
   </main>
 </div>
+<?php if ($hasConfig) rotc_player_hover_widget(); ?>
 <?php include __DIR__ . '/../templates/footer.php'; ?>
