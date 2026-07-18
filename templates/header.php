@@ -191,6 +191,7 @@ $tabs = [
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= $page_title ?? 'Return of the Champions' ?></title>
+<link rel="icon" type="image/png" href="<?= $base ?>/assets/img/rotc-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,400i,700|Roboto+Condensed:400,700|Roboto:400,400i,700" rel="stylesheet">
 <?php $cssVer = @filemtime(__DIR__ . '/../assets/mfl26.css') ?: time(); ?>
