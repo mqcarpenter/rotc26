@@ -432,6 +432,10 @@ a:hover{ color:var(--accent); }
 .rotc-trending-name{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
 .rotc-trending-pos{ color:var(--muted); flex:0 0 auto; }
 .rotc-trending-pct{ color:var(--accent); font-weight:700; flex:0 0 auto; }
+.rotc-trend-arrow{ flex:0 0 auto; font-size:10px; }
+.rotc-trend-up{ color:#1e7d32; }
+.rotc-trend-down{ color:#b3261e; }
+.rotc-trend-flat{ color:var(--muted); }
 
 /* Owner login (login.php) + Franchise action pages (franchise/submit-
    lineup.php, drop-player.php, offer-trade.php, survivor-pick.php,

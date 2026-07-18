@@ -2,13 +2,15 @@
 /**
  * index.php — the front page.
  *
- * Layout: hero carousel, then Fantasy Recap (interactive hero+list
- * hub) and Final NFL Scores in the main column; Smack Feed / Top
- * Adds-Drops tabs in the sidebar. The old "Monday Report" and
- * "Fantasy Preview" placeholder cards were removed per Matteo's call
- * -- neither was ever wired to real data (Monday Report had no data
- * source at all; Preview would've hit the same "MFL doesn't expose
- * this via API" wall the old Recap card did before it was rebuilt).
+ * Layout: hero carousel, then Hall of Fame spotlight, Fantasy Recap
+ * (interactive hero+list hub -- commented out at season start, see
+ * below), and Final NFL Scores in the main column; Smack Feed / Top
+ * Adds-Drops tabs plus the Top Free Agents/Draft Trends tabbed widget
+ * in the sidebar. The old "Monday Report" and "Fantasy Preview"
+ * placeholder cards were removed per Matteo's call -- neither was ever
+ * wired to real data (Monday Report had no data source at all; Preview
+ * would've hit the same "MFL doesn't expose this via API" wall the old
+ * Recap card did before it was rebuilt).
  */
 
 $page_title = 'Return of the Champions XXVI';
@@ -142,6 +144,13 @@ const ROTC_HOME_NFL_ABBR = [
     $fetchedSmack = rotc_fetch_smack_items(6);
     if ($fetchedSmack) { $smack_items = $fetchedSmack; }
     include __DIR__ . '/templates/sidefeed.php';
+
+    if ($hasConfig) {
+        require_once __DIR__ . '/includes/free-agent-pulse.php';
+        $top_free_agents = rotc_fetch_top_free_agents(20);
+        $adp_trends = rotc_fetch_adp_trends(20);
+        include __DIR__ . '/templates/free-agent-pulse.php';
+    }
     ?>
   </aside>
 </div>

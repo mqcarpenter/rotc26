@@ -68,14 +68,22 @@ function rotc_trending_row(array $r): void {
 
 <script>
 (function(){
-  document.querySelectorAll('.rotc-sidefeed').forEach(function(widget){
-    const tabs = widget.querySelectorAll('.rotc-sidefeed-tab');
-    tabs.forEach(function(tab){
-      tab.addEventListener('click', function(){
-        tabs.forEach(t => t.classList.remove('active'));
-        widget.querySelectorAll('.rotc-sidefeed-panel').forEach(p => p.classList.remove('active'));
-        tab.classList.add('active');
-        widget.querySelector('[data-panel="' + tab.dataset.tab + '"]').classList.add('active');
+  // Deferred to DOMContentLoaded rather than running inline at this exact
+  // point in the page -- a second .rotc-sidefeed widget included LATER on
+  // the page (e.g. templates/free-agent-pulse.php) wouldn't exist in the
+  // DOM yet if this ran immediately, so its tabs would silently never get
+  // wired up. This way any .rotc-sidefeed widget anywhere on the finished
+  // page works, regardless of include order relative to this script.
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.rotc-sidefeed').forEach(function(widget){
+      const tabs = widget.querySelectorAll('.rotc-sidefeed-tab');
+      tabs.forEach(function(tab){
+        tab.addEventListener('click', function(){
+          tabs.forEach(t => t.classList.remove('active'));
+          widget.querySelectorAll('.rotc-sidefeed-panel').forEach(p => p.classList.remove('active'));
+          tab.classList.add('active');
+          widget.querySelector('[data-panel="' + tab.dataset.tab + '"]').classList.add('active');
+        });
       });
     });
   });
