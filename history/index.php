@@ -20,6 +20,13 @@ $current_tab = 'main';
 
 include __DIR__ . '/../templates/header.php';
 
+// Was missing entirely until 2026-07-18 -- this page never actually
+// loaded config.php, so the ROTCHIST_READ_DB_* constants rotchist_db()
+// needs (see includes/rotchist-db.php) were never defined here, meaning
+// $db was always null regardless of whether config.php itself had them.
+$configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
+if (file_exists($configPath)) require_once $configPath;
+
 require_once __DIR__ . '/../includes/rotchist-db.php';
 $db = rotchist_db();
 
@@ -254,27 +261,23 @@ if (!$fetchError) {
 // HEAD TO HEAD -- lifetime records, closest games/blowouts, and
 // rivalries between any two franchises, sourced from the same
 // rotchist_mfl_games atomic log as everything else on this page.
+// Guarded by $fetchError like the rest of the page's data -- this used
+// to call $db->query() unconditionally, which fatally crashed the whole
+// page (not just showed the "not available" card) whenever $db was
+// null, e.g. before config.php actually defined the ROTCHIST_READ_DB_*
+// constants this file needs (see the require_once above, added
+// 2026-07-18 -- this file never loaded config.php at all before that).
 // ------------------------------------------------------------------
 require_once __DIR__ . '/../includes/helmets.php';
 
-$h2hFranchiseList = $db->query("SELECT id, current_name FROM rotchist_franchises ORDER BY current_name")->fetchAll();
+$h2hFranchiseList = [];
 $h2hNamesById = [];
-foreach ($h2hFranchiseList as $f) { $h2hNamesById[(int) $f['id']] = $f['current_name']; }
-
-// Helmet art keys off the CURRENT season's MFL franchise id (see
-// includes/helmets.php), so resolve stable rotchist_franchises.id ->
-// this-season mfl_franchise_id once, using the most recent real season
-// already computed above ($recentSeason), falling back to the latest
-// season on record if that's somehow unset.
-$h2hHelmetSeason = $recentSeason ?? (int) $db->query("SELECT MAX(season) FROM rotchist_mfl_franchises")->fetchColumn();
 $h2hMflIdByFranchise = [];
-if ($h2hHelmetSeason) {
-    $stmt = $db->prepare("SELECT franchise_id, mfl_franchise_id FROM rotchist_mfl_franchises WHERE season = :season AND franchise_id IS NOT NULL");
-    $stmt->execute(['season' => $h2hHelmetSeason]);
-    foreach ($stmt->fetchAll() as $row) {
-        $h2hMflIdByFranchise[(int) $row['franchise_id']] = $row['mfl_franchise_id'];
-    }
-}
+$h2hMostPlayed = [];
+$h2hClosestRivalries = [];
+$h2hTeamA = isset($_GET['teamA']) && ctype_digit((string) $_GET['teamA']) ? (int) $_GET['teamA'] : null;
+$h2hTeamB = isset($_GET['teamB']) && ctype_digit((string) $_GET['teamB']) ? (int) $_GET['teamB'] : null;
+$h2hSelected = null;
 
 function rotc_h2h_helmet(?int $franchiseId, array $mflIdMap): ?string {
     if (!$franchiseId) return null;
@@ -282,87 +285,102 @@ function rotc_h2h_helmet(?int $franchiseId, array $mflIdMap): ?string {
     return $mflId ? rotc_helmet_src($mflId) : null;
 }
 
-// Rivalries -- every unique pair that has ever played, canonicalized via
-// LEAST/GREATEST so a franchise pair only shows up once regardless of
-// which side was "franchise1" in a given game.
-$h2hRivalries = $db->query("
-    SELECT LEAST(franchise1_id, franchise2_id) AS fa, GREATEST(franchise1_id, franchise2_id) AS fb,
-           COUNT(*) AS games,
-           AVG(ABS(franchise1_score - franchise2_score)) AS avg_margin,
-           MAX(season) AS last_season
-    FROM rotchist_mfl_games
-    WHERE franchise1_id IS NOT NULL AND franchise2_id IS NOT NULL
-      AND franchise1_score IS NOT NULL AND franchise2_score IS NOT NULL
-    GROUP BY fa, fb
-")->fetchAll();
+if (!$fetchError) {
+    $h2hFranchiseList = $db->query("SELECT id, current_name FROM rotchist_franchises ORDER BY current_name")->fetchAll();
+    foreach ($h2hFranchiseList as $f) { $h2hNamesById[(int) $f['id']] = $f['current_name']; }
 
-usort($h2hRivalries, fn($a, $b) => (int) $b['games'] <=> (int) $a['games']);
-$h2hMostPlayed = array_slice($h2hRivalries, 0, 8);
+    // Helmet art keys off the CURRENT season's MFL franchise id (see
+    // includes/helmets.php), so resolve stable rotchist_franchises.id ->
+    // this-season mfl_franchise_id once, using the most recent real season
+    // already computed above ($recentSeason), falling back to the latest
+    // season on record if that's somehow unset.
+    $h2hHelmetSeason = $recentSeason ?? (int) $db->query("SELECT MAX(season) FROM rotchist_mfl_franchises")->fetchColumn();
+    if ($h2hHelmetSeason) {
+        $stmt = $db->prepare("SELECT franchise_id, mfl_franchise_id FROM rotchist_mfl_franchises WHERE season = :season AND franchise_id IS NOT NULL");
+        $stmt->execute(['season' => $h2hHelmetSeason]);
+        foreach ($stmt->fetchAll() as $row) {
+            $h2hMflIdByFranchise[(int) $row['franchise_id']] = $row['mfl_franchise_id'];
+        }
+    }
 
-$h2hEligibleForClosest = array_values(array_filter($h2hRivalries, fn($r) => (int) $r['games'] >= 5));
-usort($h2hEligibleForClosest, fn($a, $b) => (float) $a['avg_margin'] <=> (float) $b['avg_margin']);
-$h2hClosestRivalries = array_slice($h2hEligibleForClosest, 0, 8);
-
-// A specific pairing, selected via ?teamA=..&teamB=.. on this same page.
-$h2hTeamA = isset($_GET['teamA']) && ctype_digit((string) $_GET['teamA']) ? (int) $_GET['teamA'] : null;
-$h2hTeamB = isset($_GET['teamB']) && ctype_digit((string) $_GET['teamB']) ? (int) $_GET['teamB'] : null;
-$h2hSelected = null;
-
-if ($h2hTeamA && $h2hTeamB && $h2hTeamA !== $h2hTeamB && isset($h2hNamesById[$h2hTeamA]) && isset($h2hNamesById[$h2hTeamB])) {
-    $stmt = $db->prepare("
-        SELECT season, week, is_playoff, franchise1_id, franchise1_score, franchise2_id, franchise2_score
+    // Rivalries -- every unique pair that has ever played, canonicalized via
+    // LEAST/GREATEST so a franchise pair only shows up once regardless of
+    // which side was "franchise1" in a given game.
+    $h2hRivalries = $db->query("
+        SELECT LEAST(franchise1_id, franchise2_id) AS fa, GREATEST(franchise1_id, franchise2_id) AS fb,
+               COUNT(*) AS games,
+               AVG(ABS(franchise1_score - franchise2_score)) AS avg_margin,
+               MAX(season) AS last_season
         FROM rotchist_mfl_games
-        WHERE ((franchise1_id = :a AND franchise2_id = :b) OR (franchise1_id = :b AND franchise2_id = :a))
+        WHERE franchise1_id IS NOT NULL AND franchise2_id IS NOT NULL
           AND franchise1_score IS NOT NULL AND franchise2_score IS NOT NULL
-        ORDER BY season, week
-    ");
-    $stmt->execute(['a' => $h2hTeamA, 'b' => $h2hTeamB]);
-    $h2hRows = $stmt->fetchAll();
+        GROUP BY fa, fb
+    ")->fetchAll();
 
-    if ($h2hRows) {
-        $aWins = 0; $bWins = 0; $ties = 0; $aPoints = 0.0; $bPoints = 0.0;
-        $meetings = [];
-        foreach ($h2hRows as $g) {
-            $aIsF1 = (int) $g['franchise1_id'] === $h2hTeamA;
-            $aScore = (float) ($aIsF1 ? $g['franchise1_score'] : $g['franchise2_score']);
-            $bScore = (float) ($aIsF1 ? $g['franchise2_score'] : $g['franchise1_score']);
-            $margin = round(abs($aScore - $bScore), 2);
-            if ($aScore > $bScore) $aWins++;
-            elseif ($bScore > $aScore) $bWins++;
-            else $ties++;
-            $aPoints += $aScore;
-            $bPoints += $bScore;
-            $meetings[] = [
-                'season' => (int) $g['season'], 'week' => (int) $g['week'], 'is_playoff' => (int) $g['is_playoff'],
-                'a_score' => $aScore, 'b_score' => $bScore, 'margin' => $margin,
+    usort($h2hRivalries, fn($a, $b) => (int) $b['games'] <=> (int) $a['games']);
+    $h2hMostPlayed = array_slice($h2hRivalries, 0, 8);
+
+    $h2hEligibleForClosest = array_values(array_filter($h2hRivalries, fn($r) => (int) $r['games'] >= 5));
+    usort($h2hEligibleForClosest, fn($a, $b) => (float) $a['avg_margin'] <=> (float) $b['avg_margin']);
+    $h2hClosestRivalries = array_slice($h2hEligibleForClosest, 0, 8);
+
+    // A specific pairing, selected via ?teamA=..&teamB=.. on this same page.
+    if ($h2hTeamA && $h2hTeamB && $h2hTeamA !== $h2hTeamB && isset($h2hNamesById[$h2hTeamA]) && isset($h2hNamesById[$h2hTeamB])) {
+        $stmt = $db->prepare("
+            SELECT season, week, is_playoff, franchise1_id, franchise1_score, franchise2_id, franchise2_score
+            FROM rotchist_mfl_games
+            WHERE ((franchise1_id = :a AND franchise2_id = :b) OR (franchise1_id = :b AND franchise2_id = :a))
+              AND franchise1_score IS NOT NULL AND franchise2_score IS NOT NULL
+            ORDER BY season, week
+        ");
+        $stmt->execute(['a' => $h2hTeamA, 'b' => $h2hTeamB]);
+        $h2hRows = $stmt->fetchAll();
+
+        if ($h2hRows) {
+            $aWins = 0; $bWins = 0; $ties = 0; $aPoints = 0.0; $bPoints = 0.0;
+            $meetings = [];
+            foreach ($h2hRows as $g) {
+                $aIsF1 = (int) $g['franchise1_id'] === $h2hTeamA;
+                $aScore = (float) ($aIsF1 ? $g['franchise1_score'] : $g['franchise2_score']);
+                $bScore = (float) ($aIsF1 ? $g['franchise2_score'] : $g['franchise1_score']);
+                $margin = round(abs($aScore - $bScore), 2);
+                if ($aScore > $bScore) $aWins++;
+                elseif ($bScore > $aScore) $bWins++;
+                else $ties++;
+                $aPoints += $aScore;
+                $bPoints += $bScore;
+                $meetings[] = [
+                    'season' => (int) $g['season'], 'week' => (int) $g['week'], 'is_playoff' => (int) $g['is_playoff'],
+                    'a_score' => $aScore, 'b_score' => $bScore, 'margin' => $margin,
+                ];
+            }
+
+            $closest = $meetings;
+            usort($closest, fn($x, $y) => $x['margin'] <=> $y['margin']);
+            $blowouts = $meetings;
+            usort($blowouts, fn($x, $y) => $y['margin'] <=> $x['margin']);
+
+            // Current streak (from most recent meeting backward).
+            $streakTeam = null; $streakLen = 0;
+            for ($i = count($meetings) - 1; $i >= 0; $i--) {
+                $m = $meetings[$i];
+                $winner = $m['a_score'] > $m['b_score'] ? 'a' : ($m['b_score'] > $m['a_score'] ? 'b' : null);
+                if ($i === count($meetings) - 1) { $streakTeam = $winner; $streakLen = $winner ? 1 : 0; continue; }
+                if ($winner !== null && $winner === $streakTeam) { $streakLen++; } else { break; }
+            }
+
+            $h2hSelected = [
+                'a_id' => $h2hTeamA, 'b_id' => $h2hTeamB,
+                'a_name' => $h2hNamesById[$h2hTeamA], 'b_name' => $h2hNamesById[$h2hTeamB],
+                'a_wins' => $aWins, 'b_wins' => $bWins, 'ties' => $ties,
+                'a_points' => round($aPoints, 2), 'b_points' => round($bPoints, 2),
+                'games' => count($meetings),
+                'meetings' => array_reverse($meetings),
+                'closest' => array_slice($closest, 0, 10),
+                'blowouts' => array_slice($blowouts, 0, 10),
+                'streak_team' => $streakTeam, 'streak_len' => $streakLen,
             ];
         }
-
-        $closest = $meetings;
-        usort($closest, fn($x, $y) => $x['margin'] <=> $y['margin']);
-        $blowouts = $meetings;
-        usort($blowouts, fn($x, $y) => $y['margin'] <=> $x['margin']);
-
-        // Current streak (from most recent meeting backward).
-        $streakTeam = null; $streakLen = 0;
-        for ($i = count($meetings) - 1; $i >= 0; $i--) {
-            $m = $meetings[$i];
-            $winner = $m['a_score'] > $m['b_score'] ? 'a' : ($m['b_score'] > $m['a_score'] ? 'b' : null);
-            if ($i === count($meetings) - 1) { $streakTeam = $winner; $streakLen = $winner ? 1 : 0; continue; }
-            if ($winner !== null && $winner === $streakTeam) { $streakLen++; } else { break; }
-        }
-
-        $h2hSelected = [
-            'a_id' => $h2hTeamA, 'b_id' => $h2hTeamB,
-            'a_name' => $h2hNamesById[$h2hTeamA], 'b_name' => $h2hNamesById[$h2hTeamB],
-            'a_wins' => $aWins, 'b_wins' => $bWins, 'ties' => $ties,
-            'a_points' => round($aPoints, 2), 'b_points' => round($bPoints, 2),
-            'games' => count($meetings),
-            'meetings' => array_reverse($meetings),
-            'closest' => array_slice($closest, 0, 10),
-            'blowouts' => array_slice($blowouts, 0, 10),
-            'streak_team' => $streakTeam, 'streak_len' => $streakLen,
-        ];
     }
 }
 
