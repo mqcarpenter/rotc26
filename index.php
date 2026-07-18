@@ -27,11 +27,18 @@ $nflGames = [];
 $recapYear = 2025;
 $recapWeek = 17;
 
+// Hall of Fame spotlight (reigning champion) -- shown on the front page
+// year-round via templates/hall-of-fame-spotlight.php (same partial the
+// full history/hall-of-fame.php page uses). See includes/hall-of-fame.php.
+$hofChampion = null;
+$franchises = [];
+
 if ($hasConfig) {
     require_once $configPath;
     require_once __DIR__ . '/includes/mfl-api.php';
     require_once __DIR__ . '/includes/weekly-recap.php'; // also pulls in helmets.php + player-hover.php
     require_once __DIR__ . '/includes/trending-players.php';
+    require_once __DIR__ . '/includes/hall-of-fame.php';
 
     $current = rotc_current_recap_week((int) MFL_YEAR);
     if ($current) {
@@ -49,6 +56,10 @@ if ($hasConfig) {
 
     $trending_adds = rotc_fetch_trending('topAdds', 15);
     $trending_drops = rotc_fetch_trending('topDrops', 15);
+
+    $franchises = mfl_franchises();
+    $hofChampions = rotc_hall_of_fame_champions(2017, (int) MFL_YEAR);
+    if ($hofChampions) $hofChampion = $hofChampions[0];
 }
 
 const ROTC_HOME_NFL_ABBR = [
@@ -71,6 +82,18 @@ const ROTC_HOME_NFL_ABBR = [
     include __DIR__ . '/templates/hero-carousel.php';
     ?>
 
+    <?php if ($hofChampion): ?>
+      <div class="card">
+        <h2 class="card-title">Hall of Fame <span style="font-size:12px;font-weight:400;text-transform:none;color:var(--muted);"><a href="<?= $base ?>/history/hall-of-fame">See every champion &rarr;</a></span></h2>
+        <?php $spotlight = $hofChampion; include __DIR__ . '/templates/hall-of-fame-spotlight.php'; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php /* Commented out for the start of the season -- nothing has been
+       played yet, so there's no real recap to show. Restore in place
+       (don't move it) once Week 1 completes; $recap already auto-detects
+       the latest finished week via rotc_current_recap_week() above. */ ?>
+    <?php if (false): ?>
     <div class="card">
       <h2 class="card-title">Fantasy Recap</h2>
       <?php if ($recap): ?>
@@ -79,6 +102,7 @@ const ROTC_HOME_NFL_ABBR = [
         <p>No recap available yet.</p>
       <?php endif; ?>
     </div>
+    <?php endif; ?>
 
     <div class="card">
       <h2 class="card-title">Final NFL Scores <span style="font-size:12px;font-weight:400;text-transform:none;color:var(--muted);">&mdash; Week <?= htmlspecialchars($recapWeek) ?>, <?= htmlspecialchars($recapYear) ?></span> <a href="<?= $base ?>/scores/nfl-schedule" style="font-size:12px;font-weight:400;text-transform:none;">Full schedule &rarr;</a></h2>

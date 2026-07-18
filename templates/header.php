@@ -155,6 +155,10 @@ $nav_items = [
   // History nav item's "Records Hub") joined this menu and made it
   // long enough to warrant it.
   'Reports' => ['wide' => true, 'sub' => [
+    // Hall of Fame: every confirmed champion 2017-present, sourced live
+    // from MFL's own playoff-bracket API (see includes/hall-of-fame.php)
+    // -- MFL has no usable bracket data before 2017 for this league.
+    ['Hall of Fame', "$base/history/hall-of-fame"],
     // Historical Stats: league history / all-time records, sourced from
     // the rotchist_ database (see includes/rotchist-db.php) rather than
     // the live MFL API. Formerly "Records Hub" under its own top-level
