@@ -3,10 +3,13 @@
  * franchise/offer-trade.php
  * Real write action: import?TYPE=tradeProposal (OFFEREDTO,
  * WILL_GIVE_UP, WILL_RECEIVE, COMMENTS) -- confirmed live in MFL's own
- * Import API reference. Draft-pick / blind-bid-dollar trading isn't
- * offered here (only player-for-player) since that's a bigger scope
- * than what was asked for and this league's pick-trading settings
- * weren't checked; players only covers the actual request.
+ * Import API reference. WILL_GIVE_UP/WILL_RECEIVE take a single
+ * comma-separated list mixing player ids and draft-pick ids (DP_/FP_
+ * format, see rotc_all_franchise_picks() below) -- there's no separate
+ * picks parameter, so picks and players share the same give_up[]/
+ * receive[] form fields and get concatenated together before the API
+ * call. Blind-bid-dollar trading (BB_ ids) still isn't offered here --
+ * this league doesn't use Blind Bidding, so it wasn't wired in.
  */
 
 $page_title = 'Offer a Trade — Return of the Champions XXVI';
@@ -37,6 +40,23 @@ if ($hasConfig) {
     $franchiseId = rotc_mfl_franchise_id();
     $franchises = mfl_franchises();
     unset($franchises[$franchiseId]);
+
+    // Raw dump of TYPE=assets -- MFL's api_info page documents this
+    // call's params but not its response shape (unlike most export
+    // types), so rotc_all_franchise_picks() below is a best-guess
+    // parse. Load this URL once while logged in and paste the output
+    // back if picks come out missing or mislabeled elsewhere on this
+    // page -- that confirms the real field names in one shot.
+    if (($_GET['debug'] ?? '') === 'assets') {
+        header('Content-Type: text/plain');
+        echo "My franchise: $franchiseId\n\n";
+        print_r(rotc_mfl_authed_request('export', 'assets'));
+        exit;
+    }
+
+    $pickData  = rotc_all_franchise_picks($franchises, $franchiseId);
+    $myPicks   = $pickData['byFranchise'][$franchiseId] ?? [];
+    $allPicks  = $pickData['all'];
 
     // Accept an existing pending trade -- separate POST branch from the
     // "offer a new trade" one below, distinguished by the respond_trade_id
@@ -163,10 +183,12 @@ if ($hasConfig) {
 
     $allIds = array_merge(array_column($myRoster, 'id'), $pendingPlayerIds);
 
+    $theirPicks = [];
     if ($targetId !== '') {
         $theirRosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $targetId]);
         $theirRoster = mfl_normalize_list($theirRosterResp['rosters']['franchise']['player'] ?? null);
         $allIds = array_merge($allIds, array_column($theirRoster, 'id'));
+        $theirPicks = $pickData['byFranchise'][$targetId] ?? [];
     }
 
     if ($allIds) {
@@ -179,23 +201,101 @@ if ($hasConfig) {
 
 include __DIR__ . '/../templates/header.php';
 
-function rotc_trade_roster_list(array $roster, array $players, string $fieldName): void {
+function rotc_trade_roster_list(array $roster, array $players, array $picks, string $fieldName): void {
     foreach ($roster as $p) {
         $pd = $players[$p['id']] ?? [];
         echo '<label class="rotc-trade-player"><input type="checkbox" name="' . htmlspecialchars($fieldName) . '[]" value="' . htmlspecialchars($p['id']) . '"> '
             . htmlspecialchars($pd['name'] ?? ('Player #' . $p['id'])) . ' <span class="rotc-login-blurb" style="display:inline;">(' . htmlspecialchars($pd['position'] ?? '') . ' ' . htmlspecialchars($pd['team'] ?? '') . ')</span></label>';
     }
+    foreach ($picks as $pickId => $label) {
+        echo '<label class="rotc-trade-player"><input type="checkbox" name="' . htmlspecialchars($fieldName) . '[]" value="' . htmlspecialchars($pickId) . '"> '
+            . htmlspecialchars($label) . '</label>';
+    }
 }
 
-/** "Marks, Woody (RB, HOU), Fannin, Harold (TE, CLE)" for a pending-trade side. */
-function rotc_trade_player_names(array $ids, array $players): string {
+/**
+ * All tradable DRAFT PICK assets for every franchise in the league, via
+ * TYPE=assets. Player assets in that same response are ignored here --
+ * rosters()/mfl_franchises() already cover players in the shape the
+ * rest of this file expects.
+ *
+ * BEST-GUESS, UNCONFIRMED: MFL's api_info page documents this call's
+ * params but not its response shape. The field names read below
+ * (type/year/round/pick/original_team) are inferred from the DP_/FP_ id
+ * format documented under tradeProposal, not seen live yet. Check via
+ * ?debug=assets and adjust the field names here if the real response
+ * uses different keys.
+ *
+ * Returns:
+ *   'byFranchise' => [franchiseId => [pickId => label]] -- for building
+ *      the give-up/receive checkbox lists on the new-offer form.
+ *   'all' => [pickId => label incl. owning franchise] -- for labeling a
+ *      pick on either side of an existing pending trade, regardless of
+ *      which franchise the id maps to.
+ */
+function rotc_all_franchise_picks(array $franchises, string $myFranchiseId): array {
+    // "Access restricted to league owners" per MFL's docs -- same wording
+    // as pendingTrades/tradeBait above, which this codebase already
+    // treats as needing the logged-in owner's session cookie rather than
+    // the site's own read-only APIKEY, so this uses the same authed
+    // path rather than mfl_cached_get().
+    $resp = rotc_mfl_authed_request('export', 'assets');
+    $byFranchise = [];
+    $all = [];
+    if ($resp === null || isset($resp['error'])) return ['byFranchise' => $byFranchise, 'all' => $all];
+    foreach (mfl_normalize_list($resp['assets']['franchise'] ?? null) as $f) {
+        $fid = (string) ($f['id'] ?? '');
+        if ($fid === '') continue;
+        $picks = [];
+        foreach (mfl_normalize_list($f['asset'] ?? null) as $a) {
+            $type = (string) ($a['type'] ?? '');
+            if (stripos($type, 'draft') === false || stripos($type, 'pick') === false) continue;
+
+            $year  = (string) ($a['year'] ?? '');
+            $round = (int) ($a['round'] ?? 0);
+            if ($round <= 0) continue;
+            $suffix = in_array($round % 100, [11, 12, 13], true) ? 'th' : (['th', 'st', 'nd', 'rd'][$round % 10] ?? 'th');
+            $roundLabel = $round . $suffix;
+
+            $isFuture = stripos($type, 'future') !== false || ($year !== '' && (int) $year !== (int) MFL_YEAR);
+            if ($isFuture) {
+                $origTeam  = (string) ($a['original_team'] ?? $a['original_franchise'] ?? $fid);
+                $id        = 'FP_' . str_pad($origTeam, 4, '0', STR_PAD_LEFT) . '_' . $year . '_' . $round;
+                $origLabel = ($origTeam === $fid) ? '' : (' (from ' . ($franchises[$origTeam]['abbrev'] ?? $origTeam) . ')');
+                $label     = trim("$year $roundLabel Round Pick") . $origLabel;
+            } else {
+                $pickNum = (int) ($a['pick'] ?? 0);
+                if ($pickNum <= 0) continue; // can't build a submittable DP_ id without it
+                $id    = 'DP_' . str_pad((string) ($round - 1), 2, '0', STR_PAD_LEFT) . '_' . str_pad((string) ($pickNum - 1), 2, '0', STR_PAD_LEFT);
+                $label = "$year $roundLabel Round Pick, Pick $pickNum";
+            }
+            $picks[$id] = $label;
+            $all[$id] = $label . ' (' . ($franchises[$fid]['abbrev'] ?? ($fid === $myFranchiseId ? 'you' : $fid)) . ')';
+        }
+        $byFranchise[$fid] = $picks;
+    }
+    return ['byFranchise' => $byFranchise, 'all' => $all];
+}
+
+/** "Marks, Woody (RB, HOU), 2027 2nd Round Pick (from Samurai Warriors)" for a pending-trade side. */
+function rotc_trade_asset_names(array $ids, array $players, array $pickLabels): string {
     if (!$ids) return 'nothing';
     $parts = [];
     foreach ($ids as $id) {
-        $pd = $players[$id] ?? [];
-        $name = $pd['name'] ?? ('Player #' . $id);
-        $meta = trim(($pd['position'] ?? '') . ' ' . ($pd['team'] ?? ''));
-        $parts[] = $meta !== '' ? "$name ($meta)" : $name;
+        if (isset($pickLabels[$id])) {
+            $parts[] = $pickLabels[$id];
+        } elseif (str_starts_with($id, 'DP_') || str_starts_with($id, 'FP_')) {
+            // A pick id MFL sent back that isn't in our own picks lookup
+            // (e.g. assets fetch failed, or the shape guess above missed
+            // it) -- show the raw id rather than mislabeling it as a
+            // missing player.
+            $parts[] = (str_starts_with($id, 'FP_') ? 'Future pick ' : 'Draft pick ') . $id;
+        } else {
+            $pd = $players[$id] ?? [];
+            $name = $pd['name'] ?? ('Player #' . $id);
+            $meta = trim(($pd['position'] ?? '') . ' ' . ($pd['team'] ?? ''));
+            $parts[] = $meta !== '' ? "$name ($meta)" : $name;
+        }
     }
     return implode(', ', $parts);
 }
@@ -228,8 +328,8 @@ function rotc_trade_player_names(array $ids, array $players): string {
                   <?php if ($fromHelmet): ?><img src="<?= htmlspecialchars($fromHelmet) ?>" alt="" class="rotc-pending-trade-helmet"><?php endif; ?>
                   <strong><?= htmlspecialchars($fromName) ?></strong>
                 </div>
-                <p><span class="rotc-pending-trade-label">They give you</span> <?= htmlspecialchars(rotc_trade_player_names($t['receive'], $players)) ?></p>
-                <p><span class="rotc-pending-trade-label">You give up</span> <?= htmlspecialchars(rotc_trade_player_names($t['give_up'], $players)) ?></p>
+                <p><span class="rotc-pending-trade-label">They give you</span> <?= htmlspecialchars(rotc_trade_asset_names($t['receive'], $players, $allPicks)) ?></p>
+                <p><span class="rotc-pending-trade-label">You give up</span> <?= htmlspecialchars(rotc_trade_asset_names($t['give_up'], $players, $allPicks)) ?></p>
                 <?php if (!empty($t['comments'])): ?><p class="rotc-login-blurb">"<?= htmlspecialchars($t['comments']) ?>"</p><?php endif; ?>
                 <?php if (!empty($t['expires'])): ?><p class="rotc-login-blurb">Expires <?= htmlspecialchars(date('M j, Y g:i a', (int) $t['expires'])) ?></p><?php endif; ?>
                 <div class="rotc-pending-trade-actions">
@@ -258,8 +358,8 @@ function rotc_trade_player_names(array $ids, array $players): string {
                   <?php if ($toHelmet): ?><img src="<?= htmlspecialchars($toHelmet) ?>" alt="" class="rotc-pending-trade-helmet"><?php endif; ?>
                   <span>To <strong><?= htmlspecialchars($toName) ?></strong></span>
                 </div>
-                <p><span class="rotc-pending-trade-label">You give up</span> <?= htmlspecialchars(rotc_trade_player_names($t['give_up'], $players)) ?></p>
-                <p><span class="rotc-pending-trade-label">You receive</span> <?= htmlspecialchars(rotc_trade_player_names($t['receive'], $players)) ?></p>
+                <p><span class="rotc-pending-trade-label">You give up</span> <?= htmlspecialchars(rotc_trade_asset_names($t['give_up'], $players, $allPicks)) ?></p>
+                <p><span class="rotc-pending-trade-label">You receive</span> <?= htmlspecialchars(rotc_trade_asset_names($t['receive'], $players, $allPicks)) ?></p>
                 <?php if (!empty($t['expires'])): ?><p class="rotc-login-blurb">Expires <?= htmlspecialchars(date('M j, Y g:i a', (int) $t['expires'])) ?></p><?php endif; ?>
               </div>
             <?php endforeach; ?>
@@ -300,11 +400,11 @@ function rotc_trade_player_names(array $ids, array $players): string {
             <div class="rotc-trade-columns">
               <div>
                 <h3 class="rotc-trade-col-head">You give up</h3>
-                <?php rotc_trade_roster_list($myRoster, $players, 'give_up'); ?>
+                <?php rotc_trade_roster_list($myRoster, $players, $myPicks, 'give_up'); ?>
               </div>
               <div>
                 <h3 class="rotc-trade-col-head">You receive (from <?= htmlspecialchars($franchises[$targetId]['name'] ?? '') ?>)</h3>
-                <?php rotc_trade_roster_list($theirRoster, $players, 'receive'); ?>
+                <?php rotc_trade_roster_list($theirRoster, $players, $theirPicks, 'receive'); ?>
               </div>
             </div>
             <label for="rotc-trade-comments">Message (optional)</label>
