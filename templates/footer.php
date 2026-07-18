@@ -21,12 +21,10 @@
     <div class="rotc-foot-group">
       <h4>League</h4>
       <ul>
-        <li><a href="#">Rules</a></li>
-        <li><a href="#">League FAQ</a></li>
-        <li><a href="#">Constitution</a></li>
-        <li><a href="#">League Scoring</a></li>
-        <li><a href="#">Settings</a></li>
-        <li><a href="#">History</a></li>
+        <li><a href="https://www.returnofthechampions.com/faq/keeper-requirements/">Keeper Rules</a></li>
+        <li><a href="https://www.returnofthechampions.com/faq/">League FAQ</a></li>
+        <li><a href="https://www.returnofthechampions.com/faq/league-scoring/">League Scoring</a></li>
+        <li><a href="<?= $base ?>/history/">History</a></li>
       </ul>
     </div>
 
