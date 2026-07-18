@@ -53,6 +53,7 @@ if (!$fetchError) {
         if (!$p) continue;
         if ($posFilter && ($p['position'] ?? '') !== $posFilter) continue;
         $rows[] = [
+            'pd' => $p,
             'name' => $p['name'] ?? ('Player #' . $row['id']),
             'position' => $p['position'] ?? '',
             'team' => $p['team'] ?? '',
@@ -102,10 +103,12 @@ function rotc_qs3(array $overrides): string {
         <table class="data-table">
           <thead><tr><th>#</th><th></th><th>Player</th><th>Pos</th><th>NFL Team</th><th>Pts</th></tr></thead>
           <tbody>
+            <?php $periodLabel = $yearParam . ' ' . ($weekParam === 'YTD' ? 'Season' : 'Week ' . $weekParam); ?>
             <?php foreach ($rows as $i => $r): ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= $i + 1 ?></td>
-                <td><?= rotc_team_logo_img($r['team']) ?></td><td><?= htmlspecialchars($r['name']) ?></td>
+                <td><?= rotc_team_logo_img($r['team']) ?></td>
+                <td><?= rotc_player_hover_span($r['name'], $r['pd'], [$periodLabel => $r['score'] !== '' ? $r['score'] . ' pts' : '']) ?></td>
                 <td><?= htmlspecialchars($r['position']) ?></td>
                 <td><?= htmlspecialchars($r['team']) ?></td>
                 <td><?= htmlspecialchars($r['score']) ?></td>
@@ -122,4 +125,5 @@ function rotc_qs3(array $overrides): string {
   </main>
 </div>
 
+<?php if (!$fetchError) rotc_player_hover_widget(); ?>
 <?php include __DIR__ . '/../templates/footer.php'; ?>
