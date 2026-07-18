@@ -8,11 +8,12 @@
  * until Week 1 actually happens — that's expected, not a bug.
  *
  * Year selector: mfl_cached_get_year() (not mfl_cached_get(), which is
- * always MFL_YEAR) against any season back to 2004, the earliest year
- * this league's own History section covers (see history/index.php).
- * Player bio lookup (name/position/current NFL team) is NOT re-fetched
- * per year -- TYPE=players is a current directory, not a historical
- * roster, same assumption rosters.php's prior-year points column makes.
+ * always MFL_YEAR) against the current season and the two before it --
+ * kept to the past three years by request rather than the full history
+ * back to 2004 that history/index.php covers. Player bio lookup (name/
+ * position/current NFL team) is NOT re-fetched per year -- TYPE=players
+ * is a current directory, not a historical roster, same assumption
+ * rosters.php's prior-year points column makes.
  */
 
 $page_title = 'Top Performers — Return of the Champions XXVI';
@@ -34,7 +35,7 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/player-hover.php';
 
     $yearParam = (int) ($_GET['year'] ?? MFL_YEAR);
-    if ($yearParam < 2004 || $yearParam > (int) MFL_YEAR) $yearParam = (int) MFL_YEAR;
+    if ($yearParam < (int) MFL_YEAR - 2 || $yearParam > (int) MFL_YEAR) $yearParam = (int) MFL_YEAR;
 
     $raw = mfl_cached_get_year('playerScores', $yearParam, 1800, ['W' => $weekParam, 'COUNT' => 200]);
     $list = mfl_normalize_list($raw['playerScores']['playerScore'] ?? null);
@@ -80,7 +81,7 @@ function rotc_qs3(array $overrides): string {
           <form method="get" style="margin:0;">
             <?php foreach ($_GET as $k => $v): if ($k !== 'year'): ?><input type="hidden" name="<?= htmlspecialchars($k) ?>" value="<?= htmlspecialchars($v) ?>"><?php endif; endforeach; ?>
             <select name="year" onchange="this.form.submit()" style="padding:4px 9px;border:1px solid var(--line);border-radius:6px;font-size:13px;">
-              <?php for ($y = (int) MFL_YEAR; $y >= 2004; $y--): ?>
+              <?php for ($y = (int) MFL_YEAR; $y >= (int) MFL_YEAR - 2; $y--): ?>
                 <option value="<?= $y ?>"<?= $y === $yearParam ? ' selected' : '' ?>><?= $y ?></option>
               <?php endfor; ?>
             </select>
