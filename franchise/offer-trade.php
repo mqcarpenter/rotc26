@@ -53,6 +53,11 @@ if ($hasConfig) {
     $allFranchises = mfl_franchises();
     $franchises = $allFranchises;
     unset($franchises[$franchiseId]);
+    // mfl_franchises() returns MFL's raw league-export order, not
+    // alphabetical -- sorted here purely for the "send offer to" dropdown;
+    // $allFranchises (used for acquisition-map abbreviation lookups) stays
+    // in its original order since those are keyed lookups, not iterated.
+    uasort($franchises, function ($a, $b) { return strcasecmp($a['name'], $b['name']); });
 
     // Prior-season total points, same source/window as rosters.php's
     // "$prevYear Pts" column -- the current season hasn't started yet, so

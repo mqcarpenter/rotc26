@@ -28,6 +28,10 @@ if (!$fetchError) {
 
     $franchises = mfl_franchises();
     if (!$franchiseId && $franchises) $franchiseId = array_key_first($franchises);
+    // mfl_franchises() returns MFL's raw league-export order, not alphabetical --
+    // sorted here (after the default-franchise pick above, so that arbitrary
+    // "first" choice is unaffected) purely for the dropdown's display order.
+    uasort($franchises, function ($a, $b) { return strcasecmp($a['name'], $b['name']); });
 
     if ($franchiseId) {
         $raw = mfl_cached_get('whoShouldIStart', 900, ['FRANCHISE' => $franchiseId, 'W' => $week]);
