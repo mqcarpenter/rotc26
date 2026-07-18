@@ -34,19 +34,19 @@
       <div class="rotc-foot-group">
         <h4>Team Management</h4>
         <ul>
-          <li><a href="#">Submit Lineup</a></li>
-          <li><a href="#">Add / Drop</a></li>
+          <li><a href="<?= $base ?>/franchise/submit-lineup.php">Submit Lineup</a></li>
+          <li><a href="<?= $base ?>/franchise/drop-player.php">Add / Drop</a></li>
         </ul>
       </div>
       <div class="rotc-foot-group">
         <h4>Quick Links</h4>
         <ul>
-          <li><a href="#">Rosters</a></li>
-          <li><a href="#">Standings</a></li>
-          <li><a href="#">Rankings</a></li>
-          <li><a href="#">Schedule</a></li>
-          <li><a href="#">News</a></li>
-          <li><a href="#">Free Agents</a></li>
+          <li><a href="<?= $base ?>/transactions/rosters">Rosters</a></li>
+          <li><a href="<?= $base ?>/scores/standings">Standings</a></li>
+          <li><a href="<?= $base ?>/scores/power-rank">Rankings</a></li>
+          <li><a href="<?= $base ?>/scores/fantasy-schedule">Schedule</a></li>
+          <li><a href="<?= htmlspecialchars($mfl . '/news_articles?L=67102&P=*') ?>">News</a></li>
+          <li><a href="<?= $base ?>/players/free-agents">Free Agents</a></li>
         </ul>
       </div>
     </div>
