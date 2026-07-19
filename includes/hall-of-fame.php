@@ -1,19 +1,54 @@
 <?php
 /**
  * includes/hall-of-fame.php
- * League champion per season, sourced from the live MFL playoff-bracket
- * API (TYPE=playoffBrackets / TYPE=playoffBracket) -- NOT the rotchist_
- * history database. Confirmed live: MFL only has usable bracket data back
- * to 2017 for this league (2004-2016 return zero brackets), so this
- * deliberately starts at 2017 rather than attempting a fragile inference
- * from the older game-log data. See history/hall-of-fame.php's own doc
- * comment for why.
+ * League champion per season. Two sources, blended into one consistent
+ * shape by rotc_hall_of_fame_champions():
  *
- * Each season's postseason is 3 brackets (confirmed live: "ROTC
+ *   - 2017-present: the live MFL playoff-bracket API (TYPE=playoffBrackets
+ *     / TYPE=playoffBracket) -- confirmed live this only has usable
+ *     bracket data back to 2017 for this league (2004-2016 return zero
+ *     brackets). Gives champion + runner-up + final score + full
+ *     playoff path.
+ *   - 2004-2016: MFL has no API export for this at all (no bracket data,
+ *     and no dedicated "champions"/"trophy" export type exists -- checked
+ *     the full api_info doc). MFL DOES publish a commissioner-maintained
+ *     League Champions page (https://www42.myfantasyleague.com/2026/
+ *     options?L=67102&O=194) with champion + runner-up per season back
+ *     to 2004 -- transcribed into ROTC_HOF_MANUAL_CHAMPIONS below (no
+ *     score/path data available from that page, just names). Cross-
+ *     checked against the live bracket API for every overlapping year
+ *     (2017-2025) and it matched exactly, which is why this is trusted
+ *     as the source for the years the API can't confirm on its own.
+ *
+ * Each season's postseason (2017+) is 3 brackets (confirmed live: "ROTC
  * Championship", "Day Dream Believers" (consolation), "Toilet Bowl");
  * the title bracket is identified by name, not by id (bracket ids aren't
  * guaranteed stable across seasons).
  */
+
+/**
+ * Champion + runner-up for 2004-2016, transcribed from MFL's own League
+ * Champions page (see file header comment) -- no numeric franchise_id
+ * available for these (some, like Motown Lions/Alamo Assault/Phishermen,
+ * are defunct/renamed teams with no CURRENT-season MFL id at all), so
+ * these are plain team-name strings. Helmet art for the three defunct
+ * names is resolved via ROTC_HELMET_PREFIX_BY_NAME in includes/helmets.php.
+ */
+const ROTC_HOF_MANUAL_CHAMPIONS = [
+    2016 => ['championName' => 'Grindhouse Zombies', 'runnerUpName' => 'Jeepsters'],
+    2015 => ['championName' => 'Grindhouse Zombies', 'runnerUpName' => 'Dark Phoenix'],
+    2014 => ['championName' => 'Angels of Harlem', 'runnerUpName' => 'Phishermen'],
+    2013 => ['championName' => 'Jeepsters', 'runnerUpName' => 'Grindhouse Zombies'],
+    2012 => ['championName' => 'Ramrod Red Devils', 'runnerUpName' => 'Jeepsters'],
+    2011 => ['championName' => 'Krypton Knights', 'runnerUpName' => 'Angels of Harlem'],
+    2010 => ['championName' => 'Flaming Chankla Chuckers', 'runnerUpName' => 'Samurai Warriors'],
+    2009 => ['championName' => 'Krypton Knights', 'runnerUpName' => 'Samurai Warriors'],
+    2008 => ['championName' => 'Phishermen', 'runnerUpName' => 'Dark Phoenix'],
+    2007 => ['championName' => 'Angels of Harlem', 'runnerUpName' => 'Jeepsters'],
+    2006 => ['championName' => 'Angels of Harlem', 'runnerUpName' => 'Hitmen'],
+    2005 => ['championName' => 'Alamo Assault', 'runnerUpName' => 'Dark Phoenix'],
+    2004 => ['championName' => 'Motown Lions', 'runnerUpName' => 'Jeepsters'],
+];
 
 /**
  * The league champion for $year, plus their full path through the
@@ -83,10 +118,31 @@ function rotc_hof_champion_for_year(int $year): ?array {
         'year' => $year,
         'championId' => $championId,
         'runnerUpId' => $runnerUpId,
+        'championName' => null, 'runnerUpName' => null, // resolved via championId/current $franchises at render time
         'finalWeek' => (int) $finalRound['week'],
         'finalChampPts' => $champPts,
         'finalRunnerUpPts' => $runnerUpPts,
         'path' => $path,
+        'source' => 'bracket',
+    ];
+}
+
+/**
+ * $year's entry from ROTC_HOF_MANUAL_CHAMPIONS (2004-2016), shaped to
+ * match rotc_hof_champion_for_year()'s return so both can sit in the
+ * same list -- no numeric id, no score, no path (not available from
+ * MFL's League Champions page), just the two team names.
+ */
+function rotc_hof_manual_champion_for_year(int $year): ?array {
+    if (!isset(ROTC_HOF_MANUAL_CHAMPIONS[$year])) return null;
+    $entry = ROTC_HOF_MANUAL_CHAMPIONS[$year];
+    return [
+        'year' => $year,
+        'championId' => null, 'runnerUpId' => null,
+        'championName' => $entry['championName'], 'runnerUpName' => $entry['runnerUpName'],
+        'finalWeek' => null, 'finalChampPts' => null, 'finalRunnerUpPts' => null,
+        'path' => [],
+        'source' => 'league_page',
     ];
 }
 
@@ -95,13 +151,15 @@ function rotc_hof_champion_for_year(int $year): ?array {
  * Loops DOWN from $toYear (pass (int) MFL_YEAR, not a hardcoded year) so
  * next season's champion appears automatically once confirmed, same
  * self-updating approach as rotc_current_recap_week() in
- * includes/weekly-recap.php. Years with no resolved bracket are skipped,
- * not erred on.
+ * includes/weekly-recap.php. Tries the live bracket API first for every
+ * year (so this auto-upgrades to full score/path data if MFL ever
+ * backfills older brackets), falling back to the manual 2004-2016 list;
+ * years with neither are skipped, not erred on.
  */
 function rotc_hall_of_fame_champions(int $fromYear, int $toYear): array {
     $out = [];
     for ($y = $toYear; $y >= $fromYear; $y--) {
-        $c = rotc_hof_champion_for_year($y);
+        $c = rotc_hof_champion_for_year($y) ?? rotc_hof_manual_champion_for_year($y);
         if ($c) $out[] = $c;
     }
     return $out;
@@ -116,6 +174,61 @@ const ROTC_HOF_SPOTLIGHT_IMAGE = 'https://www.returnofthechampions.com/wp-conten
 /** Current team name for $franchiseId, falling back to a plain "Franchise #id" label if unresolved. */
 function rotc_hof_team_name(string $franchiseId, array $franchises): string {
     return $franchises[$franchiseId]['name'] ?? ('Franchise #' . $franchiseId);
+}
+
+/**
+ * Name for a champion/runner-up/opponent side that may be identified
+ * EITHER by a current-season franchise_id (bracket-sourced entries, id
+ * set/name null) OR by a plain name string (manual 2004-2016 entries,
+ * id null/name set -- some of those, e.g. Motown Lions, have no current
+ * franchise_id to resolve at all). Exactly one of $id/$name is expected
+ * to be non-null per rotc_hof_champion_for_year()/
+ * rotc_hof_manual_champion_for_year()'s return shape.
+ */
+function rotc_hof_resolve_name(?string $id, ?string $name, array $franchises): string {
+    if ($name !== null) return $name;
+    if ($id !== null) return rotc_hof_team_name($id, $franchises);
+    return 'Unknown';
+}
+
+/**
+ * Same id-or-name duality as rotc_hof_resolve_name(), for helmet art. Most
+ * of ROTC_HOF_MANUAL_CHAMPIONS' names (2004-2016) are teams that are still
+ * active today under the same name (Grindhouse Zombies, Angels of Harlem,
+ * Jeepsters, Ramrod Red Devils, Krypton Knights, Flaming Chankla Chuckers)
+ * -- those DO have a current franchise_id, just not one this manual entry
+ * recorded, so this reverse-looks-up $name against $franchises (current
+ * season directory) first and uses the normal id-keyed art. Only truly
+ * defunct/renamed teams with no current-season id at all (Motown Lions,
+ * Alamo Assault, Phishermen) fall through to rotc_helmet_src_by_name()'s
+ * dedicated map in includes/helmets.php.
+ */
+function rotc_hof_resolve_helmet(?string $id, ?string $name, array $franchises, string $side = 'right'): ?string {
+    if ($id !== null) return rotc_helmet_src($id, $side);
+    if ($name !== null) {
+        $foundId = rotc_hof_find_franchise_id_by_name($name, $franchises);
+        if ($foundId !== null) return rotc_helmet_src($foundId, $side);
+        return rotc_helmet_src_by_name($name, $side);
+    }
+    return null;
+}
+
+function rotc_hof_resolve_helmet_flip(?string $id, ?string $name, array $franchises, string $side = 'right'): bool {
+    if ($id !== null) return rotc_helmet_flip($id, $side);
+    if ($name !== null) {
+        $foundId = rotc_hof_find_franchise_id_by_name($name, $franchises);
+        if ($foundId !== null) return rotc_helmet_flip($foundId, $side);
+        return rotc_helmet_flip_by_name($name, $side);
+    }
+    return false;
+}
+
+/** Current-season franchise_id whose name matches $name exactly, or null if no active team is called that today. */
+function rotc_hof_find_franchise_id_by_name(string $name, array $franchises): ?string {
+    foreach ($franchises as $fid => $f) {
+        if (($f['name'] ?? '') === $name) return (string) $fid;
+    }
+    return null;
 }
 
 /** "1st"/"2nd"/"3rd"/"4th"... -- same suffix logic used elsewhere (e.g. franchise/offer-trade.php's pick labels). */

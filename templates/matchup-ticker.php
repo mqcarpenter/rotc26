@@ -33,11 +33,17 @@
     '0012':'JP','0013':'GAM','0014':'DP','0015':'GZ','0016':'JEP'
   };
   // A few teams only have one facing direction of art; flip via CSS
-  // instead of needing a second image.
+  // instead of needing a second image. AOH added 2026-07-18 -- the
+  // previous AOH_L_01/AOH_R_01 files were the wrong helmet entirely,
+  // see includes/helmets.php's matching comment (that file also has the
+  // full story on where the current text-free AOH_HELMET.png came from).
   var SINGLE_ART = {
     'CB': {file:'CB_HELMET.png', facing:'right'},
     'JP': {file:'JP_HELMET.png', facing:'right'},
-    'EH': {file:'EH_HELMET.png', facing:'left'}
+    'EH': {file:'EH_HELMET.png', facing:'left'},
+    // _v2 filename: see includes/helmets.php's matching comment -- the
+    // plain AOH_HELMET.png filename was cached for a week by browsers/CDN.
+    'AOH': {file:'AOH_HELMET_v2.png', facing:'right'}
   };
   // Franchise ID -> display abbreviation (distinct from the helmet-art
   // prefix map above — a couple of teams differ, e.g. '0002' is CB for

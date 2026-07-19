@@ -638,3 +638,81 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
   .rotc-hof-spotlight-name{ font-size:26px; }
   .rotc-hof-case-helmet{ width:130px; height:130px; }
 }
+
+/* ---- Top Games (scores/top-games.php) -------------------------
+   Bold "matchup poster/ticket" treatment per Matteo's reference (a
+   sports-championship-schedule graphic: big angled headline, dark
+   ticket-style matchup bars with large team badges flanking a VS
+   divider). Scoped to this page's own card -- the rest of the site
+   stays on its normal light .card styling; this is a deliberate,
+   contained exception, same way the Hall of Fame spotlight's dark
+   media banner is contained to its own component. */
+@media (min-width:900px){
+  /* Tightened off full-width -- reads better as a narrower, more
+     poster-like column on desktop. Left at 100% below 900px since 70%
+     of a phone-width viewport would be too cramped for the ticket rows. */
+  .rotc-topgames-main{ max-width:70%; margin:0 auto; }
+}
+.rotc-topgames-masthead{
+  font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-weight:700;
+  font-style:italic; font-size:36px; letter-spacing:.01em; text-align:center;
+  color:var(--ink); margin:10px 0 2px; transform:skew(-3deg);
+}
+.rotc-topgames-masthead span{ color:var(--accent); }
+.rotc-topgames-sub{ text-align:center; color:var(--muted); font-size:13px; margin:0 0 22px; }
+
+.rotc-topgames-list{ display:flex; flex-direction:column; gap:20px; }
+.rotc-topgames-item{ position:relative; background:var(--ink); border-radius:12px; overflow:hidden; padding-top:16px; }
+.rotc-topgames-rank{
+  position:absolute; top:-10px; left:14px; z-index:2;
+  width:40px; height:40px; border-radius:50%;
+  background:var(--accent); color:var(--on-ink); border:3px solid var(--ink);
+  display:flex; align-items:center; justify-content:center;
+  font-family:"Roboto Condensed", sans-serif; font-weight:700; font-size:18px;
+}
+.rotc-topgames-ticket{ display:flex; align-items:stretch; }
+/* Franchise "icon" art is a small (250x50) banner graphic with the team
+   name already baked in as text (confirmed live) -- set as this block's
+   own background (inline style, per-franchise, see scores/top-games.php)
+   and stretched to fully fill + crop into the angled parallelogram via
+   cover/center, rather than shown as a small contained logo. The
+   gradient below is only ever visible as a fallback for the rare
+   franchise with no icon set (paired with .rotc-topgames-name text). */
+.rotc-topgames-team{
+  flex:1 1 0; min-width:0; min-height:76px; display:flex; align-items:center; justify-content:center;
+  padding:16px 20px; background:linear-gradient(135deg, var(--accent), #a8390f);
+  background-size:cover; background-position:center;
+}
+.rotc-topgames-team-a{ justify-content:flex-end; text-align:right; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:30px; }
+.rotc-topgames-team-b{ justify-content:flex-start; text-align:left; clip-path:polygon(10% 0,100% 0,100% 100%,0 100%); padding-left:30px; margin-left:-16px; }
+.rotc-topgames-name{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-weight:700; font-size:16px; line-height:1.15; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+.rotc-topgames-vs{
+  flex:0 0 auto; align-self:center; z-index:1; margin:0 -16px;
+  width:44px; height:44px; border-radius:50%; background:var(--ink); border:3px solid var(--accent);
+  display:flex; align-items:center; justify-content:center;
+  font-family:"Roboto Condensed", sans-serif; font-weight:700; font-size:13px; color:#fff;
+}
+.rotc-topgames-meta{
+  font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.08em;
+  font-size:11px; font-weight:700; color:var(--sand); background:rgba(0,0,0,.28);
+  padding:6px 20px; text-align:center;
+}
+.rotc-topgames-why{ font-size:13px; line-height:1.5; color:var(--sand); margin:0; padding:12px 20px 18px; }
+
+@media (max-width:520px){
+  .rotc-topgames-masthead{ font-size:26px; }
+  .rotc-topgames-team{ padding:10px; min-height:56px; }
+  .rotc-topgames-team-a, .rotc-topgames-team-b{ clip-path:none; margin:0; padding:10px; }
+  .rotc-topgames-name{ font-size:12px; }
+  .rotc-topgames-vs{ width:34px; height:34px; font-size:11px; margin:0 -6px; }
+}
+
+/* ---- Latest Transactions (templates/latest-transactions.php) -- */
+.rotc-latest-txns{ display:flex; flex-direction:column; margin-top:4px; }
+.rotc-latest-txn-row{ padding:9px 0; border-bottom:1px dashed var(--line); }
+.rotc-latest-txn-row:last-child{ border-bottom:0; }
+.rotc-latest-txn-top{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:4px; }
+.rotc-latest-txn-franchise{ font-family:"Roboto Condensed", sans-serif; font-weight:700; font-size:12.5px; color:var(--ink); flex:1 1 auto; min-width:0; }
+.rotc-latest-txn-date{ font-size:11px; color:var(--muted); flex:0 0 auto; }
+.rotc-latest-txn-details{ font-size:12.5px; line-height:1.45; color:var(--ink-2); }
+.rotc-latest-txns-link{ display:inline-block; margin-top:12px; font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-size:12px; letter-spacing:.03em; font-weight:700; color:var(--accent); }

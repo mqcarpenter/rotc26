@@ -22,10 +22,43 @@ const ROTC_HELMET_PREFIX = [
 ];
 
 // A few teams only have one facing direction of art.
+// AOH added 2026-07-18: the previous AOH_L_01.jpg/AOH_R_01.jpg files were
+// the WRONG helmet entirely (an "AH" wordmark helmet, not this team's
+// real art). Every AOH_* variant that already existed on the server had
+// a baked-in "Angels of Harlem" wordmark band along the bottom -- the
+// clean, text-free source (AOH_UPDATE.png) was supplied directly by
+// Matteo, not found on the server; that file was trimmed of its white
+// background/padding (chroma-keyed to transparency) and uploaded over
+// AOH_HELMET.png so every page picks up the fix from one place rather
+// than needing a per-page correction. Facing is 'right' -- the art's
+// facemask/grille sits on the right of the frame.
 const ROTC_HELMET_SINGLE_ART = [
-    'CB' => ['file' => 'CB_HELMET.png', 'facing' => 'right'],
-    'JP' => ['file' => 'JP_HELMET.png', 'facing' => 'right'],
-    'EH' => ['file' => 'EH_HELMET.png', 'facing' => 'left'],
+    'CB'  => ['file' => 'CB_HELMET.png', 'facing' => 'right'],
+    'JP'  => ['file' => 'JP_HELMET.png', 'facing' => 'right'],
+    'EH'  => ['file' => 'EH_HELMET.png', 'facing' => 'left'],
+    // Filename bumped to _v2 on 2026-07-18: same fixed art as before, but
+    // AOH_HELMET.png was served with a 7-day Cache-Control (max-age=604800)
+    // -- overwriting that filename in place left every browser (and any
+    // intermediate CDN) showing the stale pre-fix image for up to a week.
+    // A new filename forces a real fetch. Bump the suffix again if the art
+    // ever needs to change.
+    'AOH' => ['file' => 'AOH_HELMET_v2.png', 'facing' => 'right'],
+];
+
+/**
+ * Defunct/renamed franchises that no longer have a CURRENT-season MFL
+ * franchise_id (so they can't go in ROTC_HELMET_PREFIX, which is keyed
+ * by that id) but still need helmet art for Hall of Fame's pre-2017
+ * champions (see includes/hall-of-fame.php's ROTC_HOF_MANUAL_CHAMPIONS
+ * -- those years are sourced from MFL's own League Champions page, not
+ * the live bracket API, so there's no numeric franchise_id to key off
+ * at all). Confirmed live these prefixes have real dual-direction art
+ * already uploaded (both _L_01.jpg and _R_01.jpg exist).
+ */
+const ROTC_HELMET_PREFIX_BY_NAME = [
+    'Motown Lions' => 'ML',
+    'Alamo Assault' => 'AA',
+    'Phishermen' => 'PHI',
 ];
 
 /**
@@ -35,14 +68,36 @@ const ROTC_HELMET_SINGLE_ART = [
 function rotc_helmet_src(string $franchiseId, string $side = 'right'): ?string {
     $prefix = ROTC_HELMET_PREFIX[$franchiseId] ?? null;
     if (!$prefix) return null;
+    return rotc_helmet_src_by_prefix($prefix, $side);
+}
+
+function rotc_helmet_flip(string $franchiseId, string $side = 'right'): bool {
+    $prefix = ROTC_HELMET_PREFIX[$franchiseId] ?? null;
+    if (!$prefix) return false;
+    return rotc_helmet_flip_by_prefix($prefix, $side);
+}
+
+/** Same as rotc_helmet_src(), but for a defunct/renamed team known only by NAME (see ROTC_HELMET_PREFIX_BY_NAME). */
+function rotc_helmet_src_by_name(string $teamName, string $side = 'right'): ?string {
+    $prefix = ROTC_HELMET_PREFIX_BY_NAME[$teamName] ?? null;
+    if (!$prefix) return null;
+    return rotc_helmet_src_by_prefix($prefix, $side);
+}
+
+function rotc_helmet_flip_by_name(string $teamName, string $side = 'right'): bool {
+    $prefix = ROTC_HELMET_PREFIX_BY_NAME[$teamName] ?? null;
+    if (!$prefix) return false;
+    return rotc_helmet_flip_by_prefix($prefix, $side);
+}
+
+function rotc_helmet_src_by_prefix(string $prefix, string $side): string {
     if (isset(ROTC_HELMET_SINGLE_ART[$prefix])) {
         return ROTC_HELMET_BASE . ROTC_HELMET_SINGLE_ART[$prefix]['file'];
     }
     return ROTC_HELMET_BASE . $prefix . '_' . ($side === 'left' ? 'R' : 'L') . '_01.jpg';
 }
 
-function rotc_helmet_flip(string $franchiseId, string $side = 'right'): bool {
-    $prefix = ROTC_HELMET_PREFIX[$franchiseId] ?? null;
-    if (!$prefix || !isset(ROTC_HELMET_SINGLE_ART[$prefix])) return false;
+function rotc_helmet_flip_by_prefix(string $prefix, string $side): bool {
+    if (!isset(ROTC_HELMET_SINGLE_ART[$prefix])) return false;
     return ROTC_HELMET_SINGLE_ART[$prefix]['facing'] === $side;
 }

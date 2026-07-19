@@ -8,20 +8,27 @@
  * the including page, plus includes/hall-of-fame.php and includes/helmets.php
  * already required.
  */
-$rotcHofSpotlightName = rotc_hof_team_name($spotlight['championId'], $franchises);
-$rotcHofNarrative = rotc_hof_season_narrative($spotlight['year'], $spotlight['championId'], $spotlight['path'], $franchises);
+$rotcHofSpotlightName = rotc_hof_resolve_name($spotlight['championId'], $spotlight['championName'], $franchises);
+$rotcHofNarrative = $spotlight['championId'] !== null
+    ? rotc_hof_season_narrative($spotlight['year'], $spotlight['championId'], $spotlight['path'], $franchises)
+    : [];
 ?>
 <div class="card rotc-hof-spotlight">
   <div class="rotc-hof-spotlight-media" style="background-image:url('<?= htmlspecialchars(ROTC_HOF_SPOTLIGHT_IMAGE) ?>');">
-    <img src="<?= htmlspecialchars(rotc_helmet_src($spotlight['championId']) ?? '') ?>" alt="<?= htmlspecialchars($rotcHofSpotlightName) ?> helmet" class="rotc-hof-spotlight-helmet" style="<?= rotc_helmet_flip($spotlight['championId']) ? 'transform:scaleX(-1);' : '' ?>">
+    <img src="<?= htmlspecialchars(rotc_hof_resolve_helmet($spotlight['championId'], $spotlight['championName'], $franchises) ?? '') ?>" alt="<?= htmlspecialchars($rotcHofSpotlightName) ?> helmet" class="rotc-hof-spotlight-helmet" style="<?= rotc_hof_resolve_helmet_flip($spotlight['championId'], $spotlight['championName'], $franchises) ? 'transform:scaleX(-1);' : '' ?>">
   </div>
   <div class="rotc-hof-spotlight-body">
     <div class="rotc-hof-kicker"><span class="rotc-hof-trophy">&#127942;</span> Reigning Champion &middot; <?= (int) $spotlight['year'] ?> Season</div>
     <h1 class="rotc-hof-spotlight-name"><?= htmlspecialchars($rotcHofSpotlightName) ?></h1>
-    <div class="rotc-hof-spotlight-final">Won it all: <?= htmlspecialchars(number_format($spotlight['finalChampPts'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($spotlight['finalRunnerUpPts'], 2)) ?> over <?= htmlspecialchars(rotc_hof_team_name($spotlight['runnerUpId'], $franchises)) ?></div>
+    <?php if ($spotlight['finalChampPts'] !== null): ?>
+      <div class="rotc-hof-spotlight-final">Won it all: <?= htmlspecialchars(number_format($spotlight['finalChampPts'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($spotlight['finalRunnerUpPts'], 2)) ?> over <?= htmlspecialchars(rotc_hof_resolve_name($spotlight['runnerUpId'], $spotlight['runnerUpName'], $franchises)) ?></div>
+    <?php else: ?>
+      <div class="rotc-hof-spotlight-final">League champion, over <?= htmlspecialchars(rotc_hof_resolve_name($spotlight['runnerUpId'], $spotlight['runnerUpName'], $franchises)) ?></div>
+    <?php endif; ?>
     <?php foreach ($rotcHofNarrative as $para): ?>
       <p class="rotc-recap-blurb"><?= $para ?></p>
     <?php endforeach; ?>
+    <?php if ($spotlight['path']): ?>
     <div class="rotc-hof-path">
       <?php foreach ($spotlight['path'] as $step): ?>
         <div class="rotc-hof-path-step<?= $step['isFinal'] ? ' rotc-hof-path-step-final' : '' ?>">
@@ -30,5 +37,6 @@ $rotcHofNarrative = rotc_hof_season_narrative($spotlight['year'], $spotlight['ch
         </div>
       <?php endforeach; ?>
     </div>
+    <?php endif; ?>
   </div>
 </div>

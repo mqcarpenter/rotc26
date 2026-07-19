@@ -8,8 +8,12 @@
  * live), so this deliberately starts at 2017 rather than guessing at
  * older champions from ambiguous game-log data (a same-week 3rd-place
  * game can't be reliably told apart from the real final that way).
- * Extend the start year here once there's a non-fragile way to identify
- * older champions.
+ * 2004-2016 are included too, sourced from MFL's own League Champions
+ * page rather than the bracket API (which has no data for those years) --
+ * see includes/hall-of-fame.php's ROTC_HOF_MANUAL_CHAMPIONS for detail.
+ * Those entries have no numeric franchise_id, score, or path (not
+ * published on that page), so the trophy case falls back to plain
+ * team-name resolution and hides the score line for them.
  *
  * Most recent champion gets a "spotlight" treatment (shared with index.php
  * as templates/hall-of-fame-spotlight.php, so the two can't drift out of
@@ -49,7 +53,7 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/hall-of-fame.php';
     require_once __DIR__ . '/../includes/player-hover.php';
 
-    $champions = rotc_hall_of_fame_champions(2017, (int) MFL_YEAR);
+    $champions = rotc_hall_of_fame_champions(2004, (int) MFL_YEAR);
     $franchises = mfl_franchises();
 }
 ?>
@@ -70,10 +74,12 @@ if (!$fetchError) {
           <div class="rotc-hof-case">
             <?php foreach (array_slice($champions, 1) as $c): ?>
               <div class="rotc-hof-case-item">
-                <img src="<?= htmlspecialchars(rotc_helmet_src($c['championId']) ?? '') ?>" alt="" class="rotc-hof-case-helmet" style="<?= rotc_helmet_flip($c['championId']) ? 'transform:scaleX(-1);' : '' ?>">
+                <img src="<?= htmlspecialchars(rotc_hof_resolve_helmet($c['championId'], $c['championName'], $franchises) ?? '') ?>" alt="" class="rotc-hof-case-helmet" style="<?= rotc_hof_resolve_helmet_flip($c['championId'], $c['championName'], $franchises) ? 'transform:scaleX(-1);' : '' ?>">
                 <div class="rotc-hof-case-year"><span class="rotc-hof-trophy">&#127942;</span> <?= (int) $c['year'] ?></div>
-                <div class="rotc-hof-case-name"><?= htmlspecialchars(rotc_hof_team_name($c['championId'], $franchises)) ?></div>
-                <div class="rotc-hof-case-score">Final: <?= htmlspecialchars(number_format($c['finalChampPts'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($c['finalRunnerUpPts'], 2)) ?></div>
+                <div class="rotc-hof-case-name"><?= htmlspecialchars(rotc_hof_resolve_name($c['championId'], $c['championName'], $franchises)) ?></div>
+                <?php if ($c['finalChampPts'] !== null): ?>
+                  <div class="rotc-hof-case-score">Final: <?= htmlspecialchars(number_format($c['finalChampPts'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($c['finalRunnerUpPts'], 2)) ?></div>
+                <?php endif; ?>
               </div>
             <?php endforeach; ?>
           </div>

@@ -34,107 +34,19 @@ include __DIR__ . '/../templates/header.php';
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $fetchError = !file_exists($configPath);
 
-// Waivers and Taxi Squad -- this league doesn't use either (confirmed
-// live: currentWaiverType is NONE, and Taxi Squad was dropped from the
-// nav entirely per Matteo's earlier request), so those are excluded
-// outright rather than just hidden behind a filter pill.
-//
-// FREE_AGENT is NOT excluded, even though it was originally lumped in
-// here by mistake: in a NONE-waiver league like this one, EVERY
-// immediate add/drop (including a plain drop with no add, like
-// franchise/drop-player.php submits) is recorded by MFL as type
-// FREE_AGENT -- it's not a leftover "waiver system" artifact, it's the
-// actual record of the roster moves this league does use. Excluding it
-// hid every real drop/add, including Matteo's own test drop.
-const ROTC_TXN_EXCLUDED_TYPES = ['WAIVER', 'BBID_WAIVER', 'WAIVER_REQUEST', 'BBID_WAIVER_REQUEST', 'TAXI'];
-
 $filter = $_GET['type'] ?? 'DEFAULT';
 $franchises = [];
 $rows = [];
 $players = [];
 
-/**
- * Splits the raw pipe-delimited "added|dropped" transaction string
- * into player id lists. Shared by rotc_txn_details() (the Details
- * column) and rotc_txn_type_badge() (the Type column) so both agree on
- * what actually happened in a FREE_AGENT-type row instead of each
- * re-parsing it separately.
- */
-function rotc_txn_parse_added_dropped(array $t): array {
-    $raw = (string) ($t['transaction'] ?? '');
-    $sides = explode('|', $raw, 2);
-    return [
-        'added'   => array_filter(explode(',', $sides[0] ?? '')),
-        'dropped' => array_filter(explode(',', $sides[1] ?? '')),
-    ];
-}
-
-/**
- * Pill label + CSS class for the Type column. FREE_AGENT isn't
- * exclusively a drop -- confirmed via MFL's own import docs that
- * fcfsWaiver (the call behind every FREE_AGENT-type row here) accepts
- * ADD and DROP independently or together in one instant move -- so
- * this looks at what the row's own added/dropped lists actually
- * contain rather than assuming every FREE_AGENT row is a drop. The
- * only case seen live so far (Matteo's own test) was a pure drop.
- */
-function rotc_txn_type_badge(array $t): array {
-    $type = $t['type'] ?? '';
-    if ($type === 'FREE_AGENT') {
-        $parsed = rotc_txn_parse_added_dropped($t);
-        if ($parsed['added'] && $parsed['dropped']) return ['label' => 'ADD/DROP', 'class' => 'rotc-pill-swap'];
-        if ($parsed['dropped']) return ['label' => 'DROP', 'class' => 'rotc-pill-drop'];
-        if ($parsed['added']) return ['label' => 'ADD', 'class' => 'rotc-pill-add'];
-        return ['label' => $type ?: '--', 'class' => ''];
-    }
-    if ($type === 'TRADE') return ['label' => 'TRADE', 'class' => 'rotc-pill-trade'];
-    return ['label' => $type ?: '--', 'class' => ''];
-}
-
-/**
- * Human-readable Details text for one transaction row.
- */
-function rotc_txn_details(array $t, array $players, array $franchises): string {
-    $nameOf = function ($id) use ($players) {
-        return $players[$id]['name'] ?? ('Player #' . $id);
-    };
-
-    if (($t['type'] ?? '') === 'TRADE') {
-        $f1 = $t['franchise'] ?? '';
-        $f2 = $t['franchise2'] ?? '';
-        $f1Gave = array_filter(explode(',', $t['franchise1_gave_up'] ?? ''));
-        $f2Gave = array_filter(explode(',', $t['franchise2_gave_up'] ?? ''));
-        $f1Name = $franchises[$f1]['name'] ?? $f1;
-        $f2Name = $franchises[$f2]['name'] ?? $f2;
-        $parts = [];
-        if ($f1Gave) $parts[] = htmlspecialchars($f1Name) . ' sent: ' . htmlspecialchars(implode(', ', array_map($nameOf, $f1Gave)));
-        if ($f2Gave) $parts[] = htmlspecialchars($f2Name) . ' sent: ' . htmlspecialchars(implode(', ', array_map($nameOf, $f2Gave)));
-        return $parts ? implode('<br>', $parts) : '--';
-    }
-
-    // Everything else observed so far (FREE_AGENT, and presumably the
-    // rest of the fcfsWaiver/waiver/IR family) uses the pipe-delimited
-    // "added|dropped" shape described in the file header comment.
-    $raw = (string) ($t['transaction'] ?? '');
-    if ($raw === '') return '--';
-    $parsed = rotc_txn_parse_added_dropped($t);
-    $added = $parsed['added'];
-    $dropped = $parsed['dropped'];
-    $franchiseName = $franchises[$t['franchise'] ?? '']['name'] ?? ($t['franchise'] ?? 'This team');
-    $parts = [];
-    if ($added) $parts[] = 'Added: ' . htmlspecialchars(implode(', ', array_map($nameOf, $added)));
-    // Per Matteo's request: a drop gets themed language instead of a
-    // plain "Dropped: X" label, one line per dropped player so a
-    // multi-player drop doesn't cram everyone into one sentence.
-    foreach ($dropped as $id) {
-        $parts[] = htmlspecialchars($franchiseName) . ' gave up on ' . htmlspecialchars($nameOf($id)) . '. See ya.';
-    }
-    return $parts ? implode('<br>', $parts) : htmlspecialchars($raw);
-}
-
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
+    // rotc_txn_parse_added_dropped()/rotc_txn_type_badge()/rotc_txn_details()
+    // and the ROTC_TXN_EXCLUDED_TYPES constant (waivers/taxi -- this league
+    // uses neither, see that file's doc comment) now live here, shared with
+    // the front-page "Latest Transactions" widget (templates/latest-transactions.php).
+    require_once __DIR__ . '/../includes/transactions.php';
 
     $franchises = mfl_franchises();
     $raw = mfl_cached_get('transactions', 900, ['TRANS_TYPE' => $filter, 'COUNT' => 100]);

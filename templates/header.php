@@ -101,6 +101,7 @@ $nav_items = [
     ['Power Rank', "$base/scores/power-rank"],
     ['Starting Lineups', "$base/scores/starting-lineups"],
     ['Fantasy Schedule', "$base/scores/fantasy-schedule"],
+    ['Top 10 Games', "$base/scores/top-games"],
     ['Playoff Brackets', "$base/scores/playoff-brackets"],
     ['NFL Schedule', "$base/scores/nfl-schedule"],
     ['Fantasy Previews', "$mfl/options?L=67102&O=207"],
@@ -187,6 +188,7 @@ $tabs = [
   'main'          => ['label' => 'Main',         'href' => $base !== '' ? $base . '/' : '/'],
   'gameday'       => ['label' => 'Gameday',       'href' => "$base/gameday"],
   'standings'     => ['label' => 'Standings',     'href' => "$base/scores/standings"],
+  'top-games'     => ['label' => 'Top Ten Games to Watch', 'href' => "$base/scores/top-games"],
 ];
 ?>
 <!DOCTYPE html>

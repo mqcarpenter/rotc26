@@ -41,6 +41,7 @@ if ($hasConfig) {
     require_once __DIR__ . '/includes/weekly-recap.php'; // also pulls in helmets.php + player-hover.php
     require_once __DIR__ . '/includes/trending-players.php';
     require_once __DIR__ . '/includes/hall-of-fame.php';
+    require_once __DIR__ . '/includes/transactions.php';
 
     $current = rotc_current_recap_week((int) MFL_YEAR);
     if ($current) {
@@ -62,6 +63,8 @@ if ($hasConfig) {
     $franchises = mfl_franchises();
     $hofChampions = rotc_hall_of_fame_champions(2017, (int) MFL_YEAR);
     if ($hofChampions) $hofChampion = $hofChampions[0];
+
+    $latest_txns = rotc_fetch_latest_transactions(15);
 }
 
 const ROTC_HOME_NFL_ABBR = [
@@ -150,11 +153,13 @@ const ROTC_HOME_NFL_ABBR = [
         $top_free_agents = rotc_fetch_top_free_agents(20);
         $adp_trends = rotc_fetch_adp_trends(20);
         include __DIR__ . '/templates/free-agent-pulse.php';
+
+        include __DIR__ . '/templates/latest-transactions.php';
     }
     ?>
   </aside>
 </div>
 
-<?php if ($recap) rotc_player_hover_widget(); ?>
+<?php if ($hasConfig) rotc_player_hover_widget(); ?>
 
 <?php include __DIR__ . '/templates/footer.php'; ?>
