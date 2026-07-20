@@ -8,10 +8,10 @@
  * live), so this deliberately starts at 2017 rather than guessing at
  * older champions from ambiguous game-log data (a same-week 3rd-place
  * game can't be reliably told apart from the real final that way).
- * 2004-2016 are included too, sourced from MFL's own League Champions
- * page rather than the bracket API (which has no data for those years) --
- * see includes/hall-of-fame.php's ROTC_HOF_MANUAL_CHAMPIONS for detail.
- * Those entries have no numeric franchise_id, score, or path (not
+ * 1999-2016 are included too: 2004-2016 sourced from MFL's own League
+ * Champions page, 1999-2003 supplied directly (no runner-up on record for
+ * those) -- see includes/hall-of-fame.php's ROTC_HOF_MANUAL_CHAMPIONS for
+ * detail. Those entries have no numeric franchise_id, score, or path (not
  * published on that page), so the trophy case falls back to plain
  * team-name resolution and hides the score line for them.
  *
@@ -53,7 +53,7 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/hall-of-fame.php';
     require_once __DIR__ . '/../includes/player-hover.php';
 
-    $champions = rotc_hall_of_fame_champions(2004, (int) MFL_YEAR);
+    $champions = rotc_hall_of_fame_champions(1999, (int) MFL_YEAR);
     $franchises = mfl_franchises();
 }
 ?>
@@ -63,7 +63,7 @@ if (!$fetchError) {
     <?php if ($fetchError): ?>
       <div class="card"><p>The Hall of Fame isn't available right now — check back soon.</p></div>
     <?php elseif (!$champions): ?>
-      <div class="card"><p>No confirmed champions yet for 2017 or later — check back once a season's bracket is complete.</p></div>
+      <div class="card"><p>No confirmed champions yet — check back once a season's bracket is complete.</p></div>
     <?php else: ?>
 
       <?php $spotlight = $champions[0]; include __DIR__ . '/../templates/hall-of-fame-spotlight.php'; ?>

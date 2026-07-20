@@ -43,6 +43,10 @@ const ROTC_HELMET_SINGLE_ART = [
     // A new filename forces a real fetch. Bump the suffix again if the art
     // ever needs to change.
     'AOH' => ['file' => 'AOH_HELMET_v2.png', 'facing' => 'right'],
+    // Native Americans: defunct (2003-and-earlier) team, only known by name
+    // (see ROTC_HELMET_PREFIX_BY_NAME) -- single-direction art supplied
+    // directly, facemask on the right.
+    'NAT' => ['file' => 'NAT_HELMET.png', 'facing' => 'right'],
 ];
 
 /**
@@ -59,6 +63,7 @@ const ROTC_HELMET_PREFIX_BY_NAME = [
     'Motown Lions' => 'ML',
     'Alamo Assault' => 'AA',
     'Phishermen' => 'PHI',
+    'Native Americans' => 'NAT',
 ];
 
 /**

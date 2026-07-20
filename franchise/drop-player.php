@@ -78,6 +78,19 @@ if ($hasConfig) {
         }
     }
 
+    // Default sort: position, then name alphabetically within each
+    // position -- matches the sortable table's default (unsorted) state,
+    // see the <script> at the bottom of this file for click-to-sort.
+    usort($roster, function ($a, $b) use ($players) {
+        $posA = $players[$a['id']]['position'] ?? '';
+        $posB = $players[$b['id']]['position'] ?? '';
+        $cmp = strcasecmp($posA, $posB);
+        if ($cmp !== 0) return $cmp;
+        $nameA = $players[$a['id']]['name'] ?? '';
+        $nameB = $players[$b['id']]['name'] ?? '';
+        return strcasecmp($nameA, $nameB);
+    });
+
     // Acquisition info, same source/logic as transactions/rosters.php
     // (see rotc_acquisition_maps()/rotc_acquired_label() in
     // includes/mfl-api.php) -- keeper slot, auction, draft, or trade,
@@ -134,10 +147,15 @@ include __DIR__ . '/../templates/header.php';
           <form method="post" class="rotc-lineup-form">
             <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
             <div style="overflow-x:auto;">
-            <table class="rotc-lineup-table">
+            <table class="rotc-lineup-table rotc-sortable-table" id="rotc-drop-table">
               <thead><tr>
-                <th>Drop</th><th></th><th>Player</th><th>Pos</th><th>Acquired</th>
-                <th>Inj</th><th>YTD Pts</th><th><?= (int) MFL_YEAR - 1 ?> Pts</th>
+                <th>Drop</th><th></th>
+                <th class="rotc-sortable-th" data-type="text">Player</th>
+                <th class="rotc-sortable-th" data-type="text">Pos</th>
+                <th class="rotc-sortable-th" data-type="text">Acquired</th>
+                <th class="rotc-sortable-th" data-type="text">Inj</th>
+                <th class="rotc-sortable-th" data-type="number">YTD Pts</th>
+                <th class="rotc-sortable-th" data-type="number"><?= (int) MFL_YEAR - 1 ?> Pts</th>
               </tr></thead>
               <tbody>
                 <?php foreach ($roster as $p):
@@ -159,12 +177,12 @@ include __DIR__ . '/../templates/header.php';
                   <tr>
                     <td><input type="checkbox" name="drop[]" value="<?= htmlspecialchars($p['id']) ?>"></td>
                     <td><?= rotc_team_logo_img($team) ?></td>
-                    <td><?= rotc_player_hover_span($pd['name'] ?? ('Player #' . $p['id']), $pd, $statLines) ?></td>
+                    <td data-sort-value="<?= htmlspecialchars($pd['name'] ?? '') ?>"><?= rotc_player_hover_span($pd['name'] ?? ('Player #' . $p['id']), $pd, $statLines) ?></td>
                     <td><?= htmlspecialchars($pd['position'] ?? '') ?></td>
                     <td><?= htmlspecialchars($acquired) ?></td>
                     <td><?= htmlspecialchars($injStatus ?: '--') ?></td>
-                    <td><?= $ytdPts !== '' ? htmlspecialchars((string) $ytdPts) : '--' ?></td>
-                    <td><?= $prevPts !== '' ? htmlspecialchars((string) $prevPts) : '--' ?></td>
+                    <td data-sort-value="<?= $ytdPts !== '' ? htmlspecialchars((string) $ytdPts) : '-1' ?>"><?= $ytdPts !== '' ? htmlspecialchars((string) $ytdPts) : '--' ?></td>
+                    <td data-sort-value="<?= $prevPts !== '' ? htmlspecialchars((string) $prevPts) : '-1' ?>"><?= $prevPts !== '' ? htmlspecialchars((string) $prevPts) : '--' ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -172,6 +190,43 @@ include __DIR__ . '/../templates/header.php';
             </div>
             <button type="submit" class="rotc-btn rotc-btn-danger" onclick="return confirm('Drop the selected player(s)? This happens immediately.');">Drop Selected</button>
           </form>
+          <script>
+          (function () {
+            // Generic click-to-sort for any table marked .rotc-sortable-table:
+            // click a .rotc-sortable-th to sort by that column (ascending,
+            // click again for descending); prefers each cell's
+            // data-sort-value over its text so pages can supply a proper
+            // sort key (player name without the hover markup, -1 for a
+            // "--" points cell so blanks sort to the bottom ascending).
+            var table = document.getElementById('rotc-drop-table');
+            if (!table) return;
+            var tbody = table.querySelector('tbody');
+            var ths = table.querySelectorAll('th.rotc-sortable-th');
+            ths.forEach(function (th, colIndex) {
+              var realIndex = Array.prototype.indexOf.call(th.parentNode.children, th);
+              th.addEventListener('click', function () {
+                var dir = th.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+                ths.forEach(function (t) { t.removeAttribute('data-sort-dir'); });
+                th.setAttribute('data-sort-dir', dir);
+                var type = th.getAttribute('data-type') || 'text';
+                var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+                rows.sort(function (rowA, rowB) {
+                  var cellA = rowA.children[realIndex], cellB = rowB.children[realIndex];
+                  var valA = (cellA.getAttribute('data-sort-value') !== null ? cellA.getAttribute('data-sort-value') : cellA.textContent).trim();
+                  var valB = (cellB.getAttribute('data-sort-value') !== null ? cellB.getAttribute('data-sort-value') : cellB.textContent).trim();
+                  var cmp;
+                  if (type === 'number') {
+                    cmp = (parseFloat(valA) || -1) - (parseFloat(valB) || -1);
+                  } else {
+                    cmp = valA.localeCompare(valB, undefined, {sensitivity: 'base'});
+                  }
+                  return dir === 'asc' ? cmp : -cmp;
+                });
+                rows.forEach(function (row) { tbody.appendChild(row); });
+              });
+            });
+          })();
+          </script>
         <?php endif; ?>
       <?php endif; ?>
     </div>

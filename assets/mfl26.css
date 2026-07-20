@@ -469,6 +469,12 @@ a.rotc-btn{ display:inline-block; text-decoration:none; }
 .rotc-lineup-table td{ padding:6px 8px; border-bottom:1px solid var(--line); }
 .rotc-lineup-table tr:hover td{ background:var(--sand); }
 
+.rotc-sortable-th{ cursor:pointer; user-select:none; white-space:nowrap; }
+.rotc-sortable-th:hover{ color:var(--ink); }
+.rotc-sortable-th::after{ content:'\21C5'; margin-left:4px; font-size:10px; opacity:.35; }
+.rotc-sortable-th[data-sort-dir="asc"]::after{ content:'\2191'; opacity:1; }
+.rotc-sortable-th[data-sort-dir="desc"]::after{ content:'\2193'; opacity:1; }
+
 .rotc-trade-columns{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
 @media (max-width:700px){ .rotc-trade-columns{ grid-template-columns:1fr; } }
 .rotc-trade-col-head{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-size:14px; margin:0 0 8px; }

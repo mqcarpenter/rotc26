@@ -9,16 +9,16 @@
  *     bracket data back to 2017 for this league (2004-2016 return zero
  *     brackets). Gives champion + runner-up + final score + full
  *     playoff path.
- *   - 2004-2016: MFL has no API export for this at all (no bracket data,
+ *   - 1999-2016: MFL has no API export for this at all (no bracket data,
  *     and no dedicated "champions"/"trophy" export type exists -- checked
- *     the full api_info doc). MFL DOES publish a commissioner-maintained
- *     League Champions page (https://www42.myfantasyleague.com/2026/
- *     options?L=67102&O=194) with champion + runner-up per season back
- *     to 2004 -- transcribed into ROTC_HOF_MANUAL_CHAMPIONS below (no
- *     score/path data available from that page, just names). Cross-
- *     checked against the live bracket API for every overlapping year
- *     (2017-2025) and it matched exactly, which is why this is trusted
- *     as the source for the years the API can't confirm on its own.
+ *     the full api_info doc). MFL's commissioner-maintained League
+ *     Champions page (https://www42.myfantasyleague.com/2026/
+ *     options?L=67102&O=194) covers 2004-2016 with champion + runner-up;
+ *     cross-checked against the live bracket API for every overlapping
+ *     year (2017-2025) and it matched exactly, which is why it's trusted
+ *     for the years the API can't confirm on its own. 1999-2003 predate
+ *     that page and were supplied directly (champion only, no runner-up
+ *     on record). All of it lives in ROTC_HOF_MANUAL_CHAMPIONS below.
  *
  * Each season's postseason (2017+) is 3 brackets (confirmed live: "ROTC
  * Championship", "Day Dream Believers" (consolation), "Toilet Bowl");
@@ -27,12 +27,15 @@
  */
 
 /**
- * Champion + runner-up for 2004-2016, transcribed from MFL's own League
+ * Champion + runner-up for 1999-2016, transcribed from MFL's own League
  * Champions page (see file header comment) -- no numeric franchise_id
- * available for these (some, like Motown Lions/Alamo Assault/Phishermen,
- * are defunct/renamed teams with no CURRENT-season MFL id at all), so
- * these are plain team-name strings. Helmet art for the three defunct
- * names is resolved via ROTC_HELMET_PREFIX_BY_NAME in includes/helmets.php.
+ * available for these (some, like Motown Lions/Alamo Assault/Phishermen/
+ * Native Americans, are defunct/renamed teams with no CURRENT-season MFL
+ * id at all), so these are plain team-name strings. Helmet art for the
+ * defunct names is resolved via ROTC_HELMET_PREFIX_BY_NAME in
+ * includes/helmets.php. 1999-2003 have no runner-up on record (not
+ * supplied) -- 'runnerUpName' omitted for those years rather than guessed;
+ * rotc_hof_manual_champion_for_year() falls back to null for it.
  */
 const ROTC_HOF_MANUAL_CHAMPIONS = [
     2016 => ['championName' => 'Grindhouse Zombies', 'runnerUpName' => 'Jeepsters'],
@@ -48,6 +51,11 @@ const ROTC_HOF_MANUAL_CHAMPIONS = [
     2006 => ['championName' => 'Angels of Harlem', 'runnerUpName' => 'Hitmen'],
     2005 => ['championName' => 'Alamo Assault', 'runnerUpName' => 'Dark Phoenix'],
     2004 => ['championName' => 'Motown Lions', 'runnerUpName' => 'Jeepsters'],
+    2003 => ['championName' => 'Phishermen'],
+    2002 => ['championName' => 'Native Americans'],
+    2001 => ['championName' => 'Native Americans'],
+    2000 => ['championName' => 'Angels of Harlem'],
+    1999 => ['championName' => 'Angels of Harlem'],
 ];
 
 /**
@@ -139,7 +147,7 @@ function rotc_hof_manual_champion_for_year(int $year): ?array {
     return [
         'year' => $year,
         'championId' => null, 'runnerUpId' => null,
-        'championName' => $entry['championName'], 'runnerUpName' => $entry['runnerUpName'],
+        'championName' => $entry['championName'], 'runnerUpName' => $entry['runnerUpName'] ?? null,
         'finalWeek' => null, 'finalChampPts' => null, 'finalRunnerUpPts' => null,
         'path' => [],
         'source' => 'league_page',
