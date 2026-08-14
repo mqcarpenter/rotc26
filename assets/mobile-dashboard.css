@@ -111,6 +111,7 @@
 
 /* ---- Trade panel specifics ---- */
 .rotc-mapp-trade-target{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:14px; margin-bottom:12px; }
+.rotc-mapp-trade-comments{ width:100%; box-sizing:border-box; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--ink); font-family:inherit; font-size:13px; margin:12px 0; resize:vertical; }
 .rotc-mapp-pending-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:12px; margin-bottom:10px; }
 .rotc-mapp-pending-head{ display:flex; align-items:center; gap:8px; font-family:"Roboto Condensed",sans-serif; font-weight:700; font-size:12.5px; margin-bottom:6px; }
 .rotc-mapp-pending-head img{ width:22px; height:22px; border-radius:50%; }

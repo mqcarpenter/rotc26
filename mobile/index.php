@@ -23,10 +23,14 @@
  * + nflSchedule, real import?TYPE=lineup) and the Drop panel (rosters +
  * injuries + playerScores, real import?TYPE=fcfsWaiver) are wired to
  * real MFL data, mirroring franchise/submit-lineup.php and
- * franchise/drop-player.php. The Trade, NFL Pick 'Em, and ROTC Pick 'Em
- * panels are still MOCK (each section notes the real source it will
- * use); their submit buttons return a mocked "ok" and do NOT call MFL
- * yet. Deliberately kept as
+ * franchise/drop-player.php. The Trade panel is wired too (pendingTrades
+ * + tradeResponse for accept/reject/revoke, tradeProposal for new
+ * offers, TYPE=assets for draft picks), mirroring
+ * franchise/offer-trade.php. The NFL Pick 'Em and ROTC Pick 'Em panels
+ * are still MOCK (each section notes the real source it will use); their
+ * submit buttons return a mocked "ok" and do NOT call MFL yet. The
+ * active tab is persisted across reloads via a hidden `tab` field.
+ * Deliberately kept as
  * ONE file/one shared context (one franchise list, one week) rather
  * than five separate includes re-fetching per tab.
  */
@@ -93,6 +97,16 @@ if ($hasConfig) {
     $waiverLink      = 'https://www42.myfantasyleague.com/' . (defined('MFL_YEAR') ? MFL_YEAR : date('Y')) . '/options?L=' . MFL_LEAGUE_ID . '&O=98';
 }
 
+// Active tab, persisted across GET/POST reloads -- the single-page CSS
+// tabs otherwise snap back to the default (Lineup) on every submit or
+// week/target change. Forms carry a hidden `tab`; a trade-target GET
+// (?to=) implies the Trade tab.
+$validTabs = ['lineup', 'drop', 'trade', 'nfl', 'rotc'];
+$activeTab = (string) ($_POST['tab'] ?? $_GET['tab'] ?? '');
+if (!in_array($activeTab, $validTabs, true)) {
+    $activeTab = ((string) ($_GET['to'] ?? '') !== '') ? 'trade' : 'lineup';
+}
+
 // ---- Write-action handler ----
 $result = null;
 if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -137,10 +151,57 @@ if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    } elseif ($action === 'trade') {
+        // LIVE: import?TYPE=tradeProposal, same as franchise/offer-trade.php.
+        // give_up[]/receive[] mix player ids and draft-pick ids (FP_/DP_)
+        // into the single WILL_GIVE_UP / WILL_RECEIVE lists MFL expects.
+        $to = (string) ($_POST['offeredto'] ?? '');
+        if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $result = ['action' => 'trade', 'ok' => false, 'error' => 'Your session expired — reload the page and try again.'];
+        } elseif ($to === '' || $to === $ownerFranchiseId || !isset($franchises[$to])) {
+            $result = ['action' => 'trade', 'ok' => false, 'error' => 'Choose who to send the offer to.'];
+        } else {
+            $giveUp  = array_filter((array) ($_POST['give_up'] ?? []));
+            $receive = array_filter((array) ($_POST['receive'] ?? []));
+            if (!$giveUp || !$receive) {
+                $result = ['action' => 'trade', 'ok' => false, 'error' => 'Pick at least one asset on each side of the trade.'];
+            } else {
+                $params = ['OFFEREDTO' => $to, 'WILL_GIVE_UP' => implode(',', $giveUp), 'WILL_RECEIVE' => implode(',', $receive)];
+                $comments = trim((string) ($_POST['comments'] ?? ''));
+                if ($comments !== '') $params['COMMENTS'] = $comments;
+                $resp = rotc_mfl_authed_request('import', 'tradeProposal', $params);
+                if ($resp === null) {
+                    $result = ['action' => 'trade', 'ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
+                } elseif (isset($resp['error'])) {
+                    $result = ['action' => 'trade', 'ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
+                } else {
+                    $result = ['action' => 'trade', 'ok' => true];
+                }
+            }
+        }
+    } elseif ($action === 'traderespond') {
+        // LIVE: import?TYPE=tradeResponse (accept / reject / revoke) on an
+        // existing pending trade -- a separate import type from tradeProposal.
+        $respondAction = (string) ($_POST['respond_action'] ?? '');
+        $tradeId       = (string) ($_POST['respond_trade_id'] ?? '');
+        if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $result = ['action' => 'trade', 'ok' => false, 'error' => 'Your session expired — reload the page and try again.'];
+        } elseif (!in_array($respondAction, ['accept', 'reject', 'revoke'], true) || $tradeId === '') {
+            $result = ['action' => 'trade', 'ok' => false, 'error' => 'Unknown trade response.'];
+        } else {
+            $resp = rotc_mfl_authed_request('import', 'tradeResponse', ['TRADE_ID' => $tradeId, 'RESPONSE' => $respondAction]);
+            if ($resp === null) {
+                $result = ['action' => 'trade', 'ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
+            } elseif (isset($resp['error'])) {
+                $result = ['action' => 'trade', 'ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
+            } else {
+                $result = ['action' => 'trade', 'ok' => true, 'respond' => ['accept' => 'accepted', 'reject' => 'rejected', 'revoke' => 'revoked'][$respondAction] ?? 'updated'];
+            }
+        }
     } elseif ($action !== '') {
-        // Trade / NFL Pick 'Em / ROTC Pick 'Em are not live-wired yet
-        // (following commits) -- mocked success so the UI still responds.
-        // These do NOT submit anything to MFL.
+        // NFL Pick 'Em / ROTC Pick 'Em are not live-wired yet (following
+        // commits) -- mocked success so the UI still responds. These do
+        // NOT submit anything to MFL.
         $result = ['action' => $action, 'ok' => true];
     }
 }
@@ -274,22 +335,127 @@ if ($hasConfig) {
     usort($droppable, fn($a, $b) => strcasecmp($a['pos'], $b['pos']) ?: strcasecmp($a['name'], $b['name']));
 }
 
-// ---- MOCK: Trade panel (real source: mfl_franchises() for target list, rosters() + rotc_all_franchise_picks() for both sides, same as franchise/offer-trade.php) ----
-$tradeTargets = ['Samurai Warriors', 'Flaming Chankla Chuckers', 'Gridiron Gremlins', 'Sunday Scaries', 'Thunderbolt Titans'];
-$giveUpOptions = [
-    ['name' => 'Tony Pollard', 'pos' => 'RB', 'pts' => '148.2'],
-    ['name' => 'Rome Odunze', 'pos' => 'WR', 'pts' => '96.5'],
-    ['name' => '2027 1st Round Pick', 'pos' => 'PICK', 'pts' => ''],
-];
-$receiveOptions = [
-    ['name' => 'Breece Hall', 'pos' => 'RB', 'pts' => '201.4'],
-    ['name' => 'Drake London', 'pos' => 'WR', 'pts' => '167.8'],
-    ['name' => '2027 2nd Round Pick', 'pos' => 'PICK', 'pts' => ''],
-];
-$pendingTrades = [
-    ['from' => 'Samurai Warriors', 'give' => 'Tony Pollard, 2027 1st', 'receive' => 'Breece Hall'],
-    ['from' => 'Iron Curtain Crew', 'give' => 'Rome Odunze', 'receive' => 'Drake London, 2027 4th'],
-];
+// ---- LIVE: Trade panel (mirrors franchise/offer-trade.php) ----
+/**
+ * One tradable-asset row list for a roster: players sorted by position
+ * (QB..S order, then anything else), name within, each as
+ * ['id','name','pos','pts'], with the franchise's draft picks appended
+ * as PICK rows. Top-level so it's callable from the data block below.
+ */
+function rotc_m_trade_options(array $roster, array $players, array $picks, array $prevPts): array {
+    $order = ['QB'=>0,'RB'=>1,'WR'=>2,'TE'=>3,'DE'=>4,'DT'=>5,'LB'=>6,'CB'=>7,'S'=>8];
+    $rows = [];
+    foreach ($roster as $p) {
+        $pd  = $players[$p['id']] ?? [];
+        $pos = strtoupper($pd['position'] ?? '');
+        $nm  = $pd['name'] ?? ('Player #' . $p['id']);
+        if (strpos($nm, ',') !== false) { [$l, $f] = array_map('trim', explode(',', $nm, 2)); $nm = "$f $l"; }
+        $rows[] = [
+            'id'   => (string) $p['id'],
+            'name' => $nm,
+            'pos'  => $pos,
+            'pts'  => ($prevPts[$p['id']] ?? '') !== '' ? (float) $prevPts[$p['id']] : null,
+            'ord'  => $order[$pos] ?? 99,
+        ];
+    }
+    usort($rows, fn($a, $b) => ($a['ord'] <=> $b['ord']) ?: strcasecmp($a['name'], $b['name']));
+    foreach ($rows as &$r) { unset($r['ord']); } unset($r);
+    foreach ($picks as $pickId => $label) {
+        $rows[] = ['id' => (string) $pickId, 'name' => $label, 'pos' => 'PICK', 'pts' => null];
+    }
+    return $rows;
+}
+
+$tradeFranchises = [];   // targets: all franchises minus mine, sorted by name
+$tradeTargetId   = '';
+$tradeTargetName = '';
+$tradeMyList     = [];
+$tradeTheirList  = [];
+$tradeAllPicks   = [];   // pickId => label (for labeling pending-trade sides)
+$tradePlayers    = [];   // id => details (for labeling pending-trade sides)
+$pendingIncoming = [];
+$pendingOutgoing = [];
+$pendingFetchFailed = false;
+if ($hasConfig) {
+    $tradeFranchises = $franchises;
+    unset($tradeFranchises[$ownerFranchiseId]);
+    uasort($tradeFranchises, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+
+    $tradeTargetId = (string) ($_POST['offeredto'] ?? $_GET['to'] ?? '');
+    if ($tradeTargetId !== '' && !isset($tradeFranchises[$tradeTargetId])) $tradeTargetId = '';
+    $tradeTargetName = $tradeTargetId !== '' ? ($franchises[$tradeTargetId]['name'] ?? '') : '';
+
+    // Prior-season total points (current season reference before it starts).
+    $tradePrevPts = [];
+    $tpRaw = mfl_cached_get_year('playerScores', (int) MFL_YEAR - 1, 86400, ['W' => 'YTD', 'COUNT' => 3000]);
+    foreach (mfl_normalize_list($tpRaw['playerScores']['playerScore'] ?? null) as $row) {
+        if (!empty($row['id'])) $tradePrevPts[$row['id']] = $row['score'] ?? '';
+    }
+
+    // Draft-pick assets for every franchise (TYPE=assets).
+    $tradePickData = rotc_all_franchise_picks($franchises, $ownerFranchiseId);
+    $tradeAllPicks = $tradePickData['all'];
+    $myPicks    = $tradePickData['byFranchise'][$ownerFranchiseId] ?? [];
+    $theirPicks = $tradeTargetId !== '' ? ($tradePickData['byFranchise'][$tradeTargetId] ?? []) : [];
+
+    // Pending trades involving this owner.
+    $pendingPlayerIds = [];
+    $pendingResp = rotc_mfl_authed_request('export', 'pendingTrades');
+    $pendingFetchFailed = ($pendingResp === null || isset($pendingResp['error']));
+    if (!$pendingFetchFailed) {
+        foreach (mfl_normalize_list($pendingResp['pendingTrades']['pendingTrade'] ?? null) as $t) {
+            $offeringTeam = (string) ($t['offeringteam'] ?? '');
+            $offeredTo    = (string) ($t['offeredto'] ?? '');
+            $gives = array_values(array_filter(explode(',', (string) ($t['will_give_up'] ?? ''))));
+            $gets  = array_values(array_filter(explode(',', (string) ($t['will_receive'] ?? ''))));
+            $pendingPlayerIds = array_merge($pendingPlayerIds, $gives, $gets);
+            $row = ['trade_id' => $t['trade_id'] ?? null, 'comments' => $t['comments'] ?? '', 'expires' => $t['expires'] ?? null];
+            if ($offeredTo === $ownerFranchiseId) {
+                $row['other'] = $offeringTeam; $row['receive'] = $gives; $row['give_up'] = $gets;
+                $pendingIncoming[] = $row;
+            } elseif ($offeringTeam === $ownerFranchiseId) {
+                $row['other'] = $offeredTo; $row['give_up'] = $gives; $row['receive'] = $gets;
+                $pendingOutgoing[] = $row;
+            }
+        }
+    }
+
+    // Rosters: mine always, target's when chosen.
+    $myTradeResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $ownerFranchiseId]);
+    $myTradeRoster = mfl_normalize_list($myTradeResp['rosters']['franchise']['player'] ?? null);
+    $allIds = array_merge(array_column($myTradeRoster, 'id'), $pendingPlayerIds);
+    $theirTradeRoster = [];
+    if ($tradeTargetId !== '') {
+        $theirTradeResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $tradeTargetId]);
+        $theirTradeRoster = mfl_normalize_list($theirTradeResp['rosters']['franchise']['player'] ?? null);
+        $allIds = array_merge($allIds, array_column($theirTradeRoster, 'id'));
+    }
+    if ($allIds) {
+        foreach (array_chunk(array_unique($allIds), 150) as $chunk) {
+            $r = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk), 'DETAILS' => 1], false);
+            foreach (mfl_normalize_list($r['players']['player'] ?? null) as $p) { $tradePlayers[$p['id']] = $p; }
+        }
+    }
+
+    $tradeMyList    = rotc_m_trade_options($myTradeRoster, $tradePlayers, $myPicks, $tradePrevPts);
+    $tradeTheirList = $tradeTargetId !== '' ? rotc_m_trade_options($theirTradeRoster, $tradePlayers, $theirPicks, $tradePrevPts) : [];
+}
+
+// Names one side of a pending trade (players + picks) into a short string.
+function rotc_m_trade_side(array $ids, array $players, array $pickLabels): string {
+    if (!$ids) return 'nothing';
+    $parts = [];
+    foreach ($ids as $id) {
+        if (isset($pickLabels[$id])) { $parts[] = $pickLabels[$id]; continue; }
+        if (str_starts_with($id, 'DP_') || str_starts_with($id, 'FP_')) { $parts[] = 'Draft pick ' . $id; continue; }
+        $pd = $players[$id] ?? [];
+        $nm = $pd['name'] ?? ('Player #' . $id);
+        if (strpos($nm, ',') !== false) { [$l, $f] = array_map('trim', explode(',', $nm, 2)); $nm = "$f $l"; }
+        $meta = trim(($pd['position'] ?? '') . ' ' . ($pd['team'] ?? ''));
+        $parts[] = $meta !== '' ? "$nm ($meta)" : $nm;
+    }
+    return implode(', ', $parts);
+}
 
 // ---- MOCK: NFL Pick 'Em panel (real source: TYPE=nflSchedule + import TYPE=poolPicks POOLTYPE=NFL, same as franchise/pool-pick.php) ----
 $nflMatchups = [
@@ -340,11 +506,11 @@ $rotcMatchups = [
   <!-- Tab state -- must come before .rotc-mapp-panels and .rotc-mapp-tabbar
        in the DOM for the ~ sibling-selector CSS in mobile-dashboard.css
        to work. Default tab: Lineup. -->
-  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-lineup" checked>
-  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-drop">
-  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-trade">
-  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-nfl">
-  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-rotc">
+  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-lineup"<?= $activeTab === 'lineup' ? ' checked' : '' ?>>
+  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-drop"<?= $activeTab === 'drop' ? ' checked' : '' ?>>
+  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-trade"<?= $activeTab === 'trade' ? ' checked' : '' ?>>
+  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-nfl"<?= $activeTab === 'nfl' ? ' checked' : '' ?>>
+  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-rotc"<?= $activeTab === 'rotc' ? ' checked' : '' ?>>
 
   <header class="rotc-mapp-topbar">
     <div class="rotc-mapp-brand">
@@ -371,6 +537,7 @@ $rotcMatchups = [
       <div class="rotc-mapp-panel-head">
         <h1 class="rotc-mapp-panel-title">Lineup</h1>
         <form method="get" class="rotc-mapp-week-form">
+          <input type="hidden" name="tab" value="lineup">
           <select class="rotc-mapp-week-select" name="week" onchange="this.form.submit()" aria-label="Week">
             <?php for ($w = 1; $w <= (int) $endWeek; $w++): ?>
               <option value="<?= $w ?>"<?= $w === (int) $week ? ' selected' : '' ?>>Week <?= $w ?></option>
@@ -395,6 +562,7 @@ $rotcMatchups = [
       <?php else: ?>
       <form method="post">
         <input type="hidden" name="action" value="lineup">
+        <input type="hidden" name="tab" value="lineup">
         <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
         <input type="hidden" name="week" value="<?= (int) $week ?>">
         <?php foreach ($lineup as $section => $rows): ?>
@@ -441,6 +609,7 @@ $rotcMatchups = [
       <p class="rotc-mapp-blurb">This league drops immediately, first-come-first-served — no waiver waiting period.</p>
       <form method="post">
         <input type="hidden" name="action" value="drop">
+        <input type="hidden" name="tab" value="drop">
         <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
         <div class="rotc-mapp-card">
           <?php foreach ($droppable as $i => $p): $fid = 'drop_' . $i; ?>
@@ -467,68 +636,132 @@ $rotcMatchups = [
         <h1 class="rotc-mapp-panel-title">Offer a Trade</h1>
       </div>
       <?php if ($result && $result['action'] === 'trade'): ?>
-        <div class="rotc-mapp-banner ok">Trade offer sent. Good luck, punk.</div>
+        <?php if ($result['ok']): ?>
+          <div class="rotc-mapp-banner ok"><?= isset($result['respond']) ? 'Trade ' . htmlspecialchars($result['respond']) . '.' : 'Trade offer sent.' ?> Good luck, punk.</div>
+        <?php else: ?>
+          <div class="rotc-mapp-banner err"><?= nl2br(htmlspecialchars($result['error'])) ?></div>
+        <?php endif; ?>
       <?php endif; ?>
 
-      <?php if ($pendingTrades): ?>
-        <p class="rotc-mapp-section-title">Pending — needs your response</p>
-        <?php foreach ($pendingTrades as $t): ?>
-          <div class="rotc-mapp-pending-card">
-            <div class="rotc-mapp-pending-head">
-              <img src="<?= $base ?>/assets/img/rotc-icon.png" alt="">
-              <span><?= htmlspecialchars($t['from']) ?></span>
+      <?php if ($pendingFetchFailed): ?>
+        <p class="rotc-mapp-blurb">Couldn't check MyFantasyLeague for pending trades right now.</p>
+      <?php else: ?>
+        <?php if ($pendingIncoming): ?>
+          <p class="rotc-mapp-section-title">Offered to you</p>
+          <?php foreach ($pendingIncoming as $t): $other = $franchises[$t['other']]['name'] ?? ('Franchise #' . $t['other']); $oh = rotc_helmet_src($t['other']); ?>
+            <div class="rotc-mapp-pending-card">
+              <div class="rotc-mapp-pending-head">
+                <?php if ($oh): ?><img src="<?= htmlspecialchars($oh) ?>" alt=""><?php endif; ?>
+                <span><?= htmlspecialchars($other) ?></span>
+              </div>
+              <p class="rotc-mapp-pending-line"><b>They give you:</b> <?= htmlspecialchars(rotc_m_trade_side($t['receive'], $tradePlayers, $tradeAllPicks)) ?></p>
+              <p class="rotc-mapp-pending-line"><b>You give up:</b> <?= htmlspecialchars(rotc_m_trade_side($t['give_up'], $tradePlayers, $tradeAllPicks)) ?></p>
+              <?php if (!empty($t['comments'])): ?><p class="rotc-mapp-pending-line" style="color:var(--muted);">"<?= htmlspecialchars($t['comments']) ?>"</p><?php endif; ?>
+              <?php if (!empty($t['trade_id'])): ?>
+                <div class="rotc-mapp-pending-actions">
+                  <form method="post" style="flex:1 1 0;">
+                    <input type="hidden" name="action" value="traderespond"><input type="hidden" name="tab" value="trade">
+                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+                    <input type="hidden" name="respond_trade_id" value="<?= htmlspecialchars($t['trade_id']) ?>">
+                    <input type="hidden" name="respond_action" value="accept">
+                    <button type="submit" class="rotc-mbtn rotc-mbtn-small" style="width:100%;">Accept</button>
+                  </form>
+                  <form method="post" style="flex:1 1 0;">
+                    <input type="hidden" name="action" value="traderespond"><input type="hidden" name="tab" value="trade">
+                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+                    <input type="hidden" name="respond_trade_id" value="<?= htmlspecialchars($t['trade_id']) ?>">
+                    <input type="hidden" name="respond_action" value="reject">
+                    <button type="submit" class="rotc-mbtn rotc-mbtn-secondary rotc-mbtn-small" style="width:100%;">Reject</button>
+                  </form>
+                </div>
+              <?php endif; ?>
             </div>
-            <p class="rotc-mapp-pending-line"><b>They give:</b> <?= htmlspecialchars($t['give']) ?></p>
-            <p class="rotc-mapp-pending-line"><b>You give:</b> <?= htmlspecialchars($t['receive']) ?></p>
-            <div class="rotc-mapp-pending-actions">
-              <button type="button" class="rotc-mbtn rotc-mbtn-small">Accept</button>
-              <button type="button" class="rotc-mbtn rotc-mbtn-secondary rotc-mbtn-small">Reject</button>
+          <?php endforeach; ?>
+        <?php endif; ?>
+        <?php if ($pendingOutgoing): ?>
+          <p class="rotc-mapp-section-title">Sent by you — awaiting response</p>
+          <?php foreach ($pendingOutgoing as $t): $other = $franchises[$t['other']]['name'] ?? ('Franchise #' . $t['other']); $oh = rotc_helmet_src($t['other']); ?>
+            <div class="rotc-mapp-pending-card">
+              <div class="rotc-mapp-pending-head">
+                <?php if ($oh): ?><img src="<?= htmlspecialchars($oh) ?>" alt=""><?php endif; ?>
+                <span>To <?= htmlspecialchars($other) ?></span>
+              </div>
+              <p class="rotc-mapp-pending-line"><b>You give up:</b> <?= htmlspecialchars(rotc_m_trade_side($t['give_up'], $tradePlayers, $tradeAllPicks)) ?></p>
+              <p class="rotc-mapp-pending-line"><b>You receive:</b> <?= htmlspecialchars(rotc_m_trade_side($t['receive'], $tradePlayers, $tradeAllPicks)) ?></p>
+              <?php if (!empty($t['trade_id'])): ?>
+                <div class="rotc-mapp-pending-actions">
+                  <form method="post" style="flex:1 1 0;" onsubmit="return confirm('Revoke this trade offer?');">
+                    <input type="hidden" name="action" value="traderespond"><input type="hidden" name="tab" value="trade">
+                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+                    <input type="hidden" name="respond_trade_id" value="<?= htmlspecialchars($t['trade_id']) ?>">
+                    <input type="hidden" name="respond_action" value="revoke">
+                    <button type="submit" class="rotc-mbtn rotc-mbtn-secondary rotc-mbtn-small" style="width:100%;">Revoke</button>
+                  </form>
+                </div>
+              <?php endif; ?>
             </div>
-          </div>
-        <?php endforeach; ?>
+          <?php endforeach; ?>
+        <?php endif; ?>
+        <?php if (!$pendingIncoming && !$pendingOutgoing): ?>
+          <p class="rotc-mapp-blurb">No pending trade offers right now.</p>
+        <?php endif; ?>
       <?php endif; ?>
 
       <p class="rotc-mapp-section-title">New offer</p>
+      <form method="get" class="rotc-mapp-week-form" style="margin-bottom:12px;">
+        <input type="hidden" name="tab" value="trade">
+        <select class="rotc-mapp-trade-target" name="to" onchange="this.form.submit()" style="flex:1 1 auto;">
+          <option value="">— choose a franchise —</option>
+          <?php foreach ($tradeFranchises as $fid => $f): ?>
+            <option value="<?= htmlspecialchars($fid) ?>"<?= $fid === $tradeTargetId ? ' selected' : '' ?>><?= htmlspecialchars($f['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </form>
+
+      <?php if ($tradeTargetId === ''): ?>
+        <p class="rotc-mapp-blurb">Pick a franchise above to build an offer.</p>
+      <?php else: ?>
       <form method="post">
         <input type="hidden" name="action" value="trade">
-        <select class="rotc-mapp-trade-target" name="to">
-          <option value="">— choose a franchise —</option>
-          <?php foreach ($tradeTargets as $name): ?><option><?= htmlspecialchars($name) ?></option><?php endforeach; ?>
-        </select>
+        <input type="hidden" name="tab" value="trade">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+        <input type="hidden" name="offeredto" value="<?= htmlspecialchars($tradeTargetId) ?>">
 
         <p class="rotc-mapp-section-title">You give up</p>
         <div class="rotc-mapp-card">
-          <?php foreach ($giveUpOptions as $i => $p): $fid = 'give_' . $i; ?>
+          <?php foreach ($tradeMyList as $i => $p): $fid = 'give_' . $i; ?>
             <div class="rotc-mrow">
               <div class="rotc-mrow-body">
                 <div class="rotc-mrow-name"><?= htmlspecialchars($p['name']) ?></div>
-                <div class="rotc-mrow-meta"><?= htmlspecialchars($p['pos']) ?><?= $p['pts'] !== '' ? ' &middot; ' . htmlspecialchars($p['pts']) . ' pts' : '' ?></div>
+                <div class="rotc-mrow-meta"><?= htmlspecialchars($p['pos']) ?><?= $p['pts'] !== null ? ' &middot; ' . htmlspecialchars(number_format((float) $p['pts'], 1)) . ' pts' : '' ?></div>
               </div>
               <label class="rotc-mtoggle" for="<?= $fid ?>">
-                <input type="checkbox" id="<?= $fid ?>" name="give_up[]" value="<?= htmlspecialchars($p['name']) ?>">
+                <input type="checkbox" id="<?= $fid ?>" name="give_up[]" value="<?= htmlspecialchars($p['id']) ?>">
                 <span class="rotc-mtoggle-pill">Add</span>
               </label>
             </div>
           <?php endforeach; ?>
         </div>
 
-        <p class="rotc-mapp-section-title">You receive</p>
+        <p class="rotc-mapp-section-title">You receive from <?= htmlspecialchars($tradeTargetName) ?></p>
         <div class="rotc-mapp-card">
-          <?php foreach ($receiveOptions as $i => $p): $fid = 'recv_' . $i; ?>
+          <?php foreach ($tradeTheirList as $i => $p): $fid = 'recv_' . $i; ?>
             <div class="rotc-mrow">
               <div class="rotc-mrow-body">
                 <div class="rotc-mrow-name"><?= htmlspecialchars($p['name']) ?></div>
-                <div class="rotc-mrow-meta"><?= htmlspecialchars($p['pos']) ?><?= $p['pts'] !== '' ? ' &middot; ' . htmlspecialchars($p['pts']) . ' pts' : '' ?></div>
+                <div class="rotc-mrow-meta"><?= htmlspecialchars($p['pos']) ?><?= $p['pts'] !== null ? ' &middot; ' . htmlspecialchars(number_format((float) $p['pts'], 1)) . ' pts' : '' ?></div>
               </div>
               <label class="rotc-mtoggle" for="<?= $fid ?>">
-                <input type="checkbox" id="<?= $fid ?>" name="receive[]" value="<?= htmlspecialchars($p['name']) ?>">
+                <input type="checkbox" id="<?= $fid ?>" name="receive[]" value="<?= htmlspecialchars($p['id']) ?>">
                 <span class="rotc-mtoggle-pill">Add</span>
               </label>
             </div>
           <?php endforeach; ?>
         </div>
+        <textarea name="comments" rows="2" placeholder="Message (optional)" class="rotc-mapp-trade-comments"></textarea>
         <button type="submit" class="rotc-mbtn rotc-mapp-sticky-submit">Send Trade Offer</button>
       </form>
+      <?php endif; ?>
     </section>
 
     <!-- ================= NFL PICK 'EM ================= -->
