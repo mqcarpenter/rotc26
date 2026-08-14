@@ -13,7 +13,7 @@
  * Recap card did before it was rebuilt).
  */
 
-$page_title = 'Return of the Champions XXVI';
+$page_title = 'Return of the Champions';
 $current_tab = 'main';
 
 include __DIR__ . '/templates/header.php';

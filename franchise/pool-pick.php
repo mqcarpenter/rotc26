@@ -21,7 +21,7 @@
  * pattern; not built here, same shape could be added later).
  */
 
-$page_title = 'NFL Pool Pick — Return of the Champions XXVI';
+$page_title = 'NFL Pool Pick — Return of the Champions';
 $current_tab = '';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');

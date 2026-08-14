@@ -7,7 +7,7 @@
  * page, same as every other write action discussed for this site.
  */
 
-$page_title = 'Trades — Return of the Champions XXVI';
+$page_title = 'Trades — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

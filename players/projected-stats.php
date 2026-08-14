@@ -8,7 +8,7 @@
  * included), joined against TYPE=players for name/position/team.
  */
 
-$page_title = 'Projected Stats — Return of the Champions XXVI';
+$page_title = 'Projected Stats — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

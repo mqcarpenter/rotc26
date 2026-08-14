@@ -8,7 +8,7 @@
  * name/position/team.
  */
 
-$page_title = 'Top Adds / Drops / Starters — Return of the Champions XXVI';
+$page_title = 'Top Adds / Drops / Starters — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

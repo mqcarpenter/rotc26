@@ -29,7 +29,7 @@
  * over the clean JSON this page already pulls. Not used.
  */
 
-$page_title = 'Gameday — Return of the Champions XXVI';
+$page_title = 'Gameday — Return of the Champions';
 $current_tab = 'gameday';
 
 include __DIR__ . '/templates/header.php';

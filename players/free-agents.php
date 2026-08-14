@@ -28,7 +28,7 @@
  * rather than faking it.
  */
 
-$page_title = 'Free Agents — Return of the Champions XXVI';
+$page_title = 'Free Agents — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

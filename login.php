@@ -14,7 +14,7 @@
  * unchanged from the original chrome-wrapped version.
  */
 
-$page_title = 'Log In — Return of the Champions XXVI';
+$page_title = 'Log In — Return of the Champions';
 $current_tab = '';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
@@ -143,7 +143,7 @@ if ($hasConfig) {
 <body class="rotc-lgn-body">
   <main class="rotc-lgn-card">
     <img class="rotc-lgn-logo" src="<?= $base ?>/assets/img/rotc-icon.png" alt="">
-    <h1 class="rotc-lgn-title">Return of the Champions XXVI</h1>
+    <h1 class="rotc-lgn-title">Return of the Champions</h1>
     <p class="rotc-lgn-sub">Owner Login</p>
 
     <?php if (!$hasConfig): ?>

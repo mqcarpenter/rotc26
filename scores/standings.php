@@ -26,7 +26,7 @@
  * against. leagueStandings' own PWR column is wired in below already.
  */
 
-$page_title = 'Standings — Return of the Champions XXVI';
+$page_title = 'Standings — Return of the Champions';
 $current_tab = 'standings';
 
 include __DIR__ . '/../templates/header.php';

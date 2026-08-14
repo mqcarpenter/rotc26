@@ -35,7 +35,7 @@
  * their name at the time they won.
  */
 
-$page_title = 'Hall of Fame — Return of the Champions XXVI';
+$page_title = 'Hall of Fame — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

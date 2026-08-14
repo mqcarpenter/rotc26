@@ -10,7 +10,7 @@
  * same MFL quirk as everywhere else -- run through mfl_normalize_list().
  */
 
-$page_title = 'Playoff Brackets — Return of the Champions XXVI';
+$page_title = 'Playoff Brackets — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

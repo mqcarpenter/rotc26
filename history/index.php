@@ -15,7 +15,7 @@
  * coverage if that gap matters for a given report later.
  */
 
-$page_title = 'League History — Return of the Champions XXVI';
+$page_title = 'League History — Return of the Champions';
 $current_tab = 'main';
 
 include __DIR__ . '/../templates/header.php';

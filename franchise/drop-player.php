@@ -14,7 +14,7 @@
  * guessing at building a full waiver-round UI that wasn't asked for.
  */
 
-$page_title = 'Drop a Player — Return of the Champions XXVI';
+$page_title = 'Drop a Player — Return of the Champions';
 $current_tab = '';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');

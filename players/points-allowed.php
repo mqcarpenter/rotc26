@@ -14,7 +14,7 @@
  * actual data to inspect.
  */
 
-$page_title = 'Points Allowed by Position — Return of the Champions XXVI';
+$page_title = 'Points Allowed by Position — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

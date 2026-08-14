@@ -5,7 +5,7 @@
  * season's matchup pairings; without W it returns every week at once.
  */
 
-$page_title = 'Fantasy Schedule — Return of the Champions XXVI';
+$page_title = 'Fantasy Schedule — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

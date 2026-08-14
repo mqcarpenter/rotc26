@@ -19,7 +19,7 @@
  * 'reject' to its target.
  */
 
-$page_title = 'Offer a Trade — Return of the Champions XXVI';
+$page_title = 'Offer a Trade — Return of the Champions';
 $current_tab = '';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');

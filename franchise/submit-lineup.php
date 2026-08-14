@@ -17,7 +17,7 @@
  * as a guide, but they're informational, not enforced client-side.
  */
 
-$page_title = 'Submit Lineup — Return of the Champions XXVI';
+$page_title = 'Submit Lineup — Return of the Champions';
 $current_tab = '';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');

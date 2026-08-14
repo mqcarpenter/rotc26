@@ -8,7 +8,7 @@
  * make any of this human-readable. Both confirmed live with real data.
  */
 
-$page_title = 'League Rules — Return of the Champions XXVI';
+$page_title = 'League Rules — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

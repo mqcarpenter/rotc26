@@ -13,7 +13,7 @@
  * `price`/`amount`, which don't exist on this record; fixed here.
  */
 
-$page_title = 'Auction Results — Return of the Champions XXVI';
+$page_title = 'Auction Results — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

@@ -26,7 +26,7 @@
  * transactions/rosters.php's doc comment), handled separately below.
  */
 
-$page_title = 'Transactions — Return of the Champions XXVI';
+$page_title = 'Transactions — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

@@ -10,7 +10,7 @@
  * still the real check.
  */
 
-$page_title = 'Survivor Pool Pick — Return of the Champions XXVI';
+$page_title = 'Survivor Pool Pick — Return of the Champions';
 $current_tab = '';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');

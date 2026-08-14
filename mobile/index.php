@@ -42,7 +42,7 @@
  * tab.
  */
 
-$page_title = 'Manage — Return of the Champions XXVI';
+$page_title = 'Manage — Return of the Champions';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
 $hasConfig = file_exists($configPath);

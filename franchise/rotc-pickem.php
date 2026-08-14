@@ -12,31 +12,18 @@
  * Same RANK="1" placeholder reasoning as pool-pick.php -- this
  * league's pool is a plain Pickem, not a weighted confidence pool.
  *
- * MOCK DATA PASS: this page is not wired to MFL yet, per Matteo's ask
- * to mock the whole mobile-manager set up before deciding whether to
- * go live. Swap the block below marked "MOCK" for the real calls --
- * everything else (form shape, submit handler, markup) is written to
- * be a straight drop-in once that swap happens, mirroring pool-pick.php
- * line for line:
+ * LIVE: gated behind rotc_require_login() like every other franchise/*
+ * write-action page. Week range from fantasyPoolStartWeek/EndWeek,
+ * franchises from mfl_franchises(), matchups from TYPE=schedule, submit
+ * via import?TYPE=poolPicks (POOLTYPE=Fantasy).
  *
- *   $leagueRaw   = mfl_cached_get('league', 900);
- *   $startWeek   = (int) ($leagueRaw['league']['fantasyPoolStartWeek'] ?? 1);
- *   $endWeekLg   = (int) ($leagueRaw['league']['fantasyPoolEndWeek'] ?? ($leagueRaw['league']['endWeek'] ?? 17));
- *   $schedResp   = mfl_cached_get('schedule', 900, ['W' => $week]);
- *   // matchups come from schedule.weeklySchedule.matchup[].franchise[] (isHome flag)
- *   $franchises  = mfl_franchises(); // includes.mfl-api.php, already used elsewhere
- *   ...
- *   $params = ['POOLTYPE' => 'Fantasy', 'WEEK' => $week];
- *   // same PICK{away},{home} / RANK{away},{home} loop as pool-pick.php
- *   $resp = rotc_mfl_authed_request('import', 'poolPicks', $params);
- *
- * Not yet confirmed live (flag same as offer-trade.php's assets caveat):
- * the exact key path of schedule.weeklySchedule.matchup vs a flatter
- * shape -- verify with a ?debug=schedule dump before flipping this
- * page off mock data.
+ * Not fully confirmed live: the exact key path of
+ * schedule.weeklySchedule.matchup.franchise[] vs a flatter shape --
+ * hit ?debug=schedule to dump the raw response and the parsed matchups
+ * if the games look wrong.
  */
 
-$page_title = "ROTC Pick 'Em — Return of the Champions XXVI";
+$page_title = "ROTC Pick 'Em — Return of the Champions";
 $current_tab = '';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
@@ -49,61 +36,81 @@ if ($pageBase === '.') $pageBase = '';
 
 $startWeek = 1;
 $endWeekLg = 17;
-$week = max($startWeek, min($endWeekLg, (int) ($_POST['week'] ?? $_GET['week'] ?? 6)));
+$week = 1;
 $result = null;
+$franchises = [];      // franchise id => name
+$myFranchiseId = '';
+$matchups = [];
 
-// ---- MOCK: franchise directory (real source: mfl_franchises()) ----
-$franchises = [
-    'AOH' => 'Angels of Harlem',
-    'SW'  => 'Samurai Warriors',
-    'FCC' => 'Flaming Chankla Chuckers',
-    'GG'  => 'Gridiron Gremlins',
-    'SS'  => 'Sunday Scaries',
-    'TT'  => 'Thunderbolt Titans',
-    'RR'  => 'Rogue Raccoons',
-    'BB'  => 'Blitzkrieg Bandits',
-    'CPK' => 'Couch Potato Kings',
-    'EZE' => 'End Zone Enforcers',
-    'IC'  => 'Iron Curtain Crew',
-    'DD'  => 'Dynasty Dragons',
-];
-$myFranchiseId = 'AOH';
-
-// ---- MOCK: this week's fantasy matchups (real source: TYPE=schedule) ----
-$matchups = [
-    ['away' => 'AOH', 'home' => 'SW'],
-    ['away' => 'FCC', 'home' => 'GG'],
-    ['away' => 'SS',  'home' => 'TT'],
-    ['away' => 'RR',  'home' => 'BB'],
-    ['away' => 'CPK', 'home' => 'EZE'],
-    ['away' => 'IC',  'home' => 'DD'],
-];
-
-if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Mirrors pool-pick.php's submit handling exactly -- kept here (even
-    // though this page is mock-data for now) so the swap to live is just
-    // deleting the mock arrays above, adding rotc_require_login($pageBase)
-    // like every other franchise/*.php write-action page (deliberately
-    // NOT gating this preview behind real login yet), and uncommenting a
-    // real rotc_mfl_authed_request() call in place of the mock "always
-    // ok" result below.
+if ($hasConfig) {
     require_once $configPath;
+    require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/mfl-auth.php';
-    rotc_session_start();
-    if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
-        $result = ['ok' => false, 'error' => 'Your session expired -- reload the page and try again.'];
-    } else {
-        $picked = 0;
-        foreach ($matchups as $m) {
-            $winner = trim((string) ($_POST['pick_' . $m['away'] . '_' . $m['home']] ?? ''));
-            if ($winner !== '') $picked++;
+    rotc_require_login($pageBase);
+
+    $leagueRaw = mfl_cached_get('league', 900);
+    $startWeek = (int) ($leagueRaw['league']['fantasyPoolStartWeek'] ?? 1);
+    $endWeekLg = (int) ($leagueRaw['league']['fantasyPoolEndWeek'] ?? ($leagueRaw['league']['endWeek'] ?? 17));
+    if ($startWeek < 1) $startWeek = 1;
+    if ($endWeekLg < $startWeek) $endWeekLg = $startWeek;
+    $week = max($startWeek, min($endWeekLg, (int) ($_POST['week'] ?? $_GET['week'] ?? $startWeek)));
+
+    $myFranchiseId = (string) (rotc_mfl_franchise_id() ?? '');
+    foreach (mfl_franchises() as $fid => $f) { $franchises[$fid] = $f['name']; }
+
+    // Fantasy matchups for the week, from TYPE=schedule. Key path
+    // schedule.weeklySchedule.matchup.franchise[] (isHome flag). Not fully
+    // confirmed live -- hit ?debug=schedule to dump the raw response and
+    // the parse if matchups look wrong.
+    $schedResp = mfl_cached_get('schedule', 900, ['W' => $week]);
+    foreach (mfl_normalize_list($schedResp['schedule']['weeklySchedule'] ?? null) as $wk) {
+        foreach (mfl_normalize_list($wk['matchup'] ?? null) as $m) {
+            $fr = mfl_normalize_list($m['franchise'] ?? null);
+            if (count($fr) !== 2) continue;
+            $away = null; $home = null;
+            foreach ($fr as $f) { if (($f['isHome'] ?? '0') === '1') $home = $f['id']; else $away = $f['id']; }
+            if ($away === null || $home === null) { $away = $fr[0]['id'] ?? null; $home = $fr[1]['id'] ?? null; }
+            if ($away && $home) $matchups[] = ['away' => $away, 'home' => $home];
         }
-        if ($picked === 0) {
-            $result = ['ok' => false, 'error' => 'Pick at least one matchup.'];
+    }
+
+    if (($_GET['debug'] ?? '') === 'schedule') {
+        header('Content-Type: text/plain');
+        echo "fantasyPoolStartWeek=$startWeek endWeek=$endWeekLg week=$week\n\nRAW schedule:\n";
+        print_r($schedResp);
+        echo "\nPARSED matchups:\n";
+        print_r($matchups);
+        exit;
+    }
+
+    // Real write: import?TYPE=poolPicks, POOLTYPE=Fantasy -- same PICK/RANK
+    // pair shape as pool-pick.php, franchise ids in place of NFL codes.
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $result = ['ok' => false, 'error' => 'Your session expired -- reload the page and try again.'];
         } else {
-            // MOCK: pretend MFL accepted it. Real call:
-            // rotc_mfl_authed_request('import', 'poolPicks', ['POOLTYPE' => 'Fantasy', 'WEEK' => $week, ...PICK/RANK params...])
-            $result = ['ok' => true];
+            $params = ['POOLTYPE' => 'Fantasy', 'WEEK' => $week];
+            $picked = 0;
+            foreach ($matchups as $m) {
+                $key = $m['away'] . ',' . $m['home'];
+                $winner = trim((string) ($_POST['pick_' . $m['away'] . '_' . $m['home']] ?? ''));
+                if ($winner === '') continue;
+                $params['PICK' . $key] = $winner;
+                $params['RANK' . $key] = '1'; // plain Pickem -- see pool-pick.php doc.
+                $picked++;
+            }
+            if ($picked === 0) {
+                $result = ['ok' => false, 'error' => 'Pick at least one matchup.'];
+            } else {
+                $resp = rotc_mfl_authed_request('import', 'poolPicks', $params);
+                if ($resp === null) {
+                    $result = ['ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
+                } elseif (isset($resp['error'])) {
+                    $result = ['ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
+                } else {
+                    $result = ['ok' => true];
+                }
+            }
         }
     }
 }
@@ -118,7 +125,7 @@ include __DIR__ . '/../templates/header.php';
         <p>This isn't available right now — check back soon.</p>
       <?php else: ?>
         <p class="rotc-login-blurb" style="margin-top:-4px;">
-          Pick the winner of each fantasy matchup — franchise vs. franchise, not NFL teams. Preview data below, not live yet.
+          Pick the winner of each fantasy matchup — franchise vs. franchise, not NFL teams. Your matchup is highlighted.
         </p>
 
         <?php if ($result && $result['ok']): ?>

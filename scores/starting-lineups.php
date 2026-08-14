@@ -10,7 +10,7 @@
  * rather than guessing at placeholder content.
  */
 
-$page_title = 'Starting Lineups — Return of the Champions XXVI';
+$page_title = 'Starting Lineups — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

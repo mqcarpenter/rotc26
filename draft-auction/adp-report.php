@@ -7,7 +7,7 @@
  * draftsSelectedIn, draftSelPct.
  */
 
-$page_title = 'ADP Report — Return of the Champions XXVI';
+$page_title = 'ADP Report — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

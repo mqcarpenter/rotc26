@@ -8,7 +8,7 @@
  * lineups have been submitted yet this preseason — expected, not a bug.
  */
 
-$page_title = 'Who Should I Start? — Return of the Champions XXVI';
+$page_title = 'Who Should I Start? — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

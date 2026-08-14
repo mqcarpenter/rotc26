@@ -12,7 +12,7 @@
  * initials.
  */
 
-$page_title = 'Top 10 Games — Return of the Champions XXVI';
+$page_title = 'Top 10 Games — Return of the Champions';
 $current_tab = 'top-games';
 
 include __DIR__ . '/../templates/header.php';

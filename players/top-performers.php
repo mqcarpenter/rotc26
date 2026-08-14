@@ -16,7 +16,7 @@
  * rosters.php's prior-year points column makes.
  */
 
-$page_title = 'Top Performers — Return of the Champions XXVI';
+$page_title = 'Top Performers — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

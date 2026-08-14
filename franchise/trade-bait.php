@@ -14,7 +14,7 @@
  * there.
  */
 
-$page_title = 'Trade Bait — Return of the Champions XXVI';
+$page_title = 'Trade Bait — Return of the Champions';
 $current_tab = '';
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');

@@ -29,7 +29,7 @@
  * scoring-dependent page on this site.
  */
 
-$page_title = 'Power Rank — Return of the Champions XXVI';
+$page_title = 'Power Rank — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

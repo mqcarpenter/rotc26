@@ -18,7 +18,7 @@
  * means, so not faking a derived value for it).
  */
 
-$page_title = 'Franchise Summary — Return of the Champions XXVI';
+$page_title = 'Franchise Summary — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';

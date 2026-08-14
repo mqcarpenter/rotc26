@@ -9,7 +9,7 @@
  * for a report of a few hundred names.
  */
 
-$page_title = 'NFL Injury Report — Return of the Champions XXVI';
+$page_title = 'NFL Injury Report — Return of the Champions';
 $current_tab = '';
 
 include __DIR__ . '/../templates/header.php';
