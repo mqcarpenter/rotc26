@@ -34,16 +34,29 @@ $hasConfig = file_exists($configPath);
 
 // Site-root base path, same derivation templates/header.php uses (from
 // where THIS file sits on disk, not the request path). Required here,
-// not optional: this page is SERVED AT /mobile (extensionless, via the
-// existing .htaccess rule `^([a-z0-9-]+)/?$ -> $1.php`), so a relative
-// asset href like "assets/mfl26.css" resolves against /mobile — and
-// against /mobile/ if a trailing slash is used, which the same rewrite
-// also allows, giving /mobile/assets/... and a 404. Every asset URL and
-// internal link below is therefore root-relative via $base.
-$siteRootFs = rtrim(str_replace('\\', '/', __DIR__), '/');
+// not optional: this page is SERVED AT /mobile as this folder's
+// DirectoryIndex (mobile/index.php), so a relative asset href like
+// "assets/mfl26.css" would resolve against /mobile/ and give
+// /mobile/assets/... and a 404. Every asset URL and internal link below
+// is therefore root-relative via $base. Because this file lives one
+// level down (mobile/), the site root on disk is dirname(__DIR__) — the
+// same one-level walk-up templates/header.php does from templates/.
+$siteRootFs = rtrim(str_replace('\\', '/', dirname(__DIR__)), '/');
 $docRoot    = rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
 $base = ($docRoot !== '' && strpos($siteRootFs, $docRoot) === 0) ? substr($siteRootFs, strlen($docRoot)) : '';
 if ($base === '.') $base = '';
+
+// Owner-only — no public view. Same gate every franchise/*.php action
+// page uses: redirects to /login.php (returning here afterward) unless
+// the MFL owner login captured at login is present in the session.
+// Guarded by $hasConfig so a no-config preview still renders the mock;
+// on the live server config.php exists, so this always enforces.
+if ($hasConfig) {
+    require_once $configPath;
+    require_once dirname(__DIR__) . '/includes/mfl-api.php';
+    require_once dirname(__DIR__) . '/includes/mfl-auth.php';
+    rotc_require_login($base);
+}
 
 $result = null;
 if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -144,8 +157,8 @@ $rotcMatchups = [
 <link rel="icon" type="image/png" href="<?= $base ?>/assets/img/rotc-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700|Roboto:400,400i,700" rel="stylesheet">
-<?php $cssVer1 = @filemtime(__DIR__ . '/assets/mfl26.css') ?: time(); ?>
-<?php $cssVer2 = @filemtime(__DIR__ . '/assets/mobile-dashboard.css') ?: time(); ?>
+<?php $cssVer1 = @filemtime(dirname(__DIR__) . '/assets/mfl26.css') ?: time(); ?>
+<?php $cssVer2 = @filemtime(dirname(__DIR__) . '/assets/mobile-dashboard.css') ?: time(); ?>
 <link rel="stylesheet" href="<?= $base ?>/assets/mfl26.css?v=<?= $cssVer1 ?>">
 <link rel="stylesheet" href="<?= $base ?>/assets/mobile-dashboard.css?v=<?= $cssVer2 ?>">
 </head>

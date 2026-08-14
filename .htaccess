@@ -17,6 +17,11 @@
 # hitting them directly throws PHP notices instead of a real page. Block
 # direct requests; index.php and friends still include() them fine since
 # that's a filesystem read, not an HTTP request.
+# Serve index.php for a directory request (e.g. /mobile -> mobile/index.php).
+# Set explicitly so the /mobile folder route doesn't depend on the host's
+# default DirectoryIndex including index.php.
+DirectoryIndex index.php index.html
+
 RewriteEngine On
 RewriteRule ^(templates|includes)/ - [F,L]
 
