@@ -118,6 +118,7 @@ if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // Combined DL (DT+DE) and DB (CB+S) grouping, same as the desktop page,
 // matching this IDP league's own combined starter slot types.
 $lineup = [];
+$lnCurrentFallback = false;
 if ($hasConfig) {
     $lnSections = ['QB', 'RB', 'WR', 'TE', 'DL', 'LB', 'DB'];
     $lnBucket   = ['QB'=>'QB','RB'=>'RB','WR'=>'WR','TE'=>'TE','DT'=>'DL','DE'=>'DL','LB'=>'LB','CB'=>'DB','S'=>'DB'];
@@ -126,6 +127,16 @@ if ($hasConfig) {
     // read-only APIKEY) -- per-franchise rosters are owner-only.
     $rosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $ownerFranchiseId, 'W' => $week]);
     $lnRoster = mfl_normalize_list($rosterResp['rosters']['franchise']['player'] ?? null);
+    // TYPE=rosters&W=<week> is a per-week snapshot; a future week has no
+    // snapshot yet and comes back empty. You still set a future lineup off
+    // your CURRENT roster, so fall back to the current (no-W) roster and
+    // flag it so the panel can say so.
+    $lnCurrentFallback = false;
+    if (!$lnRoster) {
+        $rosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $ownerFranchiseId]);
+        $lnRoster = mfl_normalize_list($rosterResp['rosters']['franchise']['player'] ?? null);
+        $lnCurrentFallback = (bool) $lnRoster;
+    }
     $lnRoster = array_filter($lnRoster, function ($p) {
         $s = strtoupper((string) ($p['status'] ?? ''));
         return strpos($s, 'IR') === false && strpos($s, 'TAXI') === false;
@@ -309,6 +320,9 @@ $rotcMatchups = [
         <?php endif; ?>
       <?php endif; ?>
       <p class="rotc-mapp-blurb">Tap Start for each player you want in. MyFantasyLeague enforces the position limits when you submit — if it doesn't fit, it'll say exactly why here.</p>
+      <?php if ($lnCurrentFallback): ?>
+        <p class="rotc-mapp-blurb" style="color:var(--accent);">Week <?= (int) $week ?> hasn't started yet, so this is your <strong>current</strong> roster. Setting a lineup here submits it for Week <?= (int) $week ?>.</p>
+      <?php endif; ?>
       <?php if (!$lineup): ?>
         <div class="rotc-mapp-card"><div class="rotc-mrow"><div class="rotc-mrow-body"><div class="rotc-mrow-meta">No roster found for Week <?= (int) $week ?>.</div></div></div></div>
       <?php else: ?>
