@@ -19,12 +19,14 @@
  * only for reference/diffing and isn't linked from anywhere; delete it
  * before pushing.
  *
- * LIVE-WIRING IN PROGRESS. The Lineup panel is wired to real MFL data
- * (rosters + projectedScores + nflSchedule) and submits a real
- * import?TYPE=lineup, mirroring franchise/submit-lineup.php. The Drop,
- * Trade, NFL Pick 'Em, and ROTC Pick 'Em panels are still MOCK (each
- * section notes the real source it will use); their submit buttons
- * return a mocked "ok" and do NOT call MFL yet. Deliberately kept as
+ * LIVE-WIRING IN PROGRESS. The Lineup panel (rosters + projectedScores
+ * + nflSchedule, real import?TYPE=lineup) and the Drop panel (rosters +
+ * injuries + playerScores, real import?TYPE=fcfsWaiver) are wired to
+ * real MFL data, mirroring franchise/submit-lineup.php and
+ * franchise/drop-player.php. The Trade, NFL Pick 'Em, and ROTC Pick 'Em
+ * panels are still MOCK (each section notes the real source it will
+ * use); their submit buttons return a mocked "ok" and do NOT call MFL
+ * yet. Deliberately kept as
  * ONE file/one shared context (one franchise list, one week) rather
  * than five separate includes re-fetching per tab.
  */
@@ -72,9 +74,11 @@ if ($hasConfig) {
 
 // ---- Shared live context: one pass, feeds every panel ----
 $myFranchiseName = 'My Team';
-$week    = 1;
-$endWeek = 17;
-$league  = [];
+$week       = 1;
+$endWeek    = 17;
+$league     = [];
+$waiverType = 'NONE';
+$waiverLink = '';
 if ($hasConfig) {
     $franchises      = mfl_franchises();
     $myFranchiseName = $franchises[$ownerFranchiseId]['name'] ?? $myFranchiseName;
@@ -83,6 +87,10 @@ if ($hasConfig) {
     $endWeek         = (int) ($league['endWeek'] ?? 17);
     if ($endWeek < 1) $endWeek = 17;
     $week            = max(1, min($endWeek, (int) ($_POST['week'] ?? $_GET['week'] ?? 1)));
+    // Drop path depends on the waiver system: NONE = immediate fcfsWaiver
+    // drop; anything else routes through MFL's own waiver page instead.
+    $waiverType      = strtoupper((string) ($league['currentWaiverType'] ?? 'NONE'));
+    $waiverLink      = 'https://www42.myfantasyleague.com/' . (defined('MFL_YEAR') ? MFL_YEAR : date('Y')) . '/options?L=' . MFL_LEAGUE_ID . '&O=98';
 }
 
 // ---- Write-action handler ----
@@ -106,10 +114,33 @@ if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $result = ['action' => 'lineup', 'ok' => true];
             }
         }
+    } elseif ($action === 'drop') {
+        // LIVE: import?TYPE=fcfsWaiver (DROP), same as franchise/drop-player.php.
+        // Only valid while the league runs no waivers (currentWaiverType
+        // NONE); otherwise drops must go through MFL's waiver page.
+        if ($waiverType !== 'NONE') {
+            $result = ['action' => 'drop', 'ok' => false, 'error' => 'This league is on a waiver system right now — drop through MyFantasyLeague instead.'];
+        } elseif (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $result = ['action' => 'drop', 'ok' => false, 'error' => 'Your session expired — reload the page and try again.'];
+        } else {
+            $drop = array_filter((array) ($_POST['drop'] ?? []));
+            if (!$drop) {
+                $result = ['action' => 'drop', 'ok' => false, 'error' => 'Pick at least one player to drop.'];
+            } else {
+                $resp = rotc_mfl_authed_request('import', 'fcfsWaiver', ['DROP' => implode(',', $drop)]);
+                if ($resp === null) {
+                    $result = ['action' => 'drop', 'ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
+                } elseif (isset($resp['error'])) {
+                    $result = ['action' => 'drop', 'ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
+                } else {
+                    $result = ['action' => 'drop', 'ok' => true];
+                }
+            }
+        }
     } elseif ($action !== '') {
-        // Drop / Trade / NFL Pick 'Em / ROTC Pick 'Em are not live-wired
-        // yet (following commits) -- mocked success so the UI still
-        // responds. These do NOT submit anything to MFL.
+        // Trade / NFL Pick 'Em / ROTC Pick 'Em are not live-wired yet
+        // (following commits) -- mocked success so the UI still responds.
+        // These do NOT submit anything to MFL.
         $result = ['action' => $action, 'ok' => true];
     }
 }
@@ -198,14 +229,50 @@ if ($hasConfig) {
     $lineup = array_filter($lnGrouped, fn($v) => !empty($v));
 }
 
-// ---- MOCK: Drop panel (real source: same rosters() call, filtered off IR/Taxi, same as franchise/drop-player.php) ----
-$droppable = [
-    ['name' => 'Jaylen Warren', 'pos' => 'RB', 'team' => 'PIT', 'inj' => '', 'ytd' => 42.1],
-    ['name' => 'Tyler Boyd', 'pos' => 'WR', 'team' => 'TEN', 'inj' => 'Q', 'ytd' => 38.4],
-    ['name' => 'Michael Mayer', 'pos' => 'TE', 'team' => 'LV', 'inj' => '', 'ytd' => 21.0],
-    ['name' => 'Zach Ertz', 'pos' => 'TE', 'team' => 'WAS', 'inj' => '', 'ytd' => 19.7],
-    ['name' => 'Roschon Johnson', 'pos' => 'RB', 'team' => 'CHI', 'inj' => 'O', 'ytd' => 8.2],
-];
+// ---- LIVE: Drop panel (mirrors franchise/drop-player.php) ----
+// Current roster (no week) + injury status + YTD points, sorted by
+// position then name -- the simplified drop surface.
+$droppable = [];
+if ($hasConfig) {
+    $drRosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $ownerFranchiseId]);
+    $drRoster = mfl_normalize_list($drRosterResp['rosters']['franchise']['player'] ?? null);
+
+    $drDetails = [];
+    $drIds = array_column($drRoster, 'id');
+    if ($drIds) {
+        foreach (array_chunk(array_unique($drIds), 150) as $chunk) {
+            $r = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk), 'DETAILS' => 1], false);
+            foreach (mfl_normalize_list($r['players']['player'] ?? null) as $p) { $drDetails[$p['id']] = $p; }
+        }
+    }
+
+    $drInj = [];
+    $drInjRaw = mfl_cached_get('injuries', 1800, [], false);
+    foreach (mfl_normalize_list($drInjRaw['injuries']['injury'] ?? null) as $inj) {
+        if (!empty($inj['id'])) $drInj[$inj['id']] = $inj['status'] ?? '';
+    }
+
+    $drYtd = [];
+    $drYtdRaw = mfl_cached_get('playerScores', 1800, ['W' => 'YTD', 'COUNT' => 3000]);
+    foreach (mfl_normalize_list($drYtdRaw['playerScores']['playerScore'] ?? null) as $row) {
+        if (!empty($row['id'])) $drYtd[$row['id']] = $row['score'] ?? '';
+    }
+
+    foreach ($drRoster as $p) {
+        $pd = $drDetails[$p['id']] ?? [];
+        $nm = $pd['name'] ?? ('Player #' . $p['id']);
+        if (strpos($nm, ',') !== false) { [$l, $f] = array_map('trim', explode(',', $nm, 2)); $nm = "$f $l"; }
+        $droppable[] = [
+            'id'   => $p['id'],
+            'name' => $nm,
+            'pos'  => $pd['position'] ?? '',
+            'team' => $pd['team'] ?? '',
+            'inj'  => $drInj[$p['id']] ?? '',
+            'ytd'  => ($drYtd[$p['id']] ?? '') !== '' ? (float) $drYtd[$p['id']] : null,
+        ];
+    }
+    usort($droppable, fn($a, $b) => strcasecmp($a['pos'], $b['pos']) ?: strcasecmp($a['name'], $b['name']));
+}
 
 // ---- MOCK: Trade panel (real source: mfl_franchises() for target list, rosters() + rotc_all_franchise_picks() for both sides, same as franchise/offer-trade.php) ----
 $tradeTargets = ['Samurai Warriors', 'Flaming Chankla Chuckers', 'Gridiron Gremlins', 'Sunday Scaries', 'Thunderbolt Titans'];
@@ -359,20 +426,31 @@ $rotcMatchups = [
         <h1 class="rotc-mapp-panel-title">Drop a Player</h1>
       </div>
       <?php if ($result && $result['action'] === 'drop'): ?>
-        <div class="rotc-mapp-banner ok">Player(s) dropped. Good luck, punk.</div>
+        <?php if ($result['ok']): ?>
+          <div class="rotc-mapp-banner ok">Player(s) dropped. Good luck, punk.</div>
+        <?php else: ?>
+          <div class="rotc-mapp-banner err"><?= nl2br(htmlspecialchars($result['error'])) ?></div>
+        <?php endif; ?>
       <?php endif; ?>
+      <?php if ($waiverType !== 'NONE'): ?>
+        <p class="rotc-mapp-blurb">This league is on a waiver system (<?= htmlspecialchars($waiverType) ?>) right now, so drops go through a waiver request. <a href="<?= htmlspecialchars($waiverLink) ?>" style="color:var(--accent);font-weight:700;">Manage on MyFantasyLeague &rarr;</a></p>
+      <?php elseif (!$droppable): ?>
+        <p class="rotc-mapp-blurb">This league drops immediately, first-come-first-served — no waiver waiting period.</p>
+        <div class="rotc-mapp-card"><div class="rotc-mrow"><div class="rotc-mrow-body"><div class="rotc-mrow-meta">No roster found.</div></div></div></div>
+      <?php else: ?>
       <p class="rotc-mapp-blurb">This league drops immediately, first-come-first-served — no waiver waiting period.</p>
       <form method="post">
         <input type="hidden" name="action" value="drop">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
         <div class="rotc-mapp-card">
           <?php foreach ($droppable as $i => $p): $fid = 'drop_' . $i; ?>
             <div class="rotc-mrow">
               <div class="rotc-mrow-body">
                 <div class="rotc-mrow-name"><?= htmlspecialchars($p['name']) ?><?= $p['inj'] ? ' <span style="color:var(--accent);font-size:11px;">' . htmlspecialchars($p['inj']) . '</span>' : '' ?></div>
-                <div class="rotc-mrow-meta"><?= htmlspecialchars($p['pos']) ?> &middot; <?= htmlspecialchars($p['team']) ?> &middot; <?= number_format($p['ytd'], 1) ?> YTD pts</div>
+                <div class="rotc-mrow-meta"><?= htmlspecialchars($p['pos']) ?> &middot; <?= htmlspecialchars($p['team']) ?> &middot; <?= $p['ytd'] !== null ? htmlspecialchars(number_format((float) $p['ytd'], 1)) . ' YTD pts' : 'no YTD pts' ?></div>
               </div>
               <label class="rotc-mtoggle danger" for="<?= $fid ?>">
-                <input type="checkbox" id="<?= $fid ?>" name="drop[]" value="<?= htmlspecialchars($p['name']) ?>">
+                <input type="checkbox" id="<?= $fid ?>" name="drop[]" value="<?= htmlspecialchars($p['id']) ?>">
                 <span class="rotc-mtoggle-pill">Drop</span>
               </label>
             </div>
@@ -380,6 +458,7 @@ $rotcMatchups = [
         </div>
         <button type="submit" class="rotc-mbtn rotc-mbtn-secondary rotc-mapp-sticky-submit" onclick="return confirm('Drop the selected player(s)? This happens immediately.');">Drop Selected</button>
       </form>
+      <?php endif; ?>
     </section>
 
     <!-- ================= TRADE ================= -->
