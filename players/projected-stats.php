@@ -18,6 +18,7 @@ $fetchError = !file_exists($configPath);
 
 $week = max(1, (int) ($_GET['week'] ?? 1));
 $posFilter = $_GET['pos'] ?? '';
+$faOnly    = !empty($_GET['fa']);
 $positions = ['QB', 'RB', 'WR', 'TE', 'DT', 'DE', 'LB', 'CB', 'S'];
 
 $rows = [];
@@ -26,20 +27,26 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/player-hover.php';
 
-    $raw = mfl_cached_get('projectedScores', 3600, ['W' => $week, 'COUNT' => 200]);
+    // Scan the whole projection pool when filtering to free agents.
+    $raw = mfl_cached_get('projectedScores', 3600, ['W' => $week, 'COUNT' => $faOnly ? 3000 : 200]);
     $list = mfl_normalize_list($raw['projectedScores']['playerScore'] ?? null);
     $ids = array_column($list, 'id');
 
+    $faIds = $faOnly ? rotc_free_agent_ids() : null;
+
     $players = [];
     if ($ids) {
-        $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $ids)], false);
-        foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
-            $players[$p['id']] = $p;
+        foreach (array_chunk($ids, 250) as $chunk) {
+            $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk)], false);
+            foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
+                $players[$p['id']] = $p;
+            }
         }
     }
     foreach ($list as $row) {
         $p = $players[$row['id']] ?? null;
         if (!$p) continue;
+        if ($faOnly && !isset($faIds[$row['id']])) continue;
         if ($posFilter && ($p['position'] ?? '') !== $posFilter) continue;
         $rows[] = [
             'name' => $p['name'] ?? ('Player #' . $row['id']),
@@ -76,6 +83,10 @@ function rotc_qs2(array $overrides): string {
           <?php foreach ($positions as $pos): ?>
             <a href="<?= rotc_qs2(['pos' => $pos]) ?>" style="padding:5px 10px;border-radius:999px;border:1px solid var(--line);<?= $posFilter === $pos ? 'background:var(--ink);color:var(--on-ink);' : '' ?>"><?= $pos ?></a>
           <?php endforeach; ?>
+        </div>
+        <div style="margin:0 0 16px;">
+          <a href="<?= rotc_qs2(['fa' => $faOnly ? null : 1]) ?>" style="display:inline-block;padding:6px 14px;border-radius:999px;border:1px solid var(--accent);font-weight:700;font-size:13px;<?= $faOnly ? 'background:var(--accent);color:var(--on-ink);' : 'color:var(--accent);' ?>"><?= $faOnly ? '✓ ' : '' ?>Free Agents Only</a>
+          <?php if ($faOnly): ?><span style="color:var(--muted);font-size:12px;margin-left:8px;">Showing only players available in your league.</span><?php endif; ?>
         </div>
 
         <div style="overflow-x:auto;">

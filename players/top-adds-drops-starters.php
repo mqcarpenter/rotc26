@@ -19,6 +19,7 @@ $fetchError = !file_exists($configPath);
 $tabs = ['adds' => 'Top Adds', 'drops' => 'Top Drops', 'starters' => 'Top Starters'];
 $active = $_GET['view'] ?? 'adds';
 if (!isset($tabs[$active])) $active = 'adds';
+$faOnly = !empty($_GET['fa']);
 $typeMap = ['adds' => 'topAdds', 'drops' => 'topDrops', 'starters' => 'topStarters'];
 
 $rows = [];
@@ -27,18 +28,25 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/player-hover.php';
 
-    $raw = mfl_cached_get($typeMap[$active], 1800, ['COUNT' => 50], false);
+    // Pull a deeper list when filtering to free agents (most trending
+    // players are rostered, so a top-50 slice would show almost none).
+    $raw = mfl_cached_get($typeMap[$active], 1800, ['COUNT' => $faOnly ? 500 : 50], false);
     $list = mfl_normalize_list($raw[$typeMap[$active]]['player'] ?? null);
     $ids = array_column($list, 'id');
 
+    $faIds = $faOnly ? rotc_free_agent_ids() : null;
+
     $players = [];
     if ($ids) {
-        $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $ids)], false);
-        foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
-            $players[$p['id']] = $p;
+        foreach (array_chunk($ids, 250) as $chunk) {
+            $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk)], false);
+            foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
+                $players[$p['id']] = $p;
+            }
         }
     }
     foreach ($list as $row) {
+        if ($faOnly && !isset($faIds[$row['id']])) continue;
         $p = $players[$row['id']] ?? null;
         $rows[] = [
             'name' => $p['name'] ?? ('Player #' . $row['id']),
@@ -59,10 +67,14 @@ if (!$fetchError) {
         <h2 class="card-title">Top Adds / Drops / Starters</h2>
         <p style="color:var(--muted);font-size:13px;margin-top:-6px;">League-wide percentages across all MyFantasyLeague.com-hosted leagues.</p>
 
-        <div style="display:flex;gap:6px;margin:8px 0 16px;">
+        <div style="display:flex;gap:6px;margin:8px 0 12px;">
           <?php foreach ($tabs as $key => $label): ?>
-            <a href="?view=<?= $key ?>" style="padding:6px 14px;border-radius:999px;border:1px solid var(--line);<?= $active === $key ? 'background:var(--ink);color:var(--on-ink);' : '' ?>"><?= htmlspecialchars($label) ?></a>
+            <a href="<?= htmlspecialchars('?' . http_build_query(array_merge($_GET, ['view' => $key]))) ?>" style="padding:6px 14px;border-radius:999px;border:1px solid var(--line);<?= $active === $key ? 'background:var(--ink);color:var(--on-ink);' : '' ?>"><?= htmlspecialchars($label) ?></a>
           <?php endforeach; ?>
+        </div>
+        <div style="margin:0 0 16px;">
+          <a href="<?= htmlspecialchars('?' . http_build_query(array_merge($_GET, ['fa' => $faOnly ? null : 1]))) ?>" style="display:inline-block;padding:6px 14px;border-radius:999px;border:1px solid var(--accent);font-weight:700;font-size:13px;<?= $faOnly ? 'background:var(--accent);color:var(--on-ink);' : 'color:var(--accent);' ?>"><?= $faOnly ? '✓ ' : '' ?>Free Agents Only</a>
+          <?php if ($faOnly): ?><span style="color:var(--muted);font-size:12px;margin-left:8px;">Only players available in your league.</span><?php endif; ?>
         </div>
 
         <div style="overflow-x:auto;">

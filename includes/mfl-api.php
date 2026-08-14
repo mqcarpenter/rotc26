@@ -95,6 +95,22 @@ function mfl_fetch(string $type, array $params = [], bool $includeLeague = true,
  * a *[] list from the API needs to run it through this first, or a
  * result set of exactly one silently breaks a plain foreach.
  */
+/**
+ * Set of currently-available (unrostered) player ids in THIS league, via
+ * TYPE=freeAgents -> freeAgents.leagueUnit.player[] (same source
+ * players/free-agents.php uses). Returned as [playerId => true] so any
+ * player-value page can filter its list to "free agents only" with an
+ * isset() check. Cached 15 min -- add/drop activity changes it.
+ */
+function rotc_free_agent_ids(): array {
+    $raw = mfl_cached_get('freeAgents', 900);
+    $ids = [];
+    foreach (mfl_normalize_list($raw['freeAgents']['leagueUnit']['player'] ?? null) as $p) {
+        if (!empty($p['id'])) $ids[(string) $p['id']] = true;
+    }
+    return $ids;
+}
+
 function mfl_normalize_list($val): array {
     if ($val === null) return [];
     if (!is_array($val)) return [];
