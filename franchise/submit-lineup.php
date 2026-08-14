@@ -250,7 +250,7 @@ if ($hasConfig) {
             <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
             <input type="hidden" name="week" value="<?= (int) $week ?>">
             <div style="overflow-x:auto;">
-            <table class="rotc-lineup-table">
+            <table class="rotc-lineup-table" id="rotc-lineup-table-main">
               <thead><tr>
                 <th>Start</th><th></th><th>Player</th><th>Pos</th>
                 <th>Week <?= (int) $week ?> Opp</th><th>Inj</th><th>Bye</th>

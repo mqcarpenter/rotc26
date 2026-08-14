@@ -32,6 +32,7 @@
       <div class="rotc-foot-group">
         <h4>Team Management</h4>
         <ul>
+          <li><a href="<?= $base ?>/mobile">Manage (Mobile Dashboard)</a></li>
           <li><a href="<?= $base ?>/franchise/submit-lineup.php">Submit Lineup</a></li>
           <li><a href="<?= $base ?>/franchise/drop-player.php">Add / Drop</a></li>
         </ul>

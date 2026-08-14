@@ -1,0 +1,170 @@
+/* ============================================================
+   mobile-dashboard.css
+   Standalone stylesheet for /mobile.php ONLY. Not loaded by any other
+   page. Reuses the color/type tokens from mfl26.css (:root vars,
+   fonts) but does NOT reuse .rotc-nav/.rotc-foot/.home-grid -- this
+   page renders its own minimal app shell, no desktop mega-menu, no
+   three-column footer. mfl26.css is still linked first (see
+   mobile.php's <head>) purely for the :root tokens + @font-face-ish
+   Google Fonts <link>, so colors/type match the rest of the site.
+   ============================================================ */
+
+.rotc-mapp{
+  min-height:100vh; min-height:100dvh;
+  display:flex; flex-direction:column;
+  background:var(--paper); color:var(--ink);
+  font-family:"Roboto", Arial, sans-serif;
+}
+.rotc-mapp *{ box-sizing:border-box; }
+.rotc-mapp a{ color:inherit; text-decoration:none; }
+
+/* Tab state -- 5 hidden radios, one per panel/tab, CSS-only switching
+   (no JS), same technique this site already uses for the desktop
+   burger menu and dropdowns (see .rotc-toggle in mfl26.css). */
+.rotc-mtab{ display:none; }
+
+/* ---- Top bar ---- */
+.rotc-mapp-topbar{
+  position:sticky; top:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:10px 14px; background:var(--ink); color:var(--on-ink);
+}
+.rotc-mapp-brand{ display:flex; align-items:center; gap:8px; min-width:0; }
+.rotc-mapp-brand img{ width:26px; height:26px; flex:none; }
+.rotc-mapp-brand-text{ min-width:0; }
+.rotc-mapp-brand-name{ font-family:"Roboto Condensed",sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.04em; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rotc-mapp-brand-week{ font-size:10.5px; color:rgba(253,251,247,.65); }
+.rotc-mapp-fullsite{
+  flex:none; font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.04em;
+  font-size:10.5px; font-weight:700; color:var(--accent); border:1px solid rgba(224,83,27,.5); border-radius:999px; padding:5px 10px;
+}
+
+/* ---- Panels ---- */
+.rotc-mapp-panels{ flex:1 1 auto; width:100%; max-width:640px; margin:0 auto; padding:14px 14px 96px; }
+.rotc-mapp-panel{ display:none; }
+.rotc-mapp-panel-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.rotc-mapp-panel-title{ font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.03em; font-weight:700; font-size:19px; margin:0; }
+.rotc-mapp-panel-title::after{ content:""; display:block; width:40px; height:3px; background:var(--accent); margin-top:6px; }
+.rotc-mapp-week-select{ font-family:"Roboto Condensed",sans-serif; font-size:12px; font-weight:700; padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); }
+.rotc-mapp-blurb{ font-size:12.5px; color:var(--muted); margin:0 0 14px; line-height:1.4; }
+
+.rotc-mapp-section-title{ font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; font-weight:700; font-size:11px; letter-spacing:.05em; color:var(--muted); padding:14px 2px 6px; }
+.rotc-mapp-section-title:first-child{ padding-top:0; }
+
+.rotc-mapp-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; margin-bottom:12px; }
+
+/* result banners -- reuse the same visual language as the desktop
+   .rotc-login-success / .rotc-login-error but scoped here too in
+   case this page is ever opened standalone without mfl26.css cached */
+.rotc-mapp-banner{ font-weight:600; border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:13px; }
+.rotc-mapp-banner.ok{ color:#1b5e20; background:#e8f5e9; border:1px solid #c3e6c5; }
+.rotc-mapp-banner.err{ color:#b3261e; background:#fbe9e7; border:1px solid #f3c8c2; }
+
+/* ---- Player / pick chip rows (Lineup, Drop, Trade panels) ---- */
+.rotc-mrow{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid var(--line); background:var(--card); }
+.rotc-mrow:last-child{ border-bottom:0; }
+.rotc-mrow-name{ font-weight:700; font-size:13.5px; line-height:1.25; }
+.rotc-mrow-meta{ font-size:11px; color:var(--muted); margin-top:1px; }
+.rotc-mrow-body{ flex:1 1 auto; min-width:0; }
+.rotc-mrow-stat{ flex:none; text-align:right; font-family:"Roboto Condensed",sans-serif; font-weight:700; font-size:13px; color:var(--accent); min-width:44px; }
+.rotc-mrow-stat-label{ display:block; font-family:"Roboto",sans-serif; font-weight:400; font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+
+.rotc-mtoggle{ flex:none; }
+.rotc-mtoggle input{ position:absolute; opacity:0; width:1px; height:1px; }
+.rotc-mtoggle-pill{
+  display:inline-block; padding:7px 14px; border-radius:999px; border:1px solid var(--line);
+  font-family:"Roboto Condensed",sans-serif; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.03em;
+  color:var(--muted); cursor:pointer; user-select:none; transition:background .1s, color .1s, border-color .1s;
+}
+.rotc-mtoggle:has(input:checked) .rotc-mtoggle-pill{ background:var(--accent); border-color:var(--accent); color:var(--on-ink); }
+.rotc-mtoggle.danger:has(input:checked) .rotc-mtoggle-pill{ background:#b3261e; border-color:#b3261e; color:var(--on-ink); }
+.rotc-mrow:has(.rotc-mtoggle input:checked){ background:var(--sand); }
+
+/* ---- Pick 'em matchup rows (NFL + ROTC panels) ---- */
+.rotc-mpick{ padding:10px 12px; border-bottom:1px solid var(--line); background:var(--card); }
+.rotc-mpick:last-child{ border-bottom:0; }
+.rotc-mpick.mine{ box-shadow:inset 3px 0 0 var(--accent); background:var(--sand); }
+.rotc-mpick-vs{ font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+.rotc-mpick-choices{ display:flex; gap:8px; }
+.rotc-mpick-btn{ flex:1 1 0; }
+.rotc-mpick-btn input{ position:absolute; opacity:0; width:1px; height:1px; }
+.rotc-mpick-btn-face{
+  display:block; text-align:center; padding:11px 6px; border:1px solid var(--line); border-radius:10px;
+  font-family:"Roboto Condensed",sans-serif; font-weight:700; font-size:12.5px; cursor:pointer; user-select:none;
+  transition:background .1s, color .1s, border-color .1s;
+}
+.rotc-mpick-btn:has(input:checked) .rotc-mpick-btn-face{ background:var(--accent); border-color:var(--accent); color:var(--on-ink); }
+
+/* ---- Trade panel specifics ---- */
+.rotc-mapp-trade-target{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line); background:var(--card); font-size:14px; margin-bottom:12px; }
+.rotc-mapp-pending-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:12px; margin-bottom:10px; }
+.rotc-mapp-pending-head{ display:flex; align-items:center; gap:8px; font-family:"Roboto Condensed",sans-serif; font-weight:700; font-size:12.5px; margin-bottom:6px; }
+.rotc-mapp-pending-head img{ width:22px; height:22px; border-radius:50%; }
+.rotc-mapp-pending-line{ font-size:12.5px; margin:3px 0; }
+.rotc-mapp-pending-line b{ color:var(--muted); font-weight:600; }
+.rotc-mapp-pending-actions{ display:flex; gap:8px; margin-top:8px; }
+
+/* ---- Buttons ---- */
+.rotc-mbtn{
+  display:block; width:100%; text-align:center; padding:13px 16px; border-radius:10px; border:none;
+  background:var(--accent); color:var(--on-ink); font-family:"Roboto Condensed",sans-serif; font-weight:700;
+  text-transform:uppercase; letter-spacing:.03em; font-size:14px; cursor:pointer;
+}
+.rotc-mbtn-secondary{ background:var(--ink-2); }
+.rotc-mbtn-small{ padding:8px 14px; font-size:11.5px; flex:1 1 0; }
+.rotc-mapp-sticky-submit{ position:sticky; bottom:calc(70px + env(safe-area-inset-bottom)); margin-top:14px; box-shadow:0 4px 14px rgba(42,24,16,.28); }
+
+/* ---- Bottom tab bar ---- */
+.rotc-mapp-tabbar{
+  position:fixed; left:0; right:0; bottom:0; z-index:200;
+  display:flex; background:var(--ink);
+  border-top:1px solid rgba(255,255,255,.1);
+  padding:6px 2px calc(6px + env(safe-area-inset-bottom));
+  box-shadow:0 -6px 16px rgba(0,0,0,.28);
+}
+.rotc-mapp-tabbar label{
+  position:relative; flex:1 1 0; display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:6px 2px; color:rgba(253,251,247,.58); cursor:pointer; user-select:none;
+  font-family:"Roboto Condensed",sans-serif; font-size:10px; text-transform:uppercase; letter-spacing:.02em;
+}
+.rotc-mapp-tabbar svg{ width:21px; height:21px; }
+.rotc-mapp-tab-badge{
+  position:absolute; top:2px; right:calc(50% - 20px);
+  min-width:15px; height:15px; padding:0 4px; border-radius:999px;
+  background:var(--accent); color:var(--on-ink); font-size:9px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* Active tab highlight + panel switching -- pure CSS via the 5 hidden
+   radios up top (.rotc-mtab), general-sibling-combinator so no JS is
+   needed anywhere on this page. */
+#mtab-lineup:checked ~ .rotc-mapp-panels .panel-lineup,
+#mtab-drop:checked   ~ .rotc-mapp-panels .panel-drop,
+#mtab-trade:checked  ~ .rotc-mapp-panels .panel-trade,
+#mtab-nfl:checked    ~ .rotc-mapp-panels .panel-nfl,
+#mtab-rotc:checked   ~ .rotc-mapp-panels .panel-rotc{
+  display:block;
+}
+#mtab-lineup:checked ~ .rotc-mapp-tabbar .tab-lineup,
+#mtab-drop:checked   ~ .rotc-mapp-tabbar .tab-drop,
+#mtab-trade:checked  ~ .rotc-mapp-tabbar .tab-trade,
+#mtab-nfl:checked    ~ .rotc-mapp-tabbar .tab-nfl,
+#mtab-rotc:checked   ~ .rotc-mapp-tabbar .tab-rotc{
+  color:var(--on-ink);
+}
+#mtab-lineup:checked ~ .rotc-mapp-tabbar .tab-lineup svg,
+#mtab-drop:checked   ~ .rotc-mapp-tabbar .tab-drop svg,
+#mtab-trade:checked  ~ .rotc-mapp-tabbar .tab-trade svg,
+#mtab-nfl:checked    ~ .rotc-mapp-tabbar .tab-nfl svg,
+#mtab-rotc:checked   ~ .rotc-mapp-tabbar .tab-rotc svg{
+  color:var(--accent);
+}
+
+@media (min-width:720px){
+  /* This page is built phone-first and is meant to be reached from a
+     phone, but doesn't break on a wider viewport -- caps the tab bar
+     to the same centered column as the content instead of stretching
+     edge to edge. */
+  .rotc-mapp-tabbar{ max-width:640px; left:50%; transform:translateX(-50%); border-left:1px solid rgba(255,255,255,.1); border-right:1px solid rgba(255,255,255,.1); border-radius:14px 14px 0 0; bottom:10px; }
+  .rotc-mapp-panels{ padding-bottom:110px; }
+}

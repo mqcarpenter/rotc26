@@ -115,6 +115,10 @@ $nav_items = [
     ['Offer a Trade', "$base/franchise/offer-trade.php"],
     ['Drop a Player', "$base/franchise/drop-player.php"],
     ['Make a Pool Pick', "$base/franchise/pool-pick.php"],
+    // ROTC Pick 'Em: new (see franchise/rotc-pickem.php) -- the
+    // franchise-vs-franchise "Fantasy" pool pick, previously missing
+    // from this menu (only the NFL pool had a page). Mock-data pass.
+    ["Make an ROTC Pick", "$base/franchise/rotc-pickem.php"],
     ['Make a Survivor Pick', "$base/franchise/survivor-pick.php"],
   ]],
   'Players' => ['wide' => true, 'sub' => [
@@ -217,6 +221,19 @@ $tabs = [
     <input type="checkbox" id="rotc-burger" class="rotc-burger">
     <label for="rotc-burger" class="rotc-burger-btn">&#9776;</label>
     <ul class="rotc-menu">
+      <!-- Manage: new top-level entry point (not a dropdown) to
+           franchise/manage.php, the mobile task hub -- the five things
+           an owner actually does mid-week (lineup, drops, trades, both
+           pick 'ems) as one tap-friendly screen instead of digging
+           through the Franchise mega-menu below. Placed first so it's
+           the first thing a thumb hits opening the burger on a phone.
+           Mock-data pass, see franchise/manage.php's own doc comment. -->
+      <li class="rotc-item rotc-manage">
+        <a class="rotc-top rotc-manage-pill" href="<?= $base ?>/mobile" title="Manage: lineup, drops, trades, pick 'em">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h6M9 8h2"/></svg>
+          <span>Manage</span>
+        </a>
+      </li>
       <?php foreach ($nav_items as $label => $item): ?>
         <?php $slug = strtolower(str_replace([' ', '&'], ['-', 'and'], $label)); ?>
         <li class="rotc-item<?= $item['wide'] ? ' wide' : '' ?>">
