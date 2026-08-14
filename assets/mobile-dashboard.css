@@ -38,6 +38,19 @@
   flex:none; font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.04em;
   font-size:10.5px; font-weight:700; color:var(--accent); border:1px solid rgba(224,83,27,.5); border-radius:999px; padding:5px 10px;
 }
+/* Logged-in indicator: the owner's helmet, doubling as the log-out tap
+   target. Green dot = active session. */
+.rotc-mapp-topbar-actions{ flex:none; display:flex; align-items:center; gap:8px; }
+.rotc-mapp-coach{
+  flex:none; position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; border-radius:999px; overflow:hidden;
+  background:rgba(253,251,247,.08); border:1px solid rgba(253,251,247,.22);
+}
+.rotc-mapp-coach-helmet{ width:30px; height:30px; object-fit:contain; display:block; }
+.rotc-mapp-coach::after{
+  content:""; position:absolute; right:-1px; bottom:-1px; width:9px; height:9px;
+  border-radius:999px; background:#37c26b; border:2px solid var(--ink);
+}
 
 /* ---- Panels ---- */
 .rotc-mapp-panels{ flex:1 1 auto; width:100%; max-width:640px; margin:0 auto; padding:14px 14px 96px; }

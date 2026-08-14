@@ -51,11 +51,21 @@ if ($base === '.') $base = '';
 // the MFL owner login captured at login is present in the session.
 // Guarded by $hasConfig so a no-config preview still renders the mock;
 // on the live server config.php exists, so this always enforces.
+$ownerUsername  = null;
+$ownerHelmetUrl = null;
 if ($hasConfig) {
     require_once $configPath;
     require_once dirname(__DIR__) . '/includes/mfl-api.php';
     require_once dirname(__DIR__) . '/includes/mfl-auth.php';
+    require_once dirname(__DIR__) . '/includes/helmets.php';
     rotc_require_login($base);
+
+    // Past the gate the owner is logged in and their franchise resolved.
+    // Surface who, as a helmet indicator in the top bar — the same custom
+    // helmet art the desktop nav's coach pill uses (includes/helmets.php).
+    $ownerUsername    = rotc_mfl_username();
+    $ownerFranchiseId = rotc_mfl_franchise_id();
+    $ownerHelmetUrl   = $ownerFranchiseId ? rotc_helmet_src($ownerFranchiseId) : null;
 }
 
 $result = null;
@@ -189,7 +199,14 @@ $rotcMatchups = [
         <div class="rotc-mapp-brand-week">Week <?= (int) $week ?> &middot; 2026 Season</div>
       </div>
     </div>
-    <a class="rotc-mapp-fullsite" href="<?= $base ?: '/' ?>">Full Site</a>
+    <div class="rotc-mapp-topbar-actions">
+      <a class="rotc-mapp-fullsite" href="<?= $base ?: '/' ?>">Full Site</a>
+      <?php if ($ownerHelmetUrl): ?>
+        <a class="rotc-mapp-coach" href="<?= $base ?>/logout.php" title="<?= $ownerUsername ? 'Logged in as ' . htmlspecialchars($ownerUsername) . ' — tap to log out' : 'Tap to log out' ?>">
+          <img src="<?= htmlspecialchars($ownerHelmetUrl) ?>" alt="Log out" class="rotc-mapp-coach-helmet">
+        </a>
+      <?php endif; ?>
+    </div>
   </header>
 
   <main class="rotc-mapp-panels">
