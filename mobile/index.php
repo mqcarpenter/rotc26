@@ -23,16 +23,23 @@
  * + nflSchedule, real import?TYPE=lineup) and the Drop panel (rosters +
  * injuries + playerScores, real import?TYPE=fcfsWaiver) are wired to
  * real MFL data, mirroring franchise/submit-lineup.php and
- * franchise/drop-player.php. The Trade panel is wired too (pendingTrades
- * + tradeResponse for accept/reject/revoke, tradeProposal for new
- * offers, TYPE=assets for draft picks), mirroring
- * franchise/offer-trade.php. The NFL Pick 'Em and ROTC Pick 'Em panels
- * are still MOCK (each section notes the real source it will use); their
- * submit buttons return a mocked "ok" and do NOT call MFL yet. The
- * active tab is persisted across reloads via a hidden `tab` field.
- * Deliberately kept as
- * ONE file/one shared context (one franchise list, one week) rather
- * than five separate includes re-fetching per tab.
+ * franchise/drop-player.php. Trade is wired (pendingTrades +
+ * tradeResponse for accept/reject/revoke, tradeProposal for new offers,
+ * TYPE=assets for picks), mirroring franchise/offer-trade.php. Both
+ * Pick 'Ems submit real import?TYPE=poolPicks (POOLTYPE=NFL from
+ * TYPE=nflSchedule, POOLTYPE=Fantasy from TYPE=schedule), mirroring
+ * franchise/pool-pick.php. The active tab is persisted across reloads
+ * via a hidden `tab` field.
+ *
+ * ALL FIVE PANELS ARE NOW LIVE. One caveat carried over from
+ * franchise/rotc-pickem.php: the schedule.weeklySchedule.matchup key
+ * path for the Fantasy pool isn't confirmed live -- hit
+ * /mobile?tab=rotc&debug=rotcsched to dump TYPE=schedule and confirm the
+ * parse before trusting the ROTC Pick 'Em matchups.
+ *
+ * Deliberately kept as ONE file/one shared context (one franchise list,
+ * one league fetch) rather than five separate includes re-fetching per
+ * tab.
  */
 
 $page_title = 'Manage — Return of the Champions XXVI';
@@ -198,11 +205,42 @@ if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $result = ['action' => 'trade', 'ok' => true, 'respond' => ['accept' => 'accepted', 'reject' => 'rejected', 'revoke' => 'revoked'][$respondAction] ?? 'updated'];
             }
         }
-    } elseif ($action !== '') {
-        // NFL Pick 'Em / ROTC Pick 'Em are not live-wired yet (following
-        // commits) -- mocked success so the UI still responds. These do
-        // NOT submit anything to MFL.
-        $result = ['action' => $action, 'ok' => true];
+    } elseif ($action === 'nflpick' || $action === 'rotcpick') {
+        // LIVE: import?TYPE=poolPicks, same shape as franchise/pool-pick.php.
+        // Each matchup posts pick_{away}_{home}=<winner id>; MFL wants
+        // PICK{away},{home}=<winner> and RANK{away},{home}=1 (plain Pickem,
+        // not a confidence pool). Scans the posted pick_* fields directly
+        // so it needs neither the NFL nor fantasy schedule rebuilt here.
+        if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $result = ['action' => $action, 'ok' => false, 'error' => 'Your session expired — reload the page and try again.'];
+        } else {
+            $params = ['POOLTYPE' => ($action === 'nflpick' ? 'NFL' : 'Fantasy'), 'WEEK' => (int) ($_POST['poolweek'] ?? 0)];
+            $picked = 0;
+            foreach ($_POST as $k => $v) {
+                if (strncmp($k, 'pick_', 5) !== 0) continue;
+                $winner = trim((string) $v);
+                if ($winner === '') continue;
+                $rest = substr($k, 5);
+                $usc = strrpos($rest, '_'); // away/home ids carry no underscore (NFL codes / numeric franchise ids)
+                if ($usc === false) continue;
+                $key = substr($rest, 0, $usc) . ',' . substr($rest, $usc + 1);
+                $params['PICK' . $key] = $winner;
+                $params['RANK' . $key] = '1';
+                $picked++;
+            }
+            if ($picked === 0) {
+                $result = ['action' => $action, 'ok' => false, 'error' => 'Pick at least one matchup.'];
+            } else {
+                $resp = rotc_mfl_authed_request('import', 'poolPicks', $params);
+                if ($resp === null) {
+                    $result = ['action' => $action, 'ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
+                } elseif (isset($resp['error'])) {
+                    $result = ['action' => $action, 'ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
+                } else {
+                    $result = ['action' => $action, 'ok' => true];
+                }
+            }
+        }
     }
 }
 
@@ -457,26 +495,58 @@ function rotc_m_trade_side(array $ids, array $players, array $pickLabels): strin
     return implode(', ', $parts);
 }
 
-// ---- MOCK: NFL Pick 'Em panel (real source: TYPE=nflSchedule + import TYPE=poolPicks POOLTYPE=NFL, same as franchise/pool-pick.php) ----
-$nflMatchups = [
-    ['away' => 'DAL', 'home' => 'PHI'], ['away' => 'BUF', 'home' => 'NYJ'],
-    ['away' => 'SF',  'home' => 'SEA'], ['away' => 'KC',  'home' => 'LAC'],
-    ['away' => 'GB',  'home' => 'CHI'], ['away' => 'DET', 'home' => 'MIN'],
-];
+// ---- LIVE: NFL Pick 'Em panel (mirrors franchise/pool-pick.php) ----
+$nflStartWeek = 1; $nflEndWeek = 17; $nflWeek = 1; $nflMatchups = [];
+if ($hasConfig) {
+    $nflStartWeek = (int) ($league['nflPoolStartWeek'] ?? 1);
+    $nflEndWeek   = (int) ($league['nflPoolEndWeek'] ?? ($league['endWeek'] ?? 17));
+    if ($nflStartWeek < 1) $nflStartWeek = 1;
+    if ($nflEndWeek < $nflStartWeek) $nflEndWeek = $nflStartWeek;
+    $nflWeek = max($nflStartWeek, min($nflEndWeek, (int) ($_POST['poolweek'] ?? $_GET['nflweek'] ?? $nflStartWeek)));
+    $nflSchedResp = mfl_cached_get('nflSchedule', 3600, ['W' => $nflWeek], false);
+    foreach (mfl_normalize_list($nflSchedResp['nflSchedule']['matchup'] ?? null) as $m) {
+        $teams = mfl_normalize_list($m['team'] ?? null);
+        if (count($teams) !== 2) continue;
+        $away = null; $home = null;
+        foreach ($teams as $t) { if (($t['isHome'] ?? '0') === '1') $home = $t['id']; else $away = $t['id']; }
+        if ($away && $home) $nflMatchups[] = ['away' => $away, 'home' => $home];
+    }
+}
 
-// ---- MOCK: ROTC Pick 'Em panel (real source: TYPE=schedule + import TYPE=poolPicks POOLTYPE=Fantasy, same as franchise/rotc-pickem.php) ----
-$rotcFranchises = [
-    'AOH' => 'Angels of Harlem', 'SW' => 'Samurai Warriors', 'FCC' => 'Flaming Chankla Chuckers',
-    'GG' => 'Gridiron Gremlins', 'SS' => 'Sunday Scaries', 'TT' => 'Thunderbolt Titans',
-    'RR' => 'Rogue Raccoons', 'BB' => 'Blitzkrieg Bandits', 'CPK' => 'Couch Potato Kings',
-    'EZE' => 'End Zone Enforcers', 'IC' => 'Iron Curtain Crew', 'DD' => 'Dynasty Dragons',
-];
-$myFranchiseId = 'AOH';
-$rotcMatchups = [
-    ['away' => 'AOH', 'home' => 'SW'], ['away' => 'FCC', 'home' => 'GG'],
-    ['away' => 'SS',  'home' => 'TT'], ['away' => 'RR',  'home' => 'BB'],
-    ['away' => 'CPK', 'home' => 'EZE'], ['away' => 'IC', 'home' => 'DD'],
-];
+// ---- LIVE: ROTC Pick 'Em panel (Fantasy pool; per rotc-pickem.php's plan) ----
+// The Fantasy pool is the same PICK/RANK poolPicks shape as the NFL pool,
+// with franchise ids instead of NFL codes and POOLTYPE=Fantasy. Matchups
+// come from TYPE=schedule. The schedule.weeklySchedule.matchup key path is
+// NOT confirmed live -- ?tab=rotc&debug=rotcsched dumps it to verify.
+$rotcStartWeek = 1; $rotcEndWeek = 17; $rotcWeek = 1; $rotcMatchups = [];
+if ($hasConfig) {
+    $rotcStartWeek = (int) ($league['fantasyPoolStartWeek'] ?? 1);
+    $rotcEndWeek   = (int) ($league['fantasyPoolEndWeek'] ?? ($league['endWeek'] ?? 17));
+    if ($rotcStartWeek < 1) $rotcStartWeek = 1;
+    if ($rotcEndWeek < $rotcStartWeek) $rotcEndWeek = $rotcStartWeek;
+    $rotcWeek = max($rotcStartWeek, min($rotcEndWeek, (int) ($_POST['poolweek'] ?? $_GET['rotcweek'] ?? $rotcStartWeek)));
+
+    $rotcSchedResp = mfl_cached_get('schedule', 900, ['W' => $rotcWeek]);
+    foreach (mfl_normalize_list($rotcSchedResp['schedule']['weeklySchedule'] ?? null) as $wk) {
+        foreach (mfl_normalize_list($wk['matchup'] ?? null) as $m) {
+            $fr = mfl_normalize_list($m['franchise'] ?? null);
+            if (count($fr) !== 2) continue;
+            $away = null; $home = null;
+            foreach ($fr as $f) { if (($f['isHome'] ?? '0') === '1') $home = $f['id']; else $away = $f['id']; }
+            if ($away === null || $home === null) { $away = $fr[0]['id'] ?? null; $home = $fr[1]['id'] ?? null; }
+            if ($away && $home) $rotcMatchups[] = ['away' => $away, 'home' => $home];
+        }
+    }
+
+    if (($_GET['debug'] ?? '') === 'rotcsched') {
+        header('Content-Type: text/plain');
+        echo "fantasyPoolStartWeek=$rotcStartWeek endWeek=$rotcEndWeek week=$rotcWeek\n\nRAW schedule:\n";
+        print_r($rotcSchedResp);
+        echo "\nPARSED matchups:\n";
+        print_r($rotcMatchups);
+        exit;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -768,57 +838,97 @@ $rotcMatchups = [
     <section class="rotc-mapp-panel panel-nfl">
       <div class="rotc-mapp-panel-head">
         <h1 class="rotc-mapp-panel-title">NFL Pick 'Em</h1>
-        <select class="rotc-mapp-week-select"><option>Week <?= (int) $week ?></option></select>
+        <form method="get" class="rotc-mapp-week-form">
+          <input type="hidden" name="tab" value="nfl">
+          <select class="rotc-mapp-week-select" name="nflweek" onchange="this.form.submit()" aria-label="Week">
+            <?php for ($w = (int) $nflStartWeek; $w <= (int) $nflEndWeek; $w++): ?>
+              <option value="<?= $w ?>"<?= $w === (int) $nflWeek ? ' selected' : '' ?>>Week <?= $w ?></option>
+            <?php endfor; ?>
+          </select>
+        </form>
       </div>
       <?php if ($result && $result['action'] === 'nflpick'): ?>
-        <div class="rotc-mapp-banner ok">Picks submitted for Week <?= (int) $week ?>. Good luck, punk.</div>
+        <?php if ($result['ok']): ?>
+          <div class="rotc-mapp-banner ok">Picks submitted for Week <?= (int) $nflWeek ?>. Good luck, punk.</div>
+        <?php else: ?>
+          <div class="rotc-mapp-banner err"><?= nl2br(htmlspecialchars($result['error'])) ?></div>
+        <?php endif; ?>
       <?php endif; ?>
       <p class="rotc-mapp-blurb">Tap the team you think wins each game.</p>
+      <?php if (!$nflMatchups): ?>
+        <div class="rotc-mapp-card"><div class="rotc-mrow"><div class="rotc-mrow-body"><div class="rotc-mrow-meta">No NFL schedule found for Week <?= (int) $nflWeek ?> yet.</div></div></div></div>
+      <?php else: ?>
       <form method="post">
         <input type="hidden" name="action" value="nflpick">
+        <input type="hidden" name="tab" value="nfl">
+        <input type="hidden" name="poolweek" value="<?= (int) $nflWeek ?>">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
         <div class="rotc-mapp-card">
-          <?php foreach ($nflMatchups as $i => $m): $fname = 'nfl_' . $i; ?>
+          <?php foreach ($nflMatchups as $m): $fname = 'pick_' . $m['away'] . '_' . $m['home']; ?>
             <div class="rotc-mpick">
               <div class="rotc-mpick-vs"><?= htmlspecialchars($m['away']) ?> @ <?= htmlspecialchars($m['home']) ?></div>
               <div class="rotc-mpick-choices">
-                <label class="rotc-mpick-btn"><input type="radio" name="<?= $fname ?>" value="<?= htmlspecialchars($m['away']) ?>"><span class="rotc-mpick-btn-face"><?= htmlspecialchars($m['away']) ?></span></label>
-                <label class="rotc-mpick-btn"><input type="radio" name="<?= $fname ?>" value="<?= htmlspecialchars($m['home']) ?>"><span class="rotc-mpick-btn-face"><?= htmlspecialchars($m['home']) ?></span></label>
+                <label class="rotc-mpick-btn"><input type="radio" name="<?= htmlspecialchars($fname) ?>" value="<?= htmlspecialchars($m['away']) ?>"><span class="rotc-mpick-btn-face"><?= htmlspecialchars($m['away']) ?></span></label>
+                <label class="rotc-mpick-btn"><input type="radio" name="<?= htmlspecialchars($fname) ?>" value="<?= htmlspecialchars($m['home']) ?>"><span class="rotc-mpick-btn-face"><?= htmlspecialchars($m['home']) ?></span></label>
               </div>
             </div>
           <?php endforeach; ?>
         </div>
         <button type="submit" class="rotc-mbtn rotc-mapp-sticky-submit">Submit Picks</button>
       </form>
+      <?php endif; ?>
     </section>
 
     <!-- ================= ROTC PICK 'EM ================= -->
     <section class="rotc-mapp-panel panel-rotc">
       <div class="rotc-mapp-panel-head">
         <h1 class="rotc-mapp-panel-title">ROTC Pick 'Em</h1>
-        <select class="rotc-mapp-week-select"><option>Week <?= (int) $week ?></option></select>
+        <form method="get" class="rotc-mapp-week-form">
+          <input type="hidden" name="tab" value="rotc">
+          <select class="rotc-mapp-week-select" name="rotcweek" onchange="this.form.submit()" aria-label="Week">
+            <?php for ($w = (int) $rotcStartWeek; $w <= (int) $rotcEndWeek; $w++): ?>
+              <option value="<?= $w ?>"<?= $w === (int) $rotcWeek ? ' selected' : '' ?>>Week <?= $w ?></option>
+            <?php endfor; ?>
+          </select>
+        </form>
       </div>
       <?php if ($result && $result['action'] === 'rotcpick'): ?>
-        <div class="rotc-mapp-banner ok">Picks submitted for Week <?= (int) $week ?>. Good luck, punk.</div>
+        <?php if ($result['ok']): ?>
+          <div class="rotc-mapp-banner ok">Picks submitted for Week <?= (int) $rotcWeek ?>. Good luck, punk.</div>
+        <?php else: ?>
+          <div class="rotc-mapp-banner err"><?= nl2br(htmlspecialchars($result['error'])) ?></div>
+        <?php endif; ?>
       <?php endif; ?>
       <p class="rotc-mapp-blurb">Franchise vs. franchise — pick who wins each fantasy matchup this week.</p>
+      <?php if (!$rotcMatchups): ?>
+        <div class="rotc-mapp-card"><div class="rotc-mrow"><div class="rotc-mrow-body"><div class="rotc-mrow-meta">No fantasy schedule found for Week <?= (int) $rotcWeek ?> yet.</div></div></div></div>
+      <?php else: ?>
       <form method="post">
         <input type="hidden" name="action" value="rotcpick">
+        <input type="hidden" name="tab" value="rotc">
+        <input type="hidden" name="poolweek" value="<?= (int) $rotcWeek ?>">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
         <div class="rotc-mapp-card">
-          <?php foreach ($rotcMatchups as $i => $m):
-            $fname = 'rotc_' . $i;
-            $isMine = $m['away'] === $myFranchiseId || $m['home'] === $myFranchiseId;
+          <?php foreach ($rotcMatchups as $m):
+            $fname    = 'pick_' . $m['away'] . '_' . $m['home'];
+            $awayName = $franchises[$m['away']]['name'] ?? $m['away'];
+            $homeName = $franchises[$m['home']]['name'] ?? $m['home'];
+            $awayAbbr = $franchises[$m['away']]['abbrev'] ?? $m['away'];
+            $homeAbbr = $franchises[$m['home']]['abbrev'] ?? $m['home'];
+            $isMine   = $m['away'] === $ownerFranchiseId || $m['home'] === $ownerFranchiseId;
           ?>
             <div class="rotc-mpick<?= $isMine ? ' mine' : '' ?>">
-              <div class="rotc-mpick-vs"><?= htmlspecialchars($rotcFranchises[$m['away']] ?? $m['away']) ?> @ <?= htmlspecialchars($rotcFranchises[$m['home']] ?? $m['home']) ?></div>
+              <div class="rotc-mpick-vs"><?= htmlspecialchars($awayName) ?> @ <?= htmlspecialchars($homeName) ?></div>
               <div class="rotc-mpick-choices">
-                <label class="rotc-mpick-btn"><input type="radio" name="<?= $fname ?>" value="<?= htmlspecialchars($m['away']) ?>"><span class="rotc-mpick-btn-face"><?= htmlspecialchars($m['away']) ?></span></label>
-                <label class="rotc-mpick-btn"><input type="radio" name="<?= $fname ?>" value="<?= htmlspecialchars($m['home']) ?>"><span class="rotc-mpick-btn-face"><?= htmlspecialchars($m['home']) ?></span></label>
+                <label class="rotc-mpick-btn"><input type="radio" name="<?= htmlspecialchars($fname) ?>" value="<?= htmlspecialchars($m['away']) ?>"><span class="rotc-mpick-btn-face"><?= htmlspecialchars($awayAbbr) ?></span></label>
+                <label class="rotc-mpick-btn"><input type="radio" name="<?= htmlspecialchars($fname) ?>" value="<?= htmlspecialchars($m['home']) ?>"><span class="rotc-mpick-btn-face"><?= htmlspecialchars($homeAbbr) ?></span></label>
               </div>
             </div>
           <?php endforeach; ?>
         </div>
         <button type="submit" class="rotc-mbtn rotc-mapp-sticky-submit">Submit Picks</button>
       </form>
+      <?php endif; ?>
     </section>
 
   </main>
@@ -835,7 +945,7 @@ $rotcMatchups = [
     <label class="tab-trade" for="mtab-trade" style="position:relative;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       Trade
-      <?php if ($pendingTrades): ?><span class="rotc-mapp-tab-badge"><?= count($pendingTrades) ?></span><?php endif; ?>
+      <?php if ($pendingIncoming): ?><span class="rotc-mapp-tab-badge"><?= count($pendingIncoming) ?></span><?php endif; ?>
     </label>
     <label class="tab-nfl" for="mtab-nfl">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22V3"/></svg>
