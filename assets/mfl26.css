@@ -196,8 +196,16 @@ a:hover{ color:var(--accent); }
 }
 .rotc-sub{ list-style:none; margin:0; padding:6px; position:absolute; top:100%; left:0; width:240px; max-width:90vw; background:var(--card); border:1px solid var(--line); box-shadow:0 8px 20px rgba(42,24,16,.18); display:none; z-index:10000; box-sizing:border-box; overflow:hidden; }
 .rotc-sub a{ overflow-wrap:break-word; word-break:break-word; display:block; padding:7px 10px; font-size:13px; color:var(--ink-2); }
-.rotc-item:hover .rotc-sub{ display:block; }
-.rotc-item.wide:hover .rotc-sub{ display:flex; }
+/* Open-on-hover is for real hover devices only. On a touchscreen the
+   first tap simulates :hover on the <li>, which -- combined with the
+   mobile hover-hide rules that used to live below -- fought the
+   checkbox :checked toggle and left wide menus (Reports) flipping their
+   +/- but never dropping (or dropping blank). Gating hover-open behind
+   (hover:hover) means touch relies purely on the checkbox. */
+@media (hover:hover){
+  .rotc-item:hover .rotc-sub{ display:block; }
+  .rotc-item.wide:hover .rotc-sub{ display:flex; }
+}
 .rotc-item.wide .rotc-sub{ width:480px; }
 .rotc-sub-col{ list-style:none; margin:0; padding:0; flex:1 1 50%; min-width:0; }
 .rotc-item:nth-child(n+4) .rotc-sub{ left:auto; right:0; }
@@ -228,9 +236,11 @@ a:hover{ color:var(--accent); }
   .rotc-top::after{ content:"+"; float:right; color:var(--accent); font-weight:700; }
   .rotc-toggle:checked + .rotc-top::after{ content:"-"; }
   .rotc-sub{ position:static; display:none; border:0; box-shadow:none; background:rgba(255,255,255,.04); padding:0 0 6px 10px; width:auto; }
-  .rotc-item:hover .rotc-sub{ display:none; }
-  .rotc-item.wide:hover .rotc-sub{ display:none; }
+  /* No hover-hide counters here anymore -- hover-open is gated to
+     (hover:hover) above, so on touch the checkbox alone controls the
+     submenu and there is nothing for a sticky :hover to fight. */
   .rotc-toggle:checked ~ .rotc-sub{ display:block; }
+  .rotc-item.wide .rotc-toggle:checked ~ .rotc-sub{ display:block; }
   .rotc-item.wide .rotc-sub{ width:auto; }
   .rotc-sub-col{ flex:none; }
   .rotc-sub a{ color:var(--paper); }
