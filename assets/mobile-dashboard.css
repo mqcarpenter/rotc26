@@ -58,6 +58,7 @@
 .rotc-mapp-panel-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
 .rotc-mapp-panel-title{ font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.03em; font-weight:700; font-size:19px; margin:0; }
 .rotc-mapp-panel-title::after{ content:""; display:block; width:40px; height:3px; background:var(--accent); margin-top:6px; }
+.rotc-mapp-week-form{ display:flex; align-items:center; gap:6px; margin:0; }
 .rotc-mapp-week-select{ font-family:"Roboto Condensed",sans-serif; font-size:12px; font-weight:700; padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); }
 .rotc-mapp-blurb{ font-size:12.5px; color:var(--muted); margin:0 0 14px; line-height:1.4; }
 

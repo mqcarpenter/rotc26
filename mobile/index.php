@@ -19,12 +19,14 @@
  * only for reference/diffing and isn't linked from anywhere; delete it
  * before pushing.
  *
- * MOCK DATA PASS -- nothing here calls MFL yet. Real source for each
- * panel is noted in that panel's own section below. Deliberately kept
- * as ONE file/one fetch pass rather than five separate includes: a
- * real single-page dashboard should do one shared roster fetch, one
- * shared week, one shared franchise list, and feed every panel from
- * that -- not re-fetch independently per tab.
+ * LIVE-WIRING IN PROGRESS. The Lineup panel is wired to real MFL data
+ * (rosters + projectedScores + nflSchedule) and submits a real
+ * import?TYPE=lineup, mirroring franchise/submit-lineup.php. The Drop,
+ * Trade, NFL Pick 'Em, and ROTC Pick 'Em panels are still MOCK (each
+ * section notes the real source it will use); their submit buttons
+ * return a mocked "ok" and do NOT call MFL yet. Deliberately kept as
+ * ONE file/one shared context (one franchise list, one week) rather
+ * than five separate includes re-fetching per tab.
  */
 
 $page_title = 'Manage — Return of the Champions XXVI';
@@ -68,47 +70,122 @@ if ($hasConfig) {
     $ownerHelmetUrl   = $ownerFranchiseId ? rotc_helmet_src($ownerFranchiseId) : null;
 }
 
+// ---- Shared live context: one pass, feeds every panel ----
+$myFranchiseName = 'My Team';
+$week    = 1;
+$endWeek = 17;
+$league  = [];
+if ($hasConfig) {
+    $franchises      = mfl_franchises();
+    $myFranchiseName = $franchises[$ownerFranchiseId]['name'] ?? $myFranchiseName;
+    $leagueRaw       = mfl_cached_get('league', 3600);
+    $league          = $leagueRaw['league'] ?? [];
+    $endWeek         = (int) ($league['endWeek'] ?? 17);
+    if ($endWeek < 1) $endWeek = 17;
+    $week            = max(1, min($endWeek, (int) ($_POST['week'] ?? $_GET['week'] ?? 1)));
+}
+
+// ---- Write-action handler ----
 $result = null;
 if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Every write action on this page (lineup, drop, trade, both pick
-    // 'ems) would land here once wired live, same shape as the
-    // existing franchise/*.php handlers: require config + mfl-auth,
-    // rotc_require_login(), rotc_csrf_check(), branch on which form
-    // posted (a hidden "action" field -- "lineup", "drop", "trade",
-    // "nflpick", "rotcpick"), call the matching
-    // rotc_mfl_authed_request('import', ...) exactly as that
-    // action's existing full page already does, then re-render this
-    // same tab with the result banner. Mocked to always succeed here.
     $action = (string) ($_POST['action'] ?? '');
-    if ($action !== '') {
+    if ($action === 'lineup') {
+        // LIVE: import?TYPE=lineup, same call franchise/submit-lineup.php
+        // makes. MFL validates position limits and returns the reason on
+        // rejection -- surfaced verbatim rather than swallowed.
+        if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $result = ['action' => 'lineup', 'ok' => false, 'error' => 'Your session expired — reload the page and try again.'];
+        } else {
+            $checked = array_filter((array) ($_POST['starters'] ?? []));
+            $resp = rotc_mfl_authed_request('import', 'lineup', ['W' => $week, 'STARTERS' => implode(',', $checked)]);
+            if ($resp === null) {
+                $result = ['action' => 'lineup', 'ok' => false, 'error' => 'Could not reach MyFantasyLeague. Try again in a moment.' . (rotc_mfl_last_error() ? ' [' . rotc_mfl_last_error() . ']' : '')];
+            } elseif (isset($resp['error'])) {
+                $result = ['action' => 'lineup', 'ok' => false, 'error' => is_array($resp['error']) ? ($resp['error']['message'] ?? json_encode($resp['error'])) : (string) $resp['error']];
+            } else {
+                $result = ['action' => 'lineup', 'ok' => true];
+            }
+        }
+    } elseif ($action !== '') {
+        // Drop / Trade / NFL Pick 'Em / ROTC Pick 'Em are not live-wired
+        // yet (following commits) -- mocked success so the UI still
+        // responds. These do NOT submit anything to MFL.
         $result = ['action' => $action, 'ok' => true];
     }
 }
 
-// ---- MOCK: shared context every panel uses (real source noted) ----
-// mfl_franchises() / rotc_mfl_franchise_id()
-$myFranchiseName = 'Angels of Harlem';
-$week = 6;
+// ---- LIVE: Lineup panel (mirrors franchise/submit-lineup.php) ----
+// Combined DL (DT+DE) and DB (CB+S) grouping, same as the desktop page,
+// matching this IDP league's own combined starter slot types.
+$lineup = [];
+if ($hasConfig) {
+    $lnSections = ['QB', 'RB', 'WR', 'TE', 'DL', 'LB', 'DB'];
+    $lnBucket   = ['QB'=>'QB','RB'=>'RB','WR'=>'WR','TE'=>'TE','DT'=>'DL','DE'=>'DL','LB'=>'LB','CB'=>'DB','S'=>'DB'];
 
-// ---- MOCK: Lineup panel (real source: rotc_mfl_authed_request('export','rosters',...) + projectedScores, same as franchise/submit-lineup.php) ----
-$lineup = [
-    'QB' => [
-        ['name' => 'Josh Allen', 'team' => 'BUF', 'opp' => '@ NYJ', 'proj' => 24.1, 'starting' => true],
-    ],
-    'RB' => [
-        ['name' => 'Bijan Robinson', 'team' => 'ATL', 'opp' => 'vs CAR', 'proj' => 19.4, 'starting' => true],
-        ['name' => 'De\'Von Achane', 'team' => 'MIA', 'opp' => '@ NE', 'proj' => 16.8, 'starting' => true],
-        ['name' => 'Tony Pollard', 'team' => 'TEN', 'opp' => 'vs HOU', 'proj' => 11.2, 'starting' => false],
-    ],
-    'WR' => [
-        ['name' => 'CeeDee Lamb', 'team' => 'DAL', 'opp' => '@ PHI', 'proj' => 17.9, 'starting' => true],
-        ['name' => 'Garrett Wilson', 'team' => 'NYJ', 'opp' => 'vs BUF', 'proj' => 14.3, 'starting' => true],
-        ['name' => 'Rome Odunze', 'team' => 'CHI', 'opp' => '@ GB', 'proj' => 10.6, 'starting' => false],
-    ],
-    'TE' => [
-        ['name' => 'Sam LaPorta', 'team' => 'DET', 'opp' => 'vs MIN', 'proj' => 12.0, 'starting' => true],
-    ],
-];
+    // Owner's roster for the week, via the authenticated call (not the
+    // read-only APIKEY) -- per-franchise rosters are owner-only.
+    $rosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $ownerFranchiseId, 'W' => $week]);
+    $lnRoster = mfl_normalize_list($rosterResp['rosters']['franchise']['player'] ?? null);
+    $lnRoster = array_filter($lnRoster, function ($p) {
+        $s = strtoupper((string) ($p['status'] ?? ''));
+        return strpos($s, 'IR') === false && strpos($s, 'TAXI') === false;
+    });
+
+    // Player details (name / team / position).
+    $lnDetails = [];
+    $lnIds = array_column($lnRoster, 'id');
+    if ($lnIds) {
+        foreach (array_chunk(array_unique($lnIds), 150) as $chunk) {
+            $r = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk), 'DETAILS' => 1], false);
+            foreach (mfl_normalize_list($r['players']['player'] ?? null) as $p) { $lnDetails[$p['id']] = $p; }
+        }
+    }
+
+    // This week's NFL opponent per team.
+    $lnOpp = [];
+    $lnSched = mfl_cached_get('nflSchedule', 3600, ['W' => $week], false);
+    foreach (mfl_normalize_list($lnSched['nflSchedule']['matchup'] ?? null) as $m) {
+        $teams = mfl_normalize_list($m['team'] ?? null);
+        if (count($teams) !== 2) continue;
+        [$t1, $t2] = $teams;
+        if (!empty($t1['id']) && !empty($t2['id'])) {
+            $lnOpp[$t1['id']] = ['opp' => $t2['id'], 'home' => ($t1['isHome'] ?? '0') === '1'];
+            $lnOpp[$t2['id']] = ['opp' => $t1['id'], 'home' => ($t2['isHome'] ?? '0') === '1'];
+        }
+    }
+
+    // League-scored projections for the week.
+    $lnProj = [];
+    $lnProjRaw = mfl_cached_get('projectedScores', 3600, ['W' => $week, 'COUNT' => 3000]);
+    foreach (mfl_normalize_list($lnProjRaw['projectedScores']['playerScore'] ?? null) as $row) {
+        if (!empty($row['id'])) $lnProj[$row['id']] = $row['score'] ?? null;
+    }
+
+    // Pre-check reflects only a just-submitted lineup (same limitation as
+    // the desktop page: the roster 'status' string for an already-set
+    // starter isn't confirmed live yet, so we don't pre-check from it).
+    $lnChecked = array_filter((array) ($_POST['starters'] ?? []));
+
+    $lnGrouped = array_fill_keys($lnSections, []);
+    $lnGrouped['Other'] = [];
+    foreach ($lnRoster as $p) {
+        $pd   = $lnDetails[$p['id']] ?? [];
+        $sec  = $lnBucket[$pd['position'] ?? ''] ?? 'Other';
+        $team = $pd['team'] ?? '';
+        $opp  = $lnOpp[$team] ?? null;
+        $nm   = $pd['name'] ?? ('Player #' . $p['id']);
+        if (strpos($nm, ',') !== false) { [$l, $f] = array_map('trim', explode(',', $nm, 2)); $nm = "$f $l"; }
+        $lnGrouped[$sec][] = [
+            'id'       => $p['id'],
+            'name'     => $nm,
+            'team'     => $team,
+            'opp'      => $opp ? (($opp['home'] ? 'vs ' : '@ ') . $opp['opp']) : '--',
+            'proj'     => $lnProj[$p['id']] ?? null,
+            'starting' => in_array($p['id'], $lnChecked, true),
+        ];
+    }
+    $lineup = array_filter($lnGrouped, fn($v) => !empty($v));
+}
 
 // ---- MOCK: Drop panel (real source: same rosters() call, filtered off IR/Taxi, same as franchise/drop-player.php) ----
 $droppable = [
@@ -215,26 +292,42 @@ $rotcMatchups = [
     <section class="rotc-mapp-panel panel-lineup">
       <div class="rotc-mapp-panel-head">
         <h1 class="rotc-mapp-panel-title">Lineup</h1>
-        <select class="rotc-mapp-week-select"><option>Week <?= (int) $week ?></option></select>
+        <form method="get" class="rotc-mapp-week-form">
+          <select class="rotc-mapp-week-select" name="week" onchange="this.form.submit()" aria-label="Week">
+            <?php for ($w = 1; $w <= (int) $endWeek; $w++): ?>
+              <option value="<?= $w ?>"<?= $w === (int) $week ? ' selected' : '' ?>>Week <?= $w ?></option>
+            <?php endfor; ?>
+          </select>
+          <noscript><button type="submit" class="rotc-mbtn rotc-mbtn-small">Go</button></noscript>
+        </form>
       </div>
       <?php if ($result && $result['action'] === 'lineup'): ?>
-        <div class="rotc-mapp-banner ok">Lineup submitted for Week <?= (int) $week ?>. Good luck, punk.</div>
+        <?php if ($result['ok']): ?>
+          <div class="rotc-mapp-banner ok">Lineup submitted for Week <?= (int) $week ?>. Good luck, punk.</div>
+        <?php else: ?>
+          <div class="rotc-mapp-banner err"><?= nl2br(htmlspecialchars($result['error'])) ?></div>
+        <?php endif; ?>
       <?php endif; ?>
-      <p class="rotc-mapp-blurb">Tap Start/Bench for each player. MFL's own position limits apply on submit.</p>
+      <p class="rotc-mapp-blurb">Tap Start for each player you want in. MyFantasyLeague enforces the position limits when you submit — if it doesn't fit, it'll say exactly why here.</p>
+      <?php if (!$lineup): ?>
+        <div class="rotc-mapp-card"><div class="rotc-mrow"><div class="rotc-mrow-body"><div class="rotc-mrow-meta">No roster found for Week <?= (int) $week ?>.</div></div></div></div>
+      <?php else: ?>
       <form method="post">
         <input type="hidden" name="action" value="lineup">
-        <?php foreach ($lineup as $section => $players): ?>
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+        <input type="hidden" name="week" value="<?= (int) $week ?>">
+        <?php foreach ($lineup as $section => $rows): ?>
           <p class="rotc-mapp-section-title"><?= htmlspecialchars($section) ?></p>
           <div class="rotc-mapp-card">
-            <?php foreach ($players as $i => $p): $fid = 'start_' . $section . '_' . $i; ?>
+            <?php foreach ($rows as $i => $p): $fid = 'start_' . $section . '_' . $i; ?>
               <div class="rotc-mrow">
                 <div class="rotc-mrow-body">
                   <div class="rotc-mrow-name"><?= htmlspecialchars($p['name']) ?></div>
                   <div class="rotc-mrow-meta"><?= htmlspecialchars($p['team']) ?> &middot; <?= htmlspecialchars($p['opp']) ?></div>
                 </div>
-                <div class="rotc-mrow-stat"><?= number_format($p['proj'], 1) ?><span class="rotc-mrow-stat-label">Proj</span></div>
+                <div class="rotc-mrow-stat"><?= $p['proj'] !== null ? htmlspecialchars(number_format((float) $p['proj'], 1)) : '--' ?><span class="rotc-mrow-stat-label">Proj</span></div>
                 <label class="rotc-mtoggle" for="<?= $fid ?>">
-                  <input type="checkbox" id="<?= $fid ?>" name="starters[]" value="<?= htmlspecialchars($p['name']) ?>"<?= $p['starting'] ? ' checked' : '' ?>>
+                  <input type="checkbox" id="<?= $fid ?>" name="starters[]" value="<?= htmlspecialchars($p['id']) ?>"<?= $p['starting'] ? ' checked' : '' ?>>
                   <span class="rotc-mtoggle-pill">Start</span>
                 </label>
               </div>
@@ -243,6 +336,7 @@ $rotcMatchups = [
         <?php endforeach; ?>
         <button type="submit" class="rotc-mbtn rotc-mapp-sticky-submit">Submit Lineup</button>
       </form>
+      <?php endif; ?>
     </section>
 
     <!-- ================= DROP ================= -->
