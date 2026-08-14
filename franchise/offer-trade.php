@@ -292,62 +292,9 @@ function rotc_trade_roster_list(array $roster, array $players, array $picks, str
     echo '</tbody></table></div>';
 }
 
-/**
- * All tradable DRAFT PICK assets for every franchise in the league, via
- * TYPE=assets. Player assets in that same response (a bare list of
- * {id}) are ignored here -- rosters()/mfl_franchises() already cover
- * players in the shape the rest of this file expects.
- *
- * CONFIRMED live via ?debug=assets (2026-07-18): each franchise entry
- * has currentYearDraftPicks.draftPick[] and futureYearDraftPicks.
- * draftPick[] (NOT a flat "asset" list keyed by type, as originally
- * guessed -- that field doesn't exist, which is why picks silently
- * never showed up before this fix). Each draftPick already comes with
- * a ready-to-submit id in its 'pick' field (e.g. "FP_0001_2027_1",
- * matching the FP_ format documented under tradeProposal) and a
- * ready-made human-readable 'description' (e.g. "Year 2027 Round 1
- * Draft Pick from Angels of Harlem") -- no round/suffix formatting
- * needed, MFL already did it. currentYearDraftPicks was empty for
- * every franchise in the live sample (likely because this year's
- * draft already happened), so its draftPick shape is assumed
- * symmetric with futureYearDraftPicks rather than separately confirmed.
- *
- * Returns:
- *   'byFranchise' => [franchiseId => [pickId => label]] -- for building
- *      the give-up/receive checkbox lists on the new-offer form.
- *   'all' => [pickId => label incl. owning franchise] -- for labeling a
- *      pick on either side of an existing pending trade, regardless of
- *      which franchise the id maps to.
- */
-function rotc_all_franchise_picks(array $franchises, string $myFranchiseId): array {
-    // "Access restricted to league owners" per MFL's docs -- same wording
-    // as pendingTrades/tradeBait above, which this codebase already
-    // treats as needing the logged-in owner's session cookie rather than
-    // the site's own read-only APIKEY, so this uses the same authed
-    // path rather than mfl_cached_get().
-    $resp = rotc_mfl_authed_request('export', 'assets');
-    $byFranchise = [];
-    $all = [];
-    if ($resp === null || isset($resp['error'])) return ['byFranchise' => $byFranchise, 'all' => $all];
-    foreach (mfl_normalize_list($resp['assets']['franchise'] ?? null) as $f) {
-        $fid = (string) ($f['id'] ?? '');
-        if ($fid === '') continue;
-        $picks = [];
-        $draftPicks = array_merge(
-            mfl_normalize_list($f['currentYearDraftPicks']['draftPick'] ?? null),
-            mfl_normalize_list($f['futureYearDraftPicks']['draftPick'] ?? null)
-        );
-        foreach ($draftPicks as $p) {
-            $id = (string) ($p['pick'] ?? '');
-            if ($id === '') continue;
-            $label = (string) ($p['description'] ?? $id);
-            $picks[$id] = $label;
-            $all[$id] = $label . ' (' . ($franchises[$fid]['abbrev'] ?? ($fid === $myFranchiseId ? 'you' : $fid)) . ')';
-        }
-        $byFranchise[$fid] = $picks;
-    }
-    return ['byFranchise' => $byFranchise, 'all' => $all];
-}
+// rotc_all_franchise_picks() moved to includes/mfl-api.php (shared with
+// the /mobile Trade panel). This page requires mfl-api.php above, so the
+// function is available here unchanged.
 
 /** "Marks, Woody (RB, HOU), 2027 2nd Round Pick (from Samurai Warriors)" for a pending-trade side. */
 function rotc_trade_asset_names(array $ids, array $players, array $pickLabels): string {

@@ -248,3 +248,54 @@ function rotc_acquired_label(string $franchiseId, string $playerId, string $draf
     }
     return 'Waiver/FA';
 }
+
+/**
+ * All tradable DRAFT PICK assets for every franchise in the league, via
+ * TYPE=assets. Player assets in that same response (a bare list of
+ * {id}) are ignored here -- rosters()/mfl_franchises() already cover
+ * players in the shape callers expect.
+ *
+ * Lives here (not in franchise/offer-trade.php where it started) so both
+ * that page and the /mobile Trade panel can call it -- offer-trade.php
+ * isn't a pure library (it renders a page on include), so it can't be
+ * required just for this helper.
+ *
+ * CONFIRMED live via ?debug=assets (2026-07-18): each franchise entry
+ * has currentYearDraftPicks.draftPick[] and futureYearDraftPicks.
+ * draftPick[]. Each draftPick comes with a ready-to-submit id in its
+ * 'pick' field (e.g. "FP_0001_2027_1") and a human-readable
+ * 'description'. currentYearDraftPicks was empty for every franchise in
+ * the live sample, so its shape is assumed symmetric with
+ * futureYearDraftPicks rather than separately confirmed.
+ *
+ * Returns:
+ *   'byFranchise' => [franchiseId => [pickId => label]]
+ *   'all' => [pickId => label incl. owning franchise]
+ * Requires the caller to have loaded mfl-auth.php (uses the authed call).
+ */
+function rotc_all_franchise_picks(array $franchises, string $myFranchiseId): array {
+    // "Access restricted to league owners" per MFL's docs, so this uses
+    // the logged-in owner's session cookie rather than the read-only APIKEY.
+    $resp = rotc_mfl_authed_request('export', 'assets');
+    $byFranchise = [];
+    $all = [];
+    if ($resp === null || isset($resp['error'])) return ['byFranchise' => $byFranchise, 'all' => $all];
+    foreach (mfl_normalize_list($resp['assets']['franchise'] ?? null) as $f) {
+        $fid = (string) ($f['id'] ?? '');
+        if ($fid === '') continue;
+        $picks = [];
+        $draftPicks = array_merge(
+            mfl_normalize_list($f['currentYearDraftPicks']['draftPick'] ?? null),
+            mfl_normalize_list($f['futureYearDraftPicks']['draftPick'] ?? null)
+        );
+        foreach ($draftPicks as $p) {
+            $id = (string) ($p['pick'] ?? '');
+            if ($id === '') continue;
+            $label = (string) ($p['description'] ?? $id);
+            $picks[$id] = $label;
+            $all[$id] = $label . ' (' . ($franchises[$fid]['abbrev'] ?? ($fid === $myFranchiseId ? 'you' : $fid)) . ')';
+        }
+        $byFranchise[$fid] = $picks;
+    }
+    return ['byFranchise' => $byFranchise, 'all' => $all];
+}
