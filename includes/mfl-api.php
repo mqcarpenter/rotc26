@@ -111,6 +111,74 @@ function rotc_free_agent_ids(): array {
     return $ids;
 }
 
+/**
+ * Player ids currently STARTING for a franchise in a given week, read
+ * back from a submitted lineup via TYPE=weeklyResults
+ * (matchup.franchise.player[].status == "starter"). Returned as
+ * [playerId => true] for pre-checking the lineup form; empty array when
+ * nothing is submitted yet or the read fails -- callers then fall back to
+ * the old "everything unchecked" behavior rather than guessing.
+ *
+ * NOTE: whether weeklyResults returns a lineup for an UPCOMING week
+ * (before kickoff) is not confirmed live -- pages expose a ?debug dump so
+ * this can be verified against real submitted lineups.
+ */
+function rotc_current_starter_ids(string $franchiseId, $week): array {
+    if ($franchiseId === '') return [];
+    $raw = mfl_cached_get('weeklyResults', 120, ['W' => $week]);
+    $out = [];
+    foreach (mfl_normalize_list($raw['weeklyResults']['matchup'] ?? null) as $m) {
+        foreach (mfl_normalize_list($m['franchise'] ?? null) as $fr) {
+            if ((string) ($fr['id'] ?? '') !== $franchiseId) continue;
+            foreach (mfl_normalize_list($fr['player'] ?? null) as $p) {
+                if (!empty($p['id']) && strtolower((string) ($p['status'] ?? '')) === 'starter') {
+                    $out[(string) $p['id']] = true;
+                }
+            }
+        }
+    }
+    return $out;
+}
+
+/**
+ * The set of winner ids a franchise has already picked for a given week
+ * in the NFL or Fantasy pool, read back via TYPE=pool
+ * (poolPicks.franchise[].week[]). Returned as [winnerId => true] so a
+ * pick form can pre-select the matching radio (its value is the winner's
+ * team code / franchise id). Empty when nothing is submitted or the read
+ * fails.
+ *
+ * The exact per-game shape inside a week row is NOT confirmed live (no
+ * picks existed when this league's pool code was first written), so this
+ * scans the week row defensively for any pick-like values rather than
+ * assuming one layout. Pages expose a ?debug dump to confirm it.
+ */
+function rotc_current_pool_pick_ids(string $franchiseId, string $poolType, $week): array {
+    if ($franchiseId === '') return [];
+    $raw = mfl_cached_get('pool', 120, ['POOLTYPE' => $poolType]);
+    $out = [];
+    foreach (mfl_normalize_list($raw['poolPicks']['franchise'] ?? null) as $fr) {
+        if ((string) ($fr['id'] ?? '') !== $franchiseId) continue;
+        foreach (mfl_normalize_list($fr['week'] ?? null) as $wRow) {
+            if ((int) ($wRow['week'] ?? -1) !== (int) $week) continue;
+            rotc_collect_pool_pick_values($wRow, $out);
+        }
+    }
+    return $out;
+}
+
+/** Recursively harvest 'pick' values from a pool week row (shape-agnostic). */
+function rotc_collect_pool_pick_values($node, array &$out): void {
+    if (!is_array($node)) return;
+    foreach ($node as $k => $v) {
+        if ($k === 'pick' && is_scalar($v) && (string) $v !== '') {
+            $out[(string) $v] = true;
+        } elseif (is_array($v)) {
+            rotc_collect_pool_pick_values($v, $out);
+        }
+    }
+}
+
 function mfl_normalize_list($val): array {
     if ($val === null) return [];
     if (!is_array($val)) return [];

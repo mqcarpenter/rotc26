@@ -35,6 +35,8 @@ if ($pageBase === '.') $pageBase = '';
 $result = null;
 $week = 1;
 $matchups = [];
+$pickedSet = [];
+$picksFromMfl = false;
 
 if ($hasConfig) {
     require_once $configPath;
@@ -42,6 +44,7 @@ if ($hasConfig) {
     require_once __DIR__ . '/../includes/mfl-auth.php';
     rotc_require_login($pageBase);
 
+    $franchiseId = (string) (rotc_mfl_franchise_id() ?? '');
     $leagueRaw = mfl_cached_get('league', 900);
     $startWeek = (int) ($leagueRaw['league']['nflPoolStartWeek'] ?? 1);
     $endWeekLg = (int) ($leagueRaw['league']['nflPoolEndWeek'] ?? ($leagueRaw['league']['endWeek'] ?? 17));
@@ -89,6 +92,27 @@ if ($hasConfig) {
             }
         }
     }
+
+    // Pre-select the currently-submitted picks on a plain load, so the
+    // form opens showing what you already picked. A just-submitted POST
+    // reflects the new picks instead. (?debug=pool dumps the raw shape.)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        foreach ($matchups as $m) {
+            $w = trim((string) ($_POST['pick_' . $m['away'] . '_' . $m['home']] ?? ''));
+            if ($w !== '') $pickedSet[$w] = true;
+        }
+    } else {
+        $pickedSet = rotc_current_pool_pick_ids($franchiseId, 'NFL', $week);
+    }
+    $picksFromMfl = $pickedSet && $_SERVER['REQUEST_METHOD'] !== 'POST';
+
+    if (($_GET['debug'] ?? '') === 'pool') {
+        header('Content-Type: text/plain');
+        echo "franchise=$franchiseId week=$week\n\nRAW pool (NFL):\n";
+        print_r(mfl_cached_get('pool', 0, ['POOLTYPE' => 'NFL']));
+        echo "\nPARSED picks:\n"; print_r(rotc_current_pool_pick_ids($franchiseId, 'NFL', $week));
+        exit;
+    }
 }
 
 include __DIR__ . '/../templates/header.php';
@@ -115,6 +139,9 @@ include __DIR__ . '/../templates/header.php';
           </select>
         </form>
 
+        <?php if ($picksFromMfl): ?>
+          <p class="rotc-login-blurb" style="color:var(--accent);font-weight:600;">✓ Showing your currently-submitted Week <?= (int) $week ?> picks — change any and re-submit to update them.</p>
+        <?php endif; ?>
         <?php if (!$matchups): ?>
           <p>No NFL schedule found for Week <?= (int) $week ?> yet.</p>
         <?php else: ?>
@@ -124,8 +151,8 @@ include __DIR__ . '/../templates/header.php';
             <?php foreach ($matchups as $m): $fname = 'pick_' . $m['away'] . '_' . $m['home']; ?>
               <div class="rotc-pool-matchup">
                 <span><?= htmlspecialchars($m['away']) ?> @ <?= htmlspecialchars($m['home']) ?></span>
-                <label><input type="radio" name="<?= htmlspecialchars($fname) ?>" value="<?= htmlspecialchars($m['away']) ?>"> <?= htmlspecialchars($m['away']) ?></label>
-                <label><input type="radio" name="<?= htmlspecialchars($fname) ?>" value="<?= htmlspecialchars($m['home']) ?>"> <?= htmlspecialchars($m['home']) ?></label>
+                <label><input type="radio" name="<?= htmlspecialchars($fname) ?>" value="<?= htmlspecialchars($m['away']) ?>"<?= isset($pickedSet[$m['away']]) ? ' checked' : '' ?>> <?= htmlspecialchars($m['away']) ?></label>
+                <label><input type="radio" name="<?= htmlspecialchars($fname) ?>" value="<?= htmlspecialchars($m['home']) ?>"<?= isset($pickedSet[$m['home']]) ? ' checked' : '' ?>> <?= htmlspecialchars($m['home']) ?></label>
               </div>
             <?php endforeach; ?>
             <button type="submit" class="rotc-btn">Submit Picks</button>

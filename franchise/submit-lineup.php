@@ -88,6 +88,22 @@ if ($hasConfig) {
         }
     }
 
+    // Pre-check the currently-submitted lineup on a plain page load, so
+    // the form opens showing your existing starters instead of an empty
+    // slate. A just-submitted POST above already populated $checked; only
+    // fall back to the MFL read when it didn't. (weeklyResults starter
+    // status -- see rotc_current_starter_ids(); ?debug=lineup dumps it.)
+    if (!$checked) $checked = array_keys(rotc_current_starter_ids($franchiseId, $week));
+    $lineupFromMfl = (bool) $checked && $_SERVER['REQUEST_METHOD'] !== 'POST';
+
+    if (($_GET['debug'] ?? '') === 'lineup') {
+        header('Content-Type: text/plain');
+        echo "franchise=$franchiseId week=$week\n\nRAW weeklyResults:\n";
+        print_r(mfl_cached_get('weeklyResults', 0, ['W' => $week]));
+        echo "\nPARSED starters:\n"; print_r(rotc_current_starter_ids($franchiseId, $week));
+        exit;
+    }
+
     // Owner's own roster for the selected week, via the AUTHENTICATED
     // call (not the site APIKEY) -- rosters for a specific FRANCHISE on
     // a private league are owner-only, same access rule as everything
@@ -246,6 +262,9 @@ if ($hasConfig) {
               $sectioned[$bucket ?? 'Other'][] = $p;
           }
         ?>
+          <?php if (!empty($lineupFromMfl)): ?>
+            <p class="rotc-login-blurb" style="color:var(--accent);font-weight:600;">✓ Showing your currently-submitted Week <?= (int) $week ?> lineup — change any Start boxes and re-submit to update it.</p>
+          <?php endif; ?>
           <form method="post" class="rotc-lineup-form">
             <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
             <input type="hidden" name="week" value="<?= (int) $week ?>">
