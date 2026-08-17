@@ -782,22 +782,17 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
    burger menu -- this IS the "top level menu item" the mobile hub
    needed. Placed first in the menu (see header.php) so it's the
    first thing a thumb hits opening the burger on a phone. */
-.rotc-manage-pill{
-  display:flex; align-items:center; gap:6px;
-  padding:8px 16px !important;
-  border-radius:999px;
-  background:var(--accent);
-  color:var(--on-ink) !important;
-  border-bottom:none !important;
-  text-transform:none;
-  letter-spacing:normal;
-  font-weight:700;
-}
-.rotc-manage-pill:hover{ background:#c8481a; color:var(--on-ink) !important; }
-.rotc-manage-pill svg{ width:16px; height:16px; flex:none; }
-.rotc-manage-pill::after{ content:none !important; } /* suppress mobile "+" indicator -- not a dropdown */
+/* Icon-only Manage link, sat next to the WhatsApp icon at the right of
+   the bar (same icon-link treatment as .rotc-whatsapp-link). */
+.rotc-manage-link{ display:flex; align-items:center; justify-content:center; padding:20px 4px; color:rgba(253,251,247,.82); }
+.rotc-manage-link:hover{ color:var(--accent); }
+.rotc-manage-link::after{ content:none !important; } /* not a dropdown -- suppress mobile "+" */
 @media (max-width:1100px){
-  .rotc-manage-pill{ display:inline-flex; margin:8px 4px 4px; }
+  /* In the stacked burger menu, show a label alongside the icon so the
+     row reads like the rest of the menu rather than a bare glyph. */
+  .rotc-manage-link{ justify-content:flex-start; padding:12px 4px; gap:10px; }
+  .rotc-manage-link::before{ content:"Manage"; font-family:"Roboto Condensed",sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:14px; order:2; }
+  .rotc-manage-link svg{ order:1; }
 }
 
 /* ---- 13. MANAGE HUB (franchise/manage.php) -------------------- */

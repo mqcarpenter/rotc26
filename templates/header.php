@@ -221,19 +221,6 @@ $tabs = [
     <input type="checkbox" id="rotc-burger" class="rotc-burger">
     <label for="rotc-burger" class="rotc-burger-btn">&#9776;</label>
     <ul class="rotc-menu">
-      <!-- Manage: new top-level entry point (not a dropdown) to
-           franchise/manage.php, the mobile task hub -- the five things
-           an owner actually does mid-week (lineup, drops, trades, both
-           pick 'ems) as one tap-friendly screen instead of digging
-           through the Franchise mega-menu below. Placed first so it's
-           the first thing a thumb hits opening the burger on a phone.
-           Mock-data pass, see franchise/manage.php's own doc comment. -->
-      <li class="rotc-item rotc-manage">
-        <a class="rotc-top rotc-manage-pill" href="<?= $base ?>/mobile" title="Manage: lineup, drops, trades, pick 'em">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h6M9 8h2"/></svg>
-          <span>Manage</span>
-        </a>
-      </li>
       <?php foreach ($nav_items as $label => $item): ?>
         <?php $slug = strtolower(str_replace([' ', '&'], ['-', 'and'], $label)); ?>
         <li class="rotc-item<?= $item['wide'] ? ' wide' : '' ?>">
@@ -259,6 +246,14 @@ $tabs = [
           </ul>
         </li>
       <?php endforeach; ?>
+      <!-- Manage: icon entry point to /mobile, the owner task hub
+           (lineup, drops, trades, pick 'ems). Icon-only, sat next to the
+           WhatsApp icon at the right of the bar. -->
+      <li class="rotc-item rotc-manage">
+        <a class="rotc-top rotc-manage-link" href="<?= $base ?>/mobile" title="Manage: lineup, drops, trades, pick 'em" aria-label="Manage your team on mobile">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+        </a>
+      </li>
       <li class="rotc-item rotc-whatsapp">
         <a class="rotc-top rotc-whatsapp-link" href="https://chat.whatsapp.com/HaQkAJiqi90IEmhnoqhlBr" target="_blank" rel="noopener" title="Join the league WhatsApp group" aria-label="Join the league WhatsApp group">
           <svg viewBox="0 0 32 32" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M16.004 3C9.376 3 4 8.373 4 15c0 2.315.646 4.478 1.768 6.32L4 29l7.86-1.717A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3zm6.99 16.845c-.297.836-1.47 1.53-2.412 1.73-.642.135-1.48.243-4.302-.924-3.61-1.494-5.933-5.156-6.115-5.394-.176-.238-1.464-1.95-1.464-3.72s.914-2.64 1.24-3.003c.297-.33.652-.412.87-.412.218 0 .436.002.626.011.2.01.47-.076.735.561.297.703.965 2.34 1.05 2.51.088.17.147.37.03.6-.117.23-.176.373-.35.574-.176.202-.37.45-.53.605-.176.17-.36.354-.155.694.206.34.916 1.51 1.966 2.446 1.35 1.204 2.49 1.577 2.83 1.755.34.176.54.147.74-.089.2-.235.85-.99 1.078-1.33.23-.34.46-.283.77-.17.31.117 1.98.933 2.32 1.102.34.17.564.253.647.394.083.14.083.813-.214 1.65z"/></svg>
