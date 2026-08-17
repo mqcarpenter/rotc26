@@ -252,6 +252,41 @@ a:hover{ color:var(--accent); }
   .rotc-sub a:hover{ background:rgba(224,83,27,.15); color:var(--accent); }
 }
 
+/* ---- Draft Day announcement banner (front page) ---------- */
+.rotc-draft-banner{
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  background:linear-gradient(135deg,#3a2013 0%,var(--ink) 55%,#160c05 100%);
+  border:1px solid rgba(224,83,27,.55); border-left:5px solid var(--accent);
+  border-radius:var(--radius); padding:18px 22px; margin:0 0 18px;
+  box-shadow:0 10px 26px -14px rgba(42,24,16,.5);
+}
+.rotc-draft-banner-body{ flex:1 1 260px; min-width:0; }
+.rotc-draft-eyebrow{
+  font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.14em;
+  font-size:11px; font-weight:700; color:var(--accent); margin:0 0 4px;
+}
+.rotc-draft-title{
+  font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.02em;
+  font-size:22px; font-weight:700; color:var(--on-ink); line-height:1.1; margin:0;
+}
+.rotc-draft-when{ color:rgba(253,251,247,.82); font-size:14px; margin:6px 0 0; }
+.rotc-draft-when strong{ color:#fff; }
+.rotc-draft-cta{
+  flex:none; display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+  font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.06em;
+  font-weight:700; font-size:15px; color:#fff; text-decoration:none;
+  background:linear-gradient(135deg,#F0692F,#E0531B 58%,#C0410F);
+  padding:13px 22px; border-radius:10px; box-shadow:0 8px 20px -8px rgba(224,83,27,.7);
+  transition:filter .15s, transform .08s;
+}
+.rotc-draft-cta:hover{ filter:brightness(1.07); }
+.rotc-draft-cta:active{ transform:translateY(1px); }
+@media (max-width:560px){
+  .rotc-draft-banner{ padding:16px 18px; }
+  .rotc-draft-title{ font-size:19px; }
+  .rotc-draft-cta{ width:100%; justify-content:center; }
+}
+
 /* ---- 7. TAB BAR (was .myfantasyleague_tabmenu) --------------
    Your own tabs now, not MFL's — ghost style: pill-shaped outline,
    no solid fill. Active tab gets a ring instead of the old filled-

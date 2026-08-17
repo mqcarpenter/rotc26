@@ -81,6 +81,26 @@ const ROTC_HOME_NFL_ABBR = [
 <div class="home-grid">
  <main class="home-main">
     <?php
+    // Draft Day announcement. Shown until the draft start passes, then
+    // auto-hides. Edit the date/time and league draft-room URL here.
+    $draftStartTs   = strtotime('2026-08-22 19:00:00 America/New_York');
+    $draftRoomUrl   = 'https://www42.myfantasyleague.com/2026/ajax_ld?L=' . (defined('MFL_LEAGUE_ID') ? MFL_LEAGUE_ID : '67102');
+    if (time() < $draftStartTs):
+    ?>
+    <div class="rotc-draft-banner">
+      <div class="rotc-draft-banner-body">
+        <p class="rotc-draft-eyebrow">🏈 Draft Day</p>
+        <h2 class="rotc-draft-title">The 2026 Draft Is Set</h2>
+        <p class="rotc-draft-when"><strong>Friday, August 22 · 7:00 PM ET.</strong> Get your rankings ready — the live draft room opens right here.</p>
+      </div>
+      <a class="rotc-draft-cta" href="<?= htmlspecialchars($draftRoomUrl) ?>" target="_blank" rel="noopener"
+         onclick="window.open(this.href,'rotc_live_draft','width=1200,height=850,resizable=yes,scrollbars=yes'); return false;">
+        Enter Draft Room &rarr;
+      </a>
+    </div>
+    <?php endif; ?>
+
+    <?php
     require_once __DIR__ . '/includes/wp-hero-feed.php';
     $fetchedSlides = rotc_fetch_hero_slides(5, $base . '/assets/hero/placeholder-1.jpg');
     if ($fetchedSlides) { $slides = $fetchedSlides; }
