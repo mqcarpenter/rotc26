@@ -93,10 +93,13 @@ const ROTC_HOME_NFL_ABBR = [
         <h2 class="rotc-draft-title">The 2026 Draft Is Set</h2>
         <p class="rotc-draft-when"><strong>Friday, August 22 · 7:00 PM ET.</strong> Get your rankings ready — the live draft room opens right here.</p>
       </div>
-      <a class="rotc-draft-cta" href="<?= htmlspecialchars($draftRoomUrl) ?>" target="_blank" rel="noopener"
-         onclick="window.open(this.href,'rotc_live_draft','width=1200,height=850,resizable=yes,scrollbars=yes'); return false;">
-        Enter Draft Room &rarr;
-      </a>
+      <div style="display:flex;flex-direction:column;gap:8px;flex:none;">
+        <a class="rotc-draft-cta" href="<?= htmlspecialchars($draftRoomUrl) ?>" target="_blank" rel="noopener"
+           onclick="window.open(this.href,'rotc_live_draft','width=1200,height=850,resizable=yes,scrollbars=yes'); return false;">
+          Enter Draft Room &rarr;
+        </a>
+        <a href="<?= $base ?>/draft-board" style="text-align:center;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;letter-spacing:.06em;font-weight:700;font-size:12px;color:rgba(253,251,247,.85);text-decoration:none;border:1px solid rgba(253,251,247,.3);border-radius:8px;padding:8px 14px;">📺 Live Big Board</a>
+      </div>
     </div>
     <?php endif; ?>
 

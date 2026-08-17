@@ -135,6 +135,7 @@ $nav_items = [
   // Matteo's request. keepers.php still exists at draft-auction/keepers.php
   // (not deleted, just unlinked) in case it's wanted back later.
   'Draft & Auction' => ['wide' => false, 'sub' => [
+    ['🔴 Live Draft Board', "$base/draft-board"],
     ['Draft Results', "$base/draft-auction/draft-results"],
     ['ADP Report', "$base/draft-auction/adp-report"],
     ['Auction Results', "$base/draft-auction/auction-results"],
