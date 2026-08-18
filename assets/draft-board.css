@@ -28,7 +28,12 @@ html,body{ margin:0; }
 /* On the clock hero */
 .db-clock{ display:flex; align-items:center; gap:22px; flex-wrap:wrap; padding:18px 22px; background:linear-gradient(120deg, var(--db-panel-2), var(--db-panel)); border-bottom:1px solid var(--db-line); }
 .db-clock-badge{ font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.16em; font-size:12px; font-weight:700; color:var(--db-accent); }
-.db-clock-helmet{ width:120px; height:120px; object-fit:contain; flex:none; filter:drop-shadow(0 8px 18px rgba(0,0,0,.55)); }
+/* Helmet art has a white background (JPGs) or transparency (a few PNGs);
+   put every helmet on a white rounded tile so they read consistently on
+   the dark board instead of showing raw white rectangles. */
+.db-helmet{ background:#fff; border-radius:10px; object-fit:contain; padding:3px; box-shadow:0 2px 6px rgba(0,0,0,.4); }
+.db-flip{ transform:scaleX(-1); }
+.db-clock-helmet{ width:120px; height:120px; flex:none; }
 .db-clock-main{ flex:1 1 240px; min-width:0; }
 .db-clock-team{ font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.02em; font-weight:700; font-size:30px; line-height:1.05; margin:2px 0; }
 .db-clock-sub{ color:var(--db-muted); font-size:15px; }
@@ -39,7 +44,7 @@ html,body{ margin:0; }
 .db-ondeck-label{ font-size:10px; text-transform:uppercase; letter-spacing:.14em; color:var(--db-muted); margin-bottom:6px; }
 .db-ondeck-row{ display:flex; gap:8px; flex-wrap:wrap; }
 .db-ondeck-chip{ display:inline-flex; align-items:center; gap:8px; background:rgba(0,0,0,.28); border:1px solid var(--db-line); border-radius:999px; padding:5px 14px 5px 5px; font-size:13px; font-weight:700; }
-.db-ondeck-chip img{ width:32px; height:32px; object-fit:contain; }
+.db-ondeck-chip img{ width:34px; height:34px; }
 
 /* Main split */
 .db-main{ display:grid; grid-template-columns:1fr 340px; gap:0; align-items:stretch; }
@@ -55,7 +60,7 @@ html,body{ margin:0; }
 @keyframes db-clockglow{ 50%{ box-shadow:0 0 0 2px rgba(224,83,27,.7), 0 0 26px rgba(224,83,27,.4); } }
 .db-cell.just{ animation:db-flash 1.8s ease-out; }
 @keyframes db-flash{ 0%{ box-shadow:0 0 0 3px var(--db-live), 0 0 34px rgba(55,194,107,.65); } 100%{ box-shadow:none; } }
-.db-cell img.h{ width:42px; height:42px; flex:none; object-fit:contain; filter:drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+.db-cell img.h{ width:44px; height:44px; flex:none; }
 .db-cell-body{ min-width:0; flex:1 1 auto; }
 .db-cell-name{ font-family:"Roboto Condensed",sans-serif; font-weight:700; font-size:15px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .db-cell-meta{ font-size:11px; color:var(--db-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -70,6 +75,8 @@ html,body{ margin:0; }
 .db-best-sub{ color:var(--db-muted); font-size:11px; margin:0 0 12px; }
 .db-best-item{ display:flex; align-items:center; gap:10px; padding:8px 6px; border-bottom:1px solid var(--db-line); }
 .db-best-item:last-child{ border-bottom:0; }
+.db-best-item.db-filled{ opacity:.5; }
+.db-filled-tag{ font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--db-muted); border:1px solid var(--db-line); border-radius:4px; padding:0 5px; }
 .db-ph{ width:40px; height:40px; border-radius:8px; flex:none; object-fit:cover; background:var(--db-panel-2); }
 .db-ph-fallback{ width:40px; height:40px; border-radius:8px; flex:none; display:flex; align-items:center; justify-content:center; font-family:"Roboto Condensed",sans-serif; font-weight:700; font-size:13px; color:#fff; }
 .db-best-body{ flex:1 1 auto; min-width:0; }

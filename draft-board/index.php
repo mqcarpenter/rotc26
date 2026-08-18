@@ -80,6 +80,9 @@ let prevMade = -1;
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const initials = n => (n||'').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+// Helmet <img> on a white tile, flipped so every helmet faces the same way.
+const helmet = (row, cls) => row && row.helmet
+  ? `<img class="${cls} db-helmet${row.helmetFlip?' db-flip':''}" src="${esc(row.helmet)}" alt="">` : '';
 
 function photo(pl, cls){
   if (!pl.photo)
@@ -109,9 +112,9 @@ function renderClock(){
   const c = state.onClock;
   if (!c){ el.innerHTML = `<div class="db-clock-main"><div class="db-clock-badge">Waiting for the draft to begin…</div></div>`; return; }
   const deck = (state.onDeck||[]).map(d =>
-    `<span class="db-ondeck-chip">${d.helmet?`<img src="${esc(d.helmet)}" alt="">`:''}${esc(d.teamName)}</span>`).join('');
+    `<span class="db-ondeck-chip">${helmet(d,'')}${esc(d.teamName)}</span>`).join('');
   el.innerHTML = `
-    ${c.helmet?`<img class="db-clock-helmet" src="${esc(c.helmet)}" alt="">`:''}
+    ${helmet(c,'db-clock-helmet')}
     <div class="db-clock-main">
       <div class="db-clock-badge">🪖 On the Clock</div>
       <div class="db-clock-team">${esc(c.teamName)}</div>
@@ -142,7 +145,7 @@ function renderBoard(){
         const pl = p.player;
         const just = p.overall === newestOverall ? ' just' : '';
         html += `<div class="db-cell${just}" style="border-left-color:${pl.color}">
-          ${p.helmet?`<img class="h" src="${esc(p.helmet)}" alt="">`:''}
+          ${helmet(p,'h')}
           <div class="db-cell-body">
             <div class="db-cell-name">${esc(pl.name)}</div>
             <div class="db-cell-meta"><span class="db-cell-pos" style="background:${pl.color}">${esc(pl.pos)}</span>${esc(pl.team||'FA')} · ${esc(p.teamName)}</div>
@@ -150,7 +153,7 @@ function renderBoard(){
       } else {
         const oc = state.onClock && state.onClock.overall === p.overall;
         html += `<div class="db-cell empty${oc?' onclock':''}">
-          ${p.helmet?`<img class="h" src="${esc(p.helmet)}" alt="">`:''}
+          ${helmet(p,'h')}
           <div class="db-cell-body">
             ${oc?`<div class="db-cell-onclocklabel">On the clock</div>`:`<div class="db-cell-team">${esc(p.teamName)}</div>`}
           </div><div class="db-cell-num">${p.overall}</div></div>`;
@@ -164,11 +167,11 @@ function renderBoard(){
 function renderBest(){
   const el = document.getElementById('db-best');
   el.innerHTML = (state.best||[]).map(pl => `
-    <div class="db-best-item">
+    <div class="db-best-item${pl.filled?' db-filled':''}">
       ${photo(pl,'db-ph')}
       <div class="db-best-body">
         <div class="db-best-name">${esc(pl.name)}</div>
-        <div class="db-best-meta"><span class="db-pos-badge" style="background:${pl.color}">${esc(pl.posRank||pl.pos)}</span> ${esc(pl.team||'FA')}</div>
+        <div class="db-best-meta"><span class="db-pos-badge" style="background:${pl.color}">${esc(pl.posRank||pl.pos)}</span> ${esc(pl.team||'FA')}${pl.filled?' <span class="db-filled-tag">starters set</span>':''}</div>
       </div>
       <div class="db-best-proj"><div class="v">${pl.proj!=null?pl.proj.toFixed(1):'—'}</div><div class="l">Proj</div></div>
     </div>`).join('') || '<p class="db-best-sub">No projections available yet.</p>';
@@ -179,7 +182,7 @@ function toastNewPick(){
   // newest made pick = highest overall among made
   let newest=null; for(const p of state.picks){ if(p.made && p.player && (!newest||p.overall>newest.overall)) newest=p; }
   if(!newest) return;
-  el.innerHTML = `${newest.helmet?`<img src="${esc(newest.helmet)}" alt="">`:''}
+  el.innerHTML = `${helmet(newest,'')}
     <div><div class="who">${esc(newest.teamName)} select</div><div class="what" style="color:${newest.player.color}">${esc(newest.player.name)} <span style="color:var(--db-muted);font-size:13px">${esc(newest.player.pos)}</span></div></div>`;
   el.classList.add('show');
   clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('show'), 5000);

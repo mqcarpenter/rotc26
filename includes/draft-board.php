@@ -140,8 +140,24 @@ function rotc_draft_parse_xml(string $body): ?array {
  */
 function rotc_draft_build_state(): array {
     $franchises = mfl_franchises();
+    $numTeams   = max(1, count($franchises));
     $feed = rotc_draft_fetch_results();
     $picks = $feed['picks'];
+
+    // League-wide "starter demand" per position bucket = the minimum
+    // starters each team must play there x number of teams. Once that many
+    // are drafted, everyone can fill that starting slot, so the position
+    // stops being a priority on the best-available board (a QB shouldn't
+    // headline the board once all 16 teams can start one).
+    $league = mfl_cached_get('league', 3600);
+    $needByBucket = [];
+    foreach (mfl_normalize_list($league['league']['starters']['position'] ?? null) as $pos) {
+        $name = (string) ($pos['name'] ?? '');
+        $min  = (int) (explode('-', (string) ($pos['limit'] ?? '0'))[0]);
+        // Starter slot names use combined IDP groups; map to our buckets.
+        $bucket = ['DT+DE' => 'DL', 'CB+S' => 'DB'][$name] ?? $name;
+        if ($bucket !== '') $needByBucket[$bucket] = ($needByBucket[$bucket] ?? 0) + $min * $numTeams;
+    }
 
     // Player DB (name/pos/team) -- one cached full-DB call.
     $playersDb = [];
@@ -189,6 +205,7 @@ function rotc_draft_build_state(): array {
             'teamName'  => $fr['name'] ?? ('Franchise ' . $p['franchise']),
             'teamAbbr'  => $fr['abbrev'] ?? $p['franchise'],
             'helmet'    => rotc_helmet_src($p['franchise']) ?: '',
+            'helmetFlip'=> rotc_helmet_flip($p['franchise']),
             'made'      => $p['player'] !== '',
             'ts'        => $p['ts'],
             'player'    => $p['player'] !== '' ? $mkPlayer($p['player']) : null,
@@ -223,13 +240,33 @@ function rotc_draft_build_state(): array {
         usort($list, fn($a, $b) => $b[1] <=> $a[1]);
         foreach ($list as $i => $row) { $posRank[$row[0]] = $i + 1; }
     }
-    // Remaining players by projected points, descending.
+    // How many at each bucket already drafted -> which positions have their
+    // league-wide starter demand met (so they get demoted below).
+    $draftedByBucket = [];
+    foreach (array_keys($pickedIds) as $pid) {
+        $b = rotc_draft_pos_meta($playersDb[$pid]['position'] ?? '')['bucket'];
+        $draftedByBucket[$b] = ($draftedByBucket[$b] ?? 0) + 1;
+    }
+    $bucketFilled = function (string $b) use ($needByBucket, $draftedByBucket): bool {
+        $need = $needByBucket[$b] ?? 0;
+        return $need > 0 && ($draftedByBucket[$b] ?? 0) >= $need;   // starters covered league-wide
+    };
+
+    // Remaining players: still-needed positions first (by projected
+    // points), then positions whose starters are already filled -- so a
+    // filled position (e.g. QB once every team can start one) drops off the
+    // top of the board instead of headlining it.
     $remaining = array_filter($projRows, fn($pid) => !isset($pickedIds[$pid]), ARRAY_FILTER_USE_KEY);
-    uasort($remaining, fn($a, $b) => $b['proj'] <=> $a['proj']);
+    uasort($remaining, function ($a, $b) use ($bucketFilled) {
+        $fa = $bucketFilled($a['bucket']) ? 1 : 0;
+        $fb = $bucketFilled($b['bucket']) ? 1 : 0;
+        return ($fa <=> $fb) ?: ($b['proj'] <=> $a['proj']);
+    });
     $best = [];
     foreach (array_keys($remaining) as $pid) {
         $pl = $mkPlayer((string) $pid);
         $pl['posRank'] = $pl['pos'] . ($posRank[$pid] ?? '');
+        $pl['filled']  = $bucketFilled($pl['pos']);   // starters covered league-wide
         $best[] = $pl;
         if (count($best) >= 32) break;
     }
