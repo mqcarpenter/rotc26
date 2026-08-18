@@ -75,8 +75,6 @@ html,body{ margin:0; }
 .db-best-sub{ color:var(--db-muted); font-size:11px; margin:0 0 12px; }
 .db-best-item{ display:flex; align-items:center; gap:10px; padding:8px 6px; border-bottom:1px solid var(--db-line); }
 .db-best-item:last-child{ border-bottom:0; }
-.db-best-item.db-filled{ opacity:.5; }
-.db-filled-tag{ font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--db-muted); border:1px solid var(--db-line); border-radius:4px; padding:0 5px; }
 .db-ph{ width:40px; height:40px; border-radius:8px; flex:none; object-fit:cover; background:var(--db-panel-2); }
 .db-ph-fallback{ width:40px; height:40px; border-radius:8px; flex:none; display:flex; align-items:center; justify-content:center; font-family:"Roboto Condensed",sans-serif; font-weight:700; font-size:13px; color:#fff; }
 .db-best-body{ flex:1 1 auto; min-width:0; }

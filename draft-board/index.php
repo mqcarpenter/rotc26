@@ -66,7 +66,7 @@ if ($hasConfig) {
   <div class="db-board" id="db-board"></div>
   <aside class="db-best">
     <h2 class="db-best-head">Best Available</h2>
-    <p class="db-best-sub">By our league's projected points · position rank</p>
+    <p class="db-best-sub" id="db-best-sub">By our league's projected points · position rank</p>
     <div id="db-best"></div>
   </aside>
 </div>
@@ -165,16 +165,25 @@ function renderBoard(){
 }
 
 function renderBest(){
+  // Subtitle reflects who the list is tailored to + which starting slots
+  // they still need.
+  const sub = document.getElementById('db-best-sub');
+  if (state.bestFor && (state.bestNeeds||[]).length)
+    sub.innerHTML = `For <b style="color:var(--db-ink)">${esc(state.bestFor)}</b> · still needs ${state.bestNeeds.map(esc).join(', ')}`;
+  else if (state.bestFor)
+    sub.innerHTML = `For <b style="color:var(--db-ink)">${esc(state.bestFor)}</b> · starters set — best overall`;
+  else
+    sub.textContent = "By our league's projected points";
   const el = document.getElementById('db-best');
   el.innerHTML = (state.best||[]).map(pl => `
-    <div class="db-best-item${pl.filled?' db-filled':''}">
+    <div class="db-best-item">
       ${photo(pl,'db-ph')}
       <div class="db-best-body">
         <div class="db-best-name">${esc(pl.name)}</div>
-        <div class="db-best-meta"><span class="db-pos-badge" style="background:${pl.color}">${esc(pl.posRank||pl.pos)}</span> ${esc(pl.team||'FA')}${pl.filled?' <span class="db-filled-tag">starters set</span>':''}</div>
+        <div class="db-best-meta"><span class="db-pos-badge" style="background:${pl.color}">${esc(pl.posRank||pl.pos)}</span> ${esc(pl.team||'FA')}</div>
       </div>
       <div class="db-best-proj"><div class="v">${pl.proj!=null?pl.proj.toFixed(1):'—'}</div><div class="l">Proj</div></div>
-    </div>`).join('') || '<p class="db-best-sub">No projections available yet.</p>';
+    </div>`).join('') || '<p class="db-best-sub">No players available.</p>';
 }
 
 function toastNewPick(){
