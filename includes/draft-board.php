@@ -143,7 +143,7 @@ function rotc_draft_parse_xml(string $body): ?array {
  * The full board state for rendering. Joins the live feed against
  * franchises/helmets, the player DB, ADP, and Week 1 projections.
  */
-function rotc_draft_build_state(): array {
+function rotc_draft_build_state(bool $demo = false): array {
     $franchises = mfl_franchises();
     $numTeams   = max(1, count($franchises));
     $feed = rotc_draft_fetch_results();
@@ -190,6 +190,27 @@ function rotc_draft_build_state(): array {
             'photo' => rotc_draft_photo_url((string) ($pd['espn_id'] ?? '')),
         ];
     };
+
+    // Demo mode (/draft-board?demo=1): the real draft has no picks yet, so
+    // fill the first slots with the top projected players in draft order,
+    // purely so the board can be previewed live (real helmets/photos/
+    // projections). Does NOT touch MFL. Never triggers when real picks
+    // already exist.
+    if ($demo && !array_filter($picks, fn($p) => $p['player'] !== '')) {
+        $ranked = [];
+        foreach ($proj as $pid => $s) { if ($s !== '' && isset($playersDb[$pid])) $ranked[$pid] = (float) $s; }
+        arsort($ranked);
+        $ranked = array_keys($ranked);
+        $now = time(); $i = 0; $fill = 22;
+        foreach ($picks as $k => $p) {
+            if ($i >= $fill) break;
+            if ($p['player'] === '' && isset($ranked[$i])) {
+                $picks[$k]['player'] = $ranked[$i];
+                $picks[$k]['ts'] = $now - ($fill - $i) * 40;   // staggered so the timer reads sensibly
+                $i++;
+            }
+        }
+    }
 
     // Split made vs pending; on-clock = first pending, on-deck = next few.
     $made = []; $pending = []; $pickedIds = [];

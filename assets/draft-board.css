@@ -23,6 +23,7 @@ html,body{ margin:0; }
 .db-live .dot{ width:8px; height:8px; border-radius:50%; background:var(--db-live); animation:db-pulse 1.8s infinite; }
 .db-live.stale{ color:var(--db-muted); background:rgba(138,122,108,.12); } .db-live.stale .dot{ background:var(--db-muted); animation:none; }
 @keyframes db-pulse{ 0%{box-shadow:0 0 0 0 rgba(26,157,87,.5);} 70%{box-shadow:0 0 0 7px rgba(26,157,87,0);} 100%{box-shadow:0 0 0 0 rgba(26,157,87,0);} }
+.db-demo{ font-family:"Roboto Condensed",sans-serif; text-transform:uppercase; letter-spacing:.1em; font-size:11px; font-weight:700; color:var(--db-accent); background:rgba(224,83,27,.1); border:1px solid rgba(224,83,27,.4); border-radius:999px; padding:3px 10px; }
 .db-top-meta{ margin-left:auto; display:flex; align-items:center; gap:16px; color:var(--db-muted); font-size:12px; }
 .db-fs{ background:none; border:1px solid var(--db-line); color:var(--db-muted); border-radius:9px; padding:7px 13px; cursor:pointer; font-size:12px; font-weight:600; }
 .db-fs:hover{ color:var(--db-accent); border-color:var(--db-accent); }

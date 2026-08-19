@@ -23,4 +23,4 @@ require_once dirname(__DIR__) . '/includes/mfl-api.php';
 require_once dirname(__DIR__) . '/includes/helmets.php';
 require_once dirname(__DIR__) . '/includes/draft-board.php';
 
-echo json_encode(rotc_draft_build_state(), JSON_UNESCAPED_SLASHES);
+echo json_encode(rotc_draft_build_state(!empty($_GET['demo'])), JSON_UNESCAPED_SLASHES);

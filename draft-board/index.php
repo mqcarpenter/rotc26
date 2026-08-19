@@ -19,6 +19,7 @@ $docRoot    = rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? ''), '/'
 $base = ($docRoot !== '' && strpos($siteRootFs, $docRoot) === 0) ? substr($siteRootFs, strlen($docRoot)) : '';
 if ($base === '.') $base = '';
 
+$demo = !empty($_GET['demo']);
 $initial = ['picks' => [], 'best' => [], 'onClock' => null, 'onDeck' => [], 'madeCount' => 0, 'totalPicks' => 0, 'source' => 'none'];
 $leagueName = 'Return of the Champions';
 if ($hasConfig) {
@@ -28,7 +29,7 @@ if ($hasConfig) {
     require_once dirname(__DIR__) . '/includes/draft-board.php';
     $lg = mfl_cached_get('league', 3600);
     $leagueName = $lg['league']['name'] ?? $leagueName;
-    $initial = rotc_draft_build_state();
+    $initial = rotc_draft_build_state($demo);
 }
 ?>
 <!DOCTYPE html>
@@ -52,6 +53,7 @@ if ($hasConfig) {
 <header class="db-top">
   <img src="<?= $base ?>/assets/img/rotc-icon.png" alt="">
   <span class="db-top-title"><?= htmlspecialchars($leagueName) ?> — Draft</span>
+  <?php if ($demo): ?><span class="db-demo">Demo preview</span><?php endif; ?>
   <span class="db-live" id="db-live"><span class="dot"></span> Live</span>
   <div class="db-top-meta">
     <span id="db-progress"></span>
@@ -75,6 +77,7 @@ if ($hasConfig) {
 
 <script>
 const BASE = <?= json_encode($base) ?>;
+const DEMO = <?= $demo ? 'true' : 'false' ?>;
 let state = <?= json_encode($initial, JSON_UNESCAPED_SLASHES) ?>;
 let prevMade = -1;
 
@@ -214,7 +217,7 @@ function renderAll(){
 
 async function poll(){
   try{
-    const r = await fetch(BASE + '/draft-board/feed', {cache:'no-store'});
+    const r = await fetch(BASE + '/draft-board/feed' + (DEMO?'?demo=1':''), {cache:'no-store'});
     if(!r.ok) throw 0;
     const next = await r.json();
     // Detect a new pick for the flash + toast.
