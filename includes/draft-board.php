@@ -197,17 +197,29 @@ function rotc_draft_build_state(bool $demo = false): array {
     // projections). Does NOT touch MFL. Never triggers when real picks
     // already exist.
     if ($demo && !array_filter($picks, fn($p) => $p['player'] !== '')) {
-        $ranked = [];
-        foreach ($proj as $pid => $s) { if ($s !== '' && isset($playersDb[$pid])) $ranked[$pid] = (float) $s; }
-        arsort($ranked);
-        $ranked = array_keys($ranked);
-        $now = time(); $i = 0; $fill = 22;
+        // Per-bucket queues (best projected first) + an overall fallback.
+        $byBucket = []; $rankedAll = [];
+        foreach ($proj as $pid => $s) {
+            if ($s === '' || !isset($playersDb[$pid])) continue;
+            $b = rotc_draft_pos_meta($playersDb[$pid]['position'] ?? '')['bucket'];
+            $byBucket[$b][] = [$pid, (float) $s];
+            $rankedAll[$pid] = (float) $s;
+        }
+        foreach ($byBucket as &$l) { usort($l, fn($a, $b) => $b[1] <=> $a[1]); } unset($l);
+        arsort($rankedAll); $rankedAll = array_keys($rankedAll);
+        // A realistic-ish position mix so every color shows on the board.
+        $seq = ['RB','WR','RB','QB','WR','RB','WR','TE','DL','WR','RB','LB','WR','QB','DB','RB','TE','WR','DL','LB','DB','WR'];
+        $now = time(); $i = 0; $fill = count($seq); $picked = [];
         foreach ($picks as $k => $p) {
             if ($i >= $fill) break;
-            if ($p['player'] === '' && isset($ranked[$i])) {
-                $picks[$k]['player'] = $ranked[$i];
+            if ($p['player'] !== '') continue;
+            $want = $seq[$i]; $pid = '';
+            foreach ($byBucket[$want] ?? [] as $row) { if (!isset($picked[$row[0]])) { $pid = $row[0]; break; } }
+            if ($pid === '') { foreach ($rankedAll as $cand) { if (!isset($picked[$cand])) { $pid = $cand; break; } } }
+            if ($pid !== '') {
+                $picks[$k]['player'] = $pid;
                 $picks[$k]['ts'] = $now - ($fill - $i) * 40;   // staggered so the timer reads sensibly
-                $i++;
+                $picked[$pid] = true; $i++;
             }
         }
     }
