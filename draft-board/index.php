@@ -95,6 +95,7 @@ function dbImgFail(img){
   const s = document.createElement('span');
   s.className = img.dataset.cls + ' db-ph-fallback';
   s.style.background = img.dataset.c;
+  s.style.borderColor = img.dataset.c;
   s.textContent = img.dataset.i;
   img.replaceWith(s);
 }
@@ -144,12 +145,19 @@ function renderBoard(){
       if (p.made && p.player){
         const pl = p.player;
         const just = p.overall === newestOverall ? ' just' : '';
+        // Player headshot in a square outlined in the position color; the
+        // team helmet stays as the drafting-team marker.
+        const ph = pl.photo
+          ? `<img class="db-pick-photo" src="${esc(pl.photo)}" alt="" style="border-color:${pl.color}" data-c="${pl.color}" data-i="${esc(initials(pl.name))}" data-cls="db-pick-photo" onerror="dbImgFail(this)">`
+          : `<span class="db-pick-photo db-ph-fallback" style="background:${pl.color};border-color:${pl.color}">${esc(initials(pl.name))}</span>`;
         html += `<div class="db-cell${just}" style="border-left-color:${pl.color}">
-          ${helmet(p,'h')}
+          ${ph}
           <div class="db-cell-body">
             <div class="db-cell-name">${esc(pl.name)}</div>
-            <div class="db-cell-meta"><span class="db-cell-pos" style="background:${pl.color}">${esc(pl.pos)}</span>${esc(pl.team||'FA')} · ${esc(p.teamName)}</div>
-          </div><div class="db-cell-num">${p.overall}</div></div>`;
+            <div class="db-cell-meta"><span class="db-cell-pos" style="background:${pl.color}">${esc(pl.pos)}</span>${esc(pl.team||'FA')}</div>
+          </div>
+          ${helmet(p,'db-teamhelm')}
+          <div class="db-cell-num">${p.overall}</div></div>`;
       } else {
         const oc = state.onClock && state.onClock.overall === p.overall;
         html += `<div class="db-cell empty${oc?' onclock':''}">
