@@ -36,7 +36,7 @@ if ($hasConfig) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#140d07">
+<meta name="theme-color" content="#f1ede6">
 <title>Draft Board — <?= htmlspecialchars($leagueName) ?></title>
 <link rel="icon" type="image/png" href="<?= $base ?>/assets/img/rotc-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
