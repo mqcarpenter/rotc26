@@ -40,10 +40,15 @@ function rotc_draft_pos_meta(string $pos): array {
     return ['bucket' => $pos !== '' ? $pos : '?', 'color' => '#8a7a6c'];
 }
 
-/** MFL player headshot URL (best-effort; the page falls back to a position tile if it 404s). */
-function rotc_draft_photo_url(string $playerId): string {
-    $year = defined('MFL_YEAR') ? MFL_YEAR : date('Y');
-    return "https://www.myfantasyleague.com/{$year}/photos/120/{$playerId}.jpg";
+/**
+ * Player headshot from ESPN's public CDN, keyed by the espn_id MFL
+ * carries on each player record (DETAILS=1). Transparent cutout, so it
+ * sits cleanly on the light board. Empty when we have no espn_id; the
+ * page also falls back to a position tile if a given id has no photo.
+ */
+function rotc_draft_photo_url(string $espnId): string {
+    if ($espnId === '') return '';
+    return "https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/{$espnId}.png&w=120&h=88";
 }
 
 /**
@@ -158,9 +163,10 @@ function rotc_draft_build_state(): array {
         if ($bucket !== '') $minPerTeam[$bucket] = ($minPerTeam[$bucket] ?? 0) + $min;
     }
 
-    // Player DB (name/pos/team) -- one cached full-DB call.
+    // Player DB (name/pos/team + cross-ref ids incl. espn_id for photos)
+    // -- one cached full-DB call. DETAILS=1 is what surfaces espn_id.
     $playersDb = [];
-    $allRaw = mfl_cached_get('players', 86400, [], false);
+    $allRaw = mfl_cached_get('players', 86400, ['DETAILS' => 1], false);
     foreach (mfl_normalize_list($allRaw['players']['player'] ?? null) as $p) {
         if (!empty($p['id'])) $playersDb[$p['id']] = $p;
     }
@@ -181,7 +187,7 @@ function rotc_draft_build_state(): array {
             'id' => $pid, 'name' => $name, 'pos' => $meta['bucket'], 'rawPos' => $pos,
             'team' => $pd['team'] ?? '', 'color' => $meta['color'],
             'proj' => ($proj[$pid] ?? '') !== '' ? (float) $proj[$pid] : null,
-            'photo' => rotc_draft_photo_url($pid),
+            'photo' => rotc_draft_photo_url((string) ($pd['espn_id'] ?? '')),
         ];
     };
 
@@ -261,12 +267,20 @@ function rotc_draft_build_state(): array {
     $remaining = array_filter($projRows, fn($pid) => !isset($pickedIds[$pid]), ARRAY_FILTER_USE_KEY);
     uasort($remaining, fn($a, $b) => $b['proj'] <=> $a['proj']);
     $filterToNeed = $onClockFid !== '' && !empty($neededBuckets);
+    // In need mode, cap each needed position to its top 3 by projection so
+    // the board shows the best few at every position they need, not a wall
+    // of one position. (Fallback / starters-met shows overall best.)
+    $perBucket = [];
     $best = [];
     foreach ($remaining as $pid => $r) {
-        if ($filterToNeed && !isset($neededBuckets[$r['bucket']])) continue;
+        if ($filterToNeed) {
+            if (!isset($neededBuckets[$r['bucket']])) continue;
+            if (($perBucket[$r['bucket']] ?? 0) >= 3) continue;
+        }
         $pl = $mkPlayer((string) $pid);
         $pl['posRank'] = $pl['pos'] . ($posRank[$pid] ?? '');
         $best[] = $pl;
+        $perBucket[$r['bucket']] = ($perBucket[$r['bucket']] ?? 0) + 1;
         if (count($best) >= 32) break;
     }
 
