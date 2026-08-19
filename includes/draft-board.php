@@ -177,7 +177,23 @@ function rotc_draft_build_state(bool $demo = false): array {
         if (!empty($r['id'])) $proj[$r['id']] = $r['score'] ?? '';
     }
 
-    $mkPlayer = function (string $pid) use ($playersDb, $proj): array {
+    // Positional rank across the whole projected pool (RB4 = 4th-best RB
+    // by our scoring). Built once here so both picks and best-available
+    // can label it. $projRows also feeds the best-available filtering.
+    $projRows = [];
+    foreach ($proj as $pid => $s) {
+        if ($s === '' || !isset($playersDb[$pid])) continue;
+        $projRows[$pid] = ['proj' => (float) $s, 'bucket' => rotc_draft_pos_meta($playersDb[$pid]['position'] ?? '')['bucket']];
+    }
+    $posRank = [];
+    $byBucketRank = [];
+    foreach ($projRows as $pid => $r) { $byBucketRank[$r['bucket']][] = [$pid, $r['proj']]; }
+    foreach ($byBucketRank as $list) {
+        usort($list, fn($a, $b) => $b[1] <=> $a[1]);
+        foreach ($list as $idx => $row) { $posRank[$row[0]] = $idx + 1; }
+    }
+
+    $mkPlayer = function (string $pid) use ($playersDb, $proj, $posRank): array {
         $pd = $playersDb[$pid] ?? [];
         $name = $pd['name'] ?? ('Player #' . $pid);
         if (strpos($name, ',') !== false) { [$l, $f] = array_map('trim', explode(',', $name, 2)); $name = "$f $l"; }
@@ -187,6 +203,7 @@ function rotc_draft_build_state(bool $demo = false): array {
             'id' => $pid, 'name' => $name, 'pos' => $meta['bucket'], 'rawPos' => $pos,
             'team' => $pd['team'] ?? '', 'color' => $meta['color'],
             'proj' => ($proj[$pid] ?? '') !== '' ? (float) $proj[$pid] : null,
+            'posRank' => $meta['bucket'] . ($posRank[$pid] ?? ''),
             'photo' => rotc_draft_photo_url((string) ($pd['espn_id'] ?? '')),
         ];
     };
@@ -260,24 +277,8 @@ function rotc_draft_build_state(bool $demo = false): array {
         }
     }
 
-    // Best available: ranked by this league's own projected points (the
-    // projectedScores pool is league-scored via L=), with each player's
-    // position rank computed against the full projected pool (so "RB4" =
-    // 4th-best RB by our scoring). Picked players removed; top 32.
-    $projRows = [];  // [pid => ['proj'=>float, 'bucket'=>str]]
-    foreach ($proj as $pid => $score) {
-        if ($score === '' || !isset($playersDb[$pid])) continue;
-        $bucket = rotc_draft_pos_meta($playersDb[$pid]['position'] ?? '')['bucket'];
-        $projRows[$pid] = ['proj' => (float) $score, 'bucket' => $bucket];
-    }
-    // Positional rank across the whole pool (rostered or not).
-    $byBucket = [];
-    foreach ($projRows as $pid => $r) { $byBucket[$r['bucket']][] = [$pid, $r['proj']]; }
-    $posRank = [];
-    foreach ($byBucket as $list) {
-        usort($list, fn($a, $b) => $b[1] <=> $a[1]);
-        foreach ($list as $i => $row) { $posRank[$row[0]] = $i + 1; }
-    }
+    // Best available: ranked by this league's own projected points
+    // ($projRows / $posRank were built once above and reused here).
     // Tailor best-available to the team ON THE CLOCK: what has THAT team
     // drafted so far, and which starting slots do they still need to fill?
     // Only positions they still need appear on the board -- e.g. once
@@ -310,9 +311,7 @@ function rotc_draft_build_state(bool $demo = false): array {
             if (!isset($neededBuckets[$r['bucket']])) continue;
             if (($perBucket[$r['bucket']] ?? 0) >= 3) continue;
         }
-        $pl = $mkPlayer((string) $pid);
-        $pl['posRank'] = $pl['pos'] . ($posRank[$pid] ?? '');
-        $best[] = $pl;
+        $best[] = $mkPlayer((string) $pid);   // posRank included by mkPlayer
         $perBucket[$r['bucket']] = ($perBucket[$r['bucket']] ?? 0) + 1;
         if (count($best) >= 32) break;
     }

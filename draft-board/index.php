@@ -74,6 +74,7 @@ if ($hasConfig) {
 </div>
 
 <div class="db-toast" id="db-toast"></div>
+<div class="db-hovercard" id="db-hovercard"></div>
 
 <script>
 const BASE = <?= json_encode($base) ?>;
@@ -153,7 +154,7 @@ function renderBoard(){
         const ph = pl.photo
           ? `<img class="db-pick-photo" src="${esc(pl.photo)}" alt="" style="border-color:${pl.color}" data-c="${pl.color}" data-i="${esc(initials(pl.name))}" data-cls="db-pick-photo" onerror="dbImgFail(this)">`
           : `<span class="db-pick-photo db-ph-fallback" style="background:${pl.color};border-color:${pl.color}">${esc(initials(pl.name))}</span>`;
-        html += `<div class="db-cell${just}" style="border-left-color:${pl.color}">
+        html += `<div class="db-cell${just}" style="border-left-color:${pl.color}" data-ov="${p.overall}">
           ${ph}
           <div class="db-cell-body">
             <div class="db-cell-name">${esc(pl.name)}</div>
@@ -234,6 +235,44 @@ async function poll(){
     document.getElementById('db-live').classList.add('stale');
   }
 }
+
+// Hover card for board picks -- the cell name truncates, so hovering a
+// pick shows a fuller card (photo, full name, pos rank, drafting team,
+// projection).
+(function(){
+  const board = document.getElementById('db-board');
+  const hc = document.getElementById('db-hovercard');
+  board.addEventListener('mouseover', e=>{
+    const cell = e.target.closest('.db-cell[data-ov]'); if(!cell) return;
+    const p = (state.picks||[]).find(x=>x.overall === +cell.dataset.ov);
+    if(!p || !p.player) return;
+    const pl = p.player;
+    hc.innerHTML = `
+      <div class="db-hc-top">
+        ${pl.photo?`<img class="db-hc-photo" src="${esc(pl.photo)}" alt="" style="border-color:${pl.color}" data-c="${pl.color}" data-i="${esc(initials(pl.name))}" data-cls="db-hc-photo" onerror="dbImgFail(this)">`
+                  :`<span class="db-hc-photo db-ph-fallback" style="background:${pl.color};border-color:${pl.color}">${esc(initials(pl.name))}</span>`}
+        <div><div class="db-hc-name">${esc(pl.name)}</div>
+          <div class="db-hc-sub"><span class="db-pos-badge" style="background:${pl.color}">${esc(pl.posRank||pl.pos)}</span> ${esc(pl.team||'FA')}</div></div>
+      </div>
+      <div class="db-hc-rows">
+        <div class="db-hc-row"><span>Drafted by</span><span>${p.helmet?`<img class="db-hc-helm" src="${esc(p.helmet)}">`:''}${esc(p.teamName)}</span></div>
+        <div class="db-hc-row"><span>Pick</span><span>Round ${p.round}, Pick ${p.pick} · #${p.overall}</span></div>
+        <div class="db-hc-row"><span>Proj. points</span><span>${pl.proj!=null?pl.proj.toFixed(1):'—'}</span></div>
+      </div>`;
+    hc.classList.add('show');
+    const r = cell.getBoundingClientRect(), cw = 244;
+    let left = r.left + r.width/2 - cw/2;
+    left = Math.max(8, Math.min(left, window.innerWidth - cw - 8));
+    const hcH = hc.offsetHeight || 150;
+    let top = r.top - hcH - 10;
+    if (top < 8) top = r.bottom + 10;   // flip below if no room above
+    hc.style.left = left + 'px'; hc.style.top = top + 'px';
+  });
+  board.addEventListener('mouseout', e=>{
+    const cell = e.target.closest('.db-cell[data-ov]');
+    if(cell && !cell.contains(e.relatedTarget)) hc.classList.remove('show');
+  });
+})();
 
 document.getElementById('db-fs').addEventListener('click', ()=>{
   if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
