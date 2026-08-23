@@ -85,8 +85,118 @@ const ROTC_HOME_NFL_ABBR = [
     // auto-hides. Edit the date/time and league draft-room URL here.
     $draftStartTs   = strtotime('2026-08-22 19:00:00 America/New_York');
     $draftRoomUrl   = 'https://www42.myfantasyleague.com/2026/ajax_ld?L=' . (defined('MFL_LEAGUE_ID') ? MFL_LEAGUE_ID : '67102');
-    if (time() < $draftStartTs):
+    // Once the draft is underway the announcement is replaced by a live
+    // on-the-clock module: whose pick it is, how long they've been on the
+    // clock, and the last two picks made. Same state builder the big board
+    // at /draft-board uses (includes/draft-board.php), so both agree and
+    // share its MFL response caching rather than double-fetching.
+    $draftState = null;
+    // mfl_cached_get() only exists once config.php was found and
+    // includes/mfl-api.php loaded above; without it the state builder has
+    // nothing to fetch with.
+    if (time() >= $draftStartTs && function_exists('mfl_cached_get')
+        && file_exists(__DIR__ . '/includes/draft-board.php')) {
+        try {
+            require_once __DIR__ . '/includes/draft-board.php';
+            $draftState = rotc_draft_build_state(false);
+            // Nothing drafted and nobody on the clock means MFL hasn't
+            // opened the draft yet -- fall through to the announcement
+            // rather than render an empty module.
+            if (($draftState['madeCount'] ?? 0) === 0 && empty($draftState['onClock'])) {
+                $draftState = null;
+            }
+        } catch (Throwable $e) {
+            // Never let a draft-feed hiccup take down the front page.
+            $draftState = null;
+            error_log('front-page draft module: ' . $e->getMessage());
+        }
+    }
+
+    if ($draftState !== null):
+        $oc = $draftState['onClock'] ?? null;
+        // Last two completed picks, most recent first.
+        $recent = array_values(array_filter($draftState['picks'], fn($p) => $p['made']));
+        $recent = array_slice(array_reverse($recent), 0, 2);
+        // "On the clock since" = the moment the previous pick landed. MFL's
+        // league data exposes no pick time limit, so this counts UP from
+        // that timestamp rather than down from a deadline.
+        $sinceTs = 0;
+        foreach ($draftState['picks'] as $p) {
+            if ($p['made'] && $p['ts'] > $sinceTs) $sinceTs = (int) $p['ts'];
+        }
     ?>
+    <div class="rotc-onclock" data-since="<?= (int) $sinceTs ?>">
+      <?php if ($draftState['complete'] ?? false): ?>
+        <div class="rotc-onclock-main">
+          <p class="rotc-onclock-eyebrow">🏈 Draft Complete</p>
+          <h2 class="rotc-onclock-team">That's a wrap</h2>
+          <p class="rotc-onclock-meta"><?= (int) $draftState['madeCount'] ?> picks made.</p>
+        </div>
+      <?php elseif ($oc): ?>
+        <?php if (!empty($oc['helmet'])): ?>
+          <img class="rotc-onclock-helmet<?= !empty($oc['helmetFlip']) ? ' flip' : '' ?>"
+               src="<?= htmlspecialchars($oc['helmet']) ?>" alt="">
+        <?php endif; ?>
+        <div class="rotc-onclock-main">
+          <p class="rotc-onclock-eyebrow">🪖 On the Clock</p>
+          <h2 class="rotc-onclock-team"><?= htmlspecialchars($oc['teamName']) ?></h2>
+          <p class="rotc-onclock-meta">
+            Round <?= (int) $oc['round'] ?> · Pick <?= (int) $oc['pick'] ?>
+            <span class="rotc-onclock-dim">(Overall <?= (int) $oc['overall'] ?>)</span>
+          </p>
+        </div>
+        <div class="rotc-onclock-timer">
+          <span class="t" id="rotc-onclock-timer">—</span>
+          <span class="l">on the clock</span>
+        </div>
+      <?php endif; ?>
+
+      <?php if ($recent): ?>
+      <div class="rotc-onclock-recent">
+        <p class="rotc-onclock-recent-label">Last picks</p>
+        <?php foreach ($recent as $rp): $pl = $rp['player']; ?>
+          <div class="rotc-onclock-pick">
+            <?php if (!empty($pl['photo'])): ?>
+              <img class="rotc-onclock-photo" src="<?= htmlspecialchars($pl['photo']) ?>"
+                   alt="" loading="lazy" onerror="this.style.display='none'">
+            <?php endif; ?>
+            <span class="rotc-onclock-pick-text">
+              <strong><?= htmlspecialchars($pl['name'] ?? '') ?></strong>
+              <span class="rotc-onclock-dim"><?= htmlspecialchars(trim(($pl['pos'] ?? '') . ' ' . ($pl['team'] ?? ''))) ?></span>
+              <span class="rotc-onclock-to"><?= htmlspecialchars($rp['teamAbbr']) ?> · <?= (int) $rp['round'] ?>.<?= (int) $rp['pick'] ?></span>
+            </span>
+          </div>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
+
+      <div class="rotc-onclock-actions">
+        <a class="rotc-draft-cta" href="<?= htmlspecialchars($draftRoomUrl) ?>" target="_blank" rel="noopener"
+           onclick="window.open(this.href,'rotc_live_draft','width=1200,height=850,resizable=yes,scrollbars=yes'); return false;">
+          Enter Draft Room &rarr;
+        </a>
+        <a class="rotc-onclock-secondary" href="<?= $base ?>/draft-board">📺 Live Big Board</a>
+      </div>
+    </div>
+    <script>
+    (function () {
+      var box = document.querySelector('.rotc-onclock');
+      var el = document.getElementById('rotc-onclock-timer');
+      if (!box || !el) return;
+      var since = parseInt(box.dataset.since || '0', 10);
+      if (!since) { el.textContent = '—'; return; }
+      function tick() {
+        var s = Math.max(0, Math.floor(Date.now() / 1000) - since);
+        el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      }
+      tick();
+      setInterval(tick, 1000);
+      // The page is cached server-side, so refresh periodically to pick up
+      // the next pick without anyone having to reload manually.
+      setTimeout(function () { location.reload(); }, 60000);
+    })();
+    </script>
+    <?php elseif (time() < $draftStartTs): ?>
     <div class="rotc-draft-banner">
       <div class="rotc-draft-banner-body">
         <p class="rotc-draft-eyebrow">🏈 Draft Day</p>
