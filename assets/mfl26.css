@@ -959,6 +959,12 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
     #FDFBF7 0px, #FDFBF7 78px, var(--ink) 190px, var(--ink) 100%);
   color:var(--on-ink);
   border-radius:var(--radius); padding:9px 16px; margin-bottom:14px;
+  /* Outlined so the module reads as a deliberate component. The border is
+     ink-tinted rather than a light hairline because the half that needs
+     definition is the cream end, which would otherwise dissolve into the
+     cream page background; against the dark end it simply recedes. */
+  border:1px solid rgba(42,24,16,.28);
+  box-shadow:0 1px 3px rgba(42,24,16,.10);
 }
 .rotc-onclock-helmet-wrap{
   flex:none; display:flex; align-items:center; justify-content:center;

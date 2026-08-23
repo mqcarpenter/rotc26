@@ -87,7 +87,7 @@ const ROTC_HOME_NFL_ABBR = [
     $draftRoomUrl   = 'https://www42.myfantasyleague.com/2026/ajax_ld?L=' . (defined('MFL_LEAGUE_ID') ? MFL_LEAGUE_ID : '67102');
     // Once the draft is underway the announcement is replaced by a live
     // on-the-clock module: whose pick it is, how long they've been on the
-    // clock, and the last two picks made. Same state builder the big board
+    // clock, and the last three picks made. Same state builder the big board
     // at /draft-board uses (includes/draft-board.php), so both agree and
     // share its MFL response caching rather than double-fetching.
     $draftState = null;
@@ -114,9 +114,9 @@ const ROTC_HOME_NFL_ABBR = [
 
     if ($draftState !== null):
         $oc = $draftState['onClock'] ?? null;
-        // Last two completed picks, most recent first.
+        // Last three completed picks, most recent first.
         $recent = array_values(array_filter($draftState['picks'], fn($p) => $p['made']));
-        $recent = array_slice(array_reverse($recent), 0, 2);
+        $recent = array_slice(array_reverse($recent), 0, 3);
         // "On the clock since" = the moment the previous pick landed. MFL's
         // league data exposes no pick time limit, so this counts UP from
         // that timestamp rather than down from a deadline.
