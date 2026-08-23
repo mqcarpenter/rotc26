@@ -943,62 +943,87 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
 
 /* ---- FRONT-PAGE ON-THE-CLOCK MODULE (index.php) --------------
    Replaces the Draft Day announcement once the draft is underway.
-   Shares the dark banner treatment of .rotc-draft-banner so the two
-   read as the same slot changing state, not two different components. */
+
+   The banner is a horizontal gradient, not a flat dark fill: the helmet
+   art is a white-background PNG, so it needs a light panel to sit on.
+   The gradient runs cream -> ink across the first ~200px, letting that
+   white plate blend into the dark banner instead of reading as a
+   pasted-on cut-out. Text sits well right of the transition.
+
+   Sized to roughly half the original height -- this is a status strip
+   above the hero carousel, not a hero itself, so the last-picks row runs
+   horizontally rather than stacking. */
 .rotc-onclock{
-  display:flex; flex-wrap:wrap; align-items:center; gap:16px;
-  background:var(--ink); color:var(--on-ink);
-  border-radius:var(--radius); padding:16px 20px; margin-bottom:18px;
+  display:flex; flex-wrap:wrap; align-items:center; gap:12px;
+  background:linear-gradient(100deg,
+    #FDFBF7 0px, #FDFBF7 78px, var(--ink) 190px, var(--ink) 100%);
+  color:var(--on-ink);
+  border-radius:var(--radius); padding:9px 16px; margin-bottom:14px;
 }
-.rotc-onclock-helmet{ width:64px; height:auto; flex:none; }
+.rotc-onclock-helmet-wrap{
+  flex:none; display:flex; align-items:center; justify-content:center;
+  width:58px; height:44px;
+}
+.rotc-onclock-helmet{ width:100%; height:auto; mix-blend-mode:multiply; }
 .rotc-onclock-helmet.flip{ transform:scaleX(-1); }
-.rotc-onclock-main{ flex:1 1 220px; min-width:0; }
+.rotc-onclock-main{ flex:1 1 190px; min-width:0; }
 .rotc-onclock-eyebrow{
   margin:0; font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
-  letter-spacing:.08em; font-size:12px; font-weight:700; color:var(--accent);
+  letter-spacing:.08em; font-size:10px; font-weight:700; color:var(--accent);
 }
 .rotc-onclock-team{
-  margin:2px 0 0; font-family:"Roboto Condensed",sans-serif; font-size:26px;
+  margin:0; font-family:"Roboto Condensed",sans-serif; font-size:19px;
   line-height:1.15; font-weight:700;
 }
-.rotc-onclock-meta{ margin:2px 0 0; font-size:13px; color:rgba(253,251,247,.85); }
+.rotc-onclock-meta{ margin:0; font-size:11.5px; color:rgba(253,251,247,.8); }
 .rotc-onclock-dim{ opacity:.6; }
-/* Timer is tabular so the digits don't jitter as it ticks. */
+/* Tabular digits so the clock doesn't jitter as it ticks. */
 .rotc-onclock-timer{ flex:none; text-align:center; }
 .rotc-onclock-timer .t{
-  display:block; font-family:"Roboto Condensed",sans-serif; font-size:30px;
+  display:block; font-family:"Roboto Condensed",sans-serif; font-size:21px;
   font-weight:700; font-variant-numeric:tabular-nums; color:var(--accent);
+  line-height:1.1;
 }
 .rotc-onclock-timer .l{
-  display:block; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
-  color:rgba(253,251,247,.6);
+  display:block; font-size:9px; text-transform:uppercase; letter-spacing:.06em;
+  color:rgba(253,251,247,.55);
 }
-/* Last picks: deliberately smaller than the on-clock team -- supporting
-   detail, not competing with the headline. */
+/* Last picks: one horizontal row, smaller than the on-clock team --
+   supporting detail that must not compete with the headline. */
 .rotc-onclock-recent{
-  flex:1 1 100%; border-top:1px solid rgba(253,251,247,.15); padding-top:10px;
+  flex:1 1 100%; display:flex; align-items:center; flex-wrap:wrap; gap:14px;
+  border-top:1px solid rgba(253,251,247,.14); padding-top:6px; margin-top:1px;
 }
 .rotc-onclock-recent-label{
-  margin:0 0 6px; font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
-  letter-spacing:.06em; font-size:10.5px; font-weight:700; color:rgba(253,251,247,.55);
+  margin:0; font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
+  letter-spacing:.06em; font-size:9.5px; font-weight:700;
+  color:rgba(253,251,247,.5); flex:none;
 }
-.rotc-onclock-pick{ display:flex; align-items:center; gap:9px; margin-bottom:5px; }
+.rotc-onclock-pick{ display:flex; align-items:center; gap:7px; }
 .rotc-onclock-photo{
-  width:34px; height:25px; object-fit:cover; object-position:top center;
-  border-radius:4px; background:rgba(253,251,247,.08); flex:none;
+  width:26px; height:20px; object-fit:cover; object-position:top center;
+  border-radius:3px; background:rgba(253,251,247,.08); flex:none;
 }
-.rotc-onclock-pick-text{ font-size:12.5px; line-height:1.3; min-width:0; }
+.rotc-onclock-pick-text{ font-size:11.5px; line-height:1.25; min-width:0; }
 .rotc-onclock-pick-text strong{ font-weight:700; }
-.rotc-onclock-to{ color:rgba(253,251,247,.55); margin-left:4px; }
-.rotc-onclock-actions{ display:flex; flex-direction:column; gap:8px; flex:none; }
+.rotc-onclock-to{ color:rgba(253,251,247,.5); margin-left:3px; }
+.rotc-onclock-actions{ display:flex; align-items:center; gap:8px; flex:none; }
+.rotc-onclock-actions .rotc-draft-cta{ padding:7px 14px; font-size:12px; }
 .rotc-onclock-secondary{
-  text-align:center; font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
-  letter-spacing:.06em; font-weight:700; font-size:12px; color:rgba(253,251,247,.85);
-  text-decoration:none; border:1px solid rgba(253,251,247,.3);
-  border-radius:8px; padding:8px 14px;
+  font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
+  letter-spacing:.06em; font-weight:700; font-size:11px; color:rgba(253,251,247,.8);
+  text-decoration:none; border:1px solid rgba(253,251,247,.28);
+  border-radius:8px; padding:7px 12px; white-space:nowrap;
 }
-@media (max-width:600px){
-  .rotc-onclock-team{ font-size:21px; }
-  .rotc-onclock-helmet{ width:48px; }
+@media (max-width:720px){
+  /* Stacked, so the cream panel reads as a band across the top instead
+     of a vertical stripe behind centred text. */
+  .rotc-onclock{
+    background:linear-gradient(170deg,
+      #FDFBF7 0px, #FDFBF7 40px, var(--ink) 96px, var(--ink) 100%);
+    padding-top:6px;
+  }
+  .rotc-onclock-team{ font-size:17px; }
   .rotc-onclock-actions{ flex:1 1 100%; }
+  .rotc-onclock-actions .rotc-draft-cta{ flex:1; text-align:center; }
 }

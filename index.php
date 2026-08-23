@@ -134,8 +134,14 @@ const ROTC_HOME_NFL_ABBR = [
         </div>
       <?php elseif ($oc): ?>
         <?php if (!empty($oc['helmet'])): ?>
-          <img class="rotc-onclock-helmet<?= !empty($oc['helmetFlip']) ? ' flip' : '' ?>"
-               src="<?= htmlspecialchars($oc['helmet']) ?>" alt="">
+          <?php // Helmet art is a white-background PNG, so it can't sit
+                // directly on the dark banner. The wrapper carries a light
+                // panel that the banner gradient fades out of, making the
+                // white read as part of the design instead of a cut-out. ?>
+          <span class="rotc-onclock-helmet-wrap">
+            <img class="rotc-onclock-helmet<?= !empty($oc['helmetFlip']) ? ' flip' : '' ?>"
+                 src="<?= htmlspecialchars($oc['helmet']) ?>" alt="">
+          </span>
         <?php endif; ?>
         <div class="rotc-onclock-main">
           <p class="rotc-onclock-eyebrow">🪖 On the Clock</p>
@@ -171,9 +177,17 @@ const ROTC_HOME_NFL_ABBR = [
       <?php endif; ?>
 
       <div class="rotc-onclock-actions">
-        <a class="rotc-draft-cta" href="<?= htmlspecialchars($draftRoomUrl) ?>" target="_blank" rel="noopener"
-           onclick="window.open(this.href,'rotc_live_draft','width=1200,height=850,resizable=yes,scrollbars=yes'); return false;">
-          Enter Draft Room &rarr;
+        <?php
+        // Not the live draft room (ajax_ld): that closes once the draft
+        // moves to slow/offline picks, which is where this league is now.
+        // O=52 is MFL's Make Draft Pick page, the same target as the
+        // Franchise menu item -- see templates/header.php.
+        $makePickUrl = 'https://www42.myfantasyleague.com/2026/options?L='
+                     . (defined('MFL_LEAGUE_ID') ? MFL_LEAGUE_ID : '67102') . '&O=52';
+        ?>
+        <a class="rotc-draft-cta" href="<?= htmlspecialchars($makePickUrl) ?>" target="_blank" rel="noopener"
+           onclick="window.open(this.href,'rotc_mfl','width=1200,height=900,resizable=yes,scrollbars=yes'); return false;">
+          Make Your Pick &rarr;
         </a>
         <a class="rotc-onclock-secondary" href="<?= $base ?>/draft-board">📺 Live Big Board</a>
       </div>
