@@ -117,9 +117,10 @@ const ROTC_HOME_NFL_ABBR = [
         // Last three completed picks, most recent first.
         $recent = array_values(array_filter($draftState['picks'], fn($p) => $p['made']));
         $recent = array_slice(array_reverse($recent), 0, 3);
-        // "On the clock since" = the moment the previous pick landed. MFL's
-        // league data exposes no pick time limit, so this counts UP from
-        // that timestamp rather than down from a deadline.
+        // Timestamp of the previous completed pick. The module reports
+        // elapsed time SINCE that pick rather than time remaining: MFL's
+        // league data exposes no pick time limit, so a countdown would be
+        // inventing a deadline that does not exist.
         $sinceTs = 0;
         foreach ($draftState['picks'] as $p) {
             if ($p['made'] && $p['ts'] > $sinceTs) $sinceTs = (int) $p['ts'];
@@ -153,7 +154,7 @@ const ROTC_HOME_NFL_ABBR = [
         </div>
         <div class="rotc-onclock-timer">
           <span class="t" id="rotc-onclock-timer">—</span>
-          <span class="l">on the clock</span>
+          <span class="l">since last pick</span>
         </div>
       <?php endif; ?>
 
@@ -199,15 +200,20 @@ const ROTC_HOME_NFL_ABBR = [
       if (!box || !el) return;
       var since = parseInt(box.dataset.since || '0', 10);
       if (!since) { el.textContent = '—'; return; }
+      // Hours and minutes, not m:ss. This measures time SINCE THE LAST
+      // PICK, not time remaining -- MFL exposes no pick time limit, so
+      // there is no deadline to count down to. At the scale this actually
+      // runs (slow/offline picks, often many hours) seconds are noise.
       function tick() {
         var s = Math.max(0, Math.floor(Date.now() / 1000) - since);
-        el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+        var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+        el.textContent = h ? h + 'h ' + m + 'm' : m + 'm';
       }
       tick();
-      setInterval(tick, 1000);
-      // The page is cached server-side, so refresh periodically to pick up
-      // the next pick without anyone having to reload manually.
-      setTimeout(function () { location.reload(); }, 60000);
+      // Ticks the displayed minute over while the page sits open. Does NOT
+      // reload the page: picks land far too slowly to justify pulling the
+      // front page out from under whoever is reading it.
+      setInterval(tick, 60000);
     })();
     </script>
     <?php elseif (time() < $draftStartTs): ?>
