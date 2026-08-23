@@ -25,11 +25,13 @@
 //
 // The trailing COLLATE is required, not cosmetic: CAST(int AS CHAR) yields a
 // string in the connection's collation while the CHAR(4) column carries the
-// table's utf8mb4_unicode_ci, and UNION-ing the two halves then fails with
+// column's own collation, and UNION-ing the two halves then fails with
 // "Illegal mix of collations for operation 'UNION'". Pinning both sides to
-// one collation makes the halves compatible.
-const ROTC_TO_KEY_PROPOSER  = "COALESCE(CAST(t.proposer_id AS CHAR), CONCAT('m', t.proposer_mfl_id)) COLLATE utf8mb4_unicode_ci";
-const ROTC_TO_KEY_RECIPIENT = "COALESCE(CAST(t.recipient_id AS CHAR), CONCAT('m', t.recipient_mfl_id)) COLLATE utf8mb4_unicode_ci";
+// one collation makes the halves compatible. It must be utf8mb4_general_ci:
+// that is what the existing rotchist_* tables use, and the joins to
+// rotchist_franchises / rotchist_mfl_franchises compare against them.
+const ROTC_TO_KEY_PROPOSER  = "COALESCE(CAST(t.proposer_id AS CHAR), CONCAT('m', t.proposer_mfl_id)) COLLATE utf8mb4_general_ci";
+const ROTC_TO_KEY_RECIPIENT = "COALESCE(CAST(t.recipient_id AS CHAR), CONCAT('m', t.recipient_mfl_id)) COLLATE utf8mb4_general_ci";
 
 function rotc_trade_offers_available(PDO $db): bool {
     try {

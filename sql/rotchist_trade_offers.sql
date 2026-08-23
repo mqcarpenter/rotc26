@@ -68,4 +68,4 @@ CREATE TABLE IF NOT EXISTS rotchist_trade_offers (
   KEY idx_proposer (season, proposer_mfl_id),
   KEY idx_recipient (season, recipient_mfl_id),
   KEY idx_occurred (occurred_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
