@@ -1,3 +1,8 @@
 .DS_Store
 *.log
 config.php
+
+# Raw MFL commissioner report HTML cached by tools/trade_offers_backfill.py.
+# ~28MB of derived data -- re-fetchable, and it carries a logged-in
+# commissioner view of the league, so it stays out of the repo.
+data/cache/

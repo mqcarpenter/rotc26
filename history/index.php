@@ -513,6 +513,7 @@ function rotc_h2h_rivalry_table(array $rows, array $namesById, array $mflIdMap, 
         <button type="button" data-target="hist-milestones">Milestones</button>
         <button type="button" class="<?= $h2hDefaultActive ? 'active' : '' ?>" data-target="hist-h2h">Head to Head</button>
         <button type="button" data-target="hist-players">Player Records</button>
+        <button type="button" data-target="hist-trade-market">Trade Market</button>
       </nav>
 
       <div class="rotc-history-content">
@@ -625,6 +626,26 @@ function rotc_h2h_rivalry_table(array $rows, array $namesById, array $mflIdMap, 
 
           <h3>Rivalries — Closest Series (min. 5 games)</h3>
           <?php rotc_h2h_rivalry_table($h2hClosestRivalries, $h2hNamesById, $h2hMflIdByFranchise, 'avg margin', 'avg_margin', ' pts'); ?>
+        </div>
+
+        <div class="card rotc-history-panel" id="hist-trade-market" hidden>
+          <?php
+          // Trade offers live in their own table, populated by a scrape of
+          // MFL's commissioner-only report rather than by rotchist_mfl_ingest
+          // (see includes/trade-offers.php). Guarded so the rest of the
+          // records hub still renders on an install where that table hasn't
+          // been created or ingested yet.
+          require_once __DIR__ . '/../includes/trade-offers.php';
+          if (rotc_trade_offers_available($db)) {
+              rotc_trade_offers_render(rotc_trade_offers_data($db));
+          } else {
+              echo '<h3>The Trade Market</h3>';
+              echo '<p>Trade offer history hasn\'t been loaded yet. Create '
+                 . 'the table from <code>sql/rotchist_trade_offers.sql</code>, '
+                 . 'then run <code>tools/trade_offers_backfill.py</code> '
+                 . 'followed by <code>tools/trade_offers_ingest.php</code>.</p>';
+          }
+          ?>
         </div>
 
       </div>

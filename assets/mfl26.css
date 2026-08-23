@@ -908,3 +908,35 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
 /* Highlights the viewer's own matchup row on franchise/rotc-pickem.php --
    same left-accent-stripe treatment as .data-table's .my-franchise row. */
 .rotc-pool-matchup-mine{ background:var(--sand); box-shadow:inset 3px 0 0 var(--accent); padding-left:8px; border-radius:6px; }
+/* ---- TRADE MARKET (history/index.php "Trade Market" panel) ----
+   Stat tiles, inline-SVG charts and caveat notes for the trade offer
+   history in includes/trade-offers.php. Chart colours are deliberately
+   OUTSIDE the :root palette above -- they encode five fixed outcome
+   categories (accepted/rejected/revoked/expired) that need to stay
+   distinguishable from each other, not harmonise with the site accent. */
+.rotc-to-stats{
+  display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 18px;
+}
+.rotc-to-stat{
+  flex:1 1 130px; background:var(--paper); border:1px solid var(--line);
+  border-radius:var(--radius); padding:12px 14px;
+}
+.rotc-to-stat strong{
+  display:block; font-family:"Roboto Condensed", sans-serif;
+  font-size:24px; line-height:1.1; color:var(--accent);
+}
+.rotc-to-stat span{
+  display:block; margin-top:3px; font-size:12px; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.03em;
+}
+.rotc-to-note{
+  font-size:12.5px; line-height:1.5; color:var(--muted); margin:6px 0 14px;
+}
+/* Charts scale with the panel; the viewBox does the layout work so the
+   SVG never needs a fixed pixel width on small screens. */
+.rotc-to-chart{
+  display:block; width:100%; height:auto; max-width:640px; margin:6px 0 16px;
+}
+.rotc-to-axis{
+  font-family:"Roboto Condensed", sans-serif; font-size:11px; fill:var(--ink-2);
+}
