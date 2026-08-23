@@ -635,9 +635,20 @@ function rotc_h2h_rivalry_table(array $rows, array $namesById, array $mflIdMap, 
           // (see includes/trade-offers.php). Guarded so the rest of the
           // records hub still renders on an install where that table hasn't
           // been created or ingested yet.
+          // Hard-isolated: this panel renders BEFORE the tab-switching
+          // <script> at the foot of the page, so any fatal in here stops
+          // output and takes every other tab's button down with it -- the
+          // whole records hub reads as broken. Catching Throwable keeps a
+          // failure contained to this one panel.
           require_once __DIR__ . '/../includes/trade-offers.php';
           if (rotc_trade_offers_available($db)) {
-              rotc_trade_offers_render(rotc_trade_offers_data($db));
+              try {
+                  rotc_trade_offers_render(rotc_trade_offers_data($db));
+              } catch (Throwable $e) {
+                  echo '<h3>The Trade Market</h3>';
+                  echo '<p>Trade offer stats are temporarily unavailable.</p>';
+                  error_log('trade-offers panel: ' . $e->getMessage());
+              }
           } else {
               echo '<h3>The Trade Market</h3>';
               echo '<p>Trade offer history hasn\'t been loaded yet. Create '
