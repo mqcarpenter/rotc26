@@ -19,9 +19,17 @@
 
 // Grouping key for a franchise across seasons. Prefers the stable
 // rotchist_franchises identity resolved at ingest, falling back to the raw
-// MFL id when that resolution wasn't available -- franchise 0004 has been
-// Sexual Chocolate, Philippine Seminoles and Krypton Knights, so grouping on
-// the season name would split one franchise into three.
+// MFL id when that resolution wasn't available.
+//
+// Grouping on the MFL id instead would be WRONG, because MFL slots change
+// hands: slot 0002 was Krypton Knights 2006-2020 and Carnivorous
+// SilverBacks from 2021, two different franchises. Krypton Knights also
+// MOVED, from slot 0002 to 0004. Only the rotchist_franchises identity
+// follows a franchise through both, which is why this resolves rather than
+// grouping on what MFL happens to call a slot in the current season.
+//
+// This legitimately yields more keys than there are current teams (21 vs
+// 16): franchises that have left the league still hold their history.
 //
 // The trailing COLLATE is required, not cosmetic: CAST(int AS CHAR) yields a
 // string in the connection's collation while the CHAR(4) column carries the
