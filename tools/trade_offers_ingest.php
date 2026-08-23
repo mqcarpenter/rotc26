@@ -29,6 +29,15 @@ if (file_exists($configPath)) require_once $configPath;
 
 $dryRun = in_array('--dry-run', $argv, true);
 
+// Decoding 14k rows of JSON into PHP arrays needs more than a stock shared
+// -host CLI limit, and exceeding it kills the process with no message --
+// which looked exactly like a silent failure the first time this ran.
+// Hosts that forbid raising it just ignore this.
+@ini_set('memory_limit', '512M');
+// Surface anything fatal rather than dying quietly.
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
 $jsonPath = $root . '/data/trade_offers.json';
 if (!file_exists($jsonPath)) {
     fwrite(STDERR, "missing $jsonPath -- run tools/trade_offers_backfill.py first\n");
@@ -109,8 +118,17 @@ foreach ($data['rows'] as $r) {
     $parsed[] = $row;
 }
 
+// The decoded JSON is ~7MB on disk but far larger as PHP arrays, and it
+// is dead weight once $parsed exists -- holding both is what pushes this
+// past a shared host's memory_limit and gets the process killed with no
+// error printed at all.
+unset($data);
+gc_collect_cycles();
+
 printf("parsed %d rows (%d unparseable dates, %d unknown statuses)\n",
        count($parsed), $badDates, $badStatus);
+printf("memory in use: %.1f MB (limit %s)\n",
+       memory_get_usage(true) / 1048576, ini_get('memory_limit'));
 
 $hashes = array_column($parsed, 'row_hash');
 $dupes  = count($hashes) - count(array_unique($hashes));
@@ -164,32 +182,60 @@ try {
                  . " storing MFL ids only\n");
 }
 
-$sql = "INSERT INTO rotchist_trade_offers
-          (season, league_id, status, proposer_mfl_id, recipient_mfl_id,
-           proposer_id, recipient_id, proposer_gave, recipient_gave,
-           reason, occurred_at, expires_at, row_hash)
-        VALUES
-          (:season, :league_id, :status, :proposer_mfl_id, :recipient_mfl_id,
-           :proposer_id, :recipient_id, :proposer_gave, :recipient_gave,
-           :reason, :occurred_at, :expires_at, :row_hash)
-        ON DUPLICATE KEY UPDATE
-           proposer_id    = VALUES(proposer_id),
-           recipient_id   = VALUES(recipient_id),
-           proposer_gave  = VALUES(proposer_gave),
-           recipient_gave = VALUES(recipient_gave),
-           reason         = VALUES(reason),
-           expires_at     = VALUES(expires_at)";
-$stmt = $pdo->prepare($sql);
+// Insert in batches rather than one statement per row. 14k individual
+// round trips inside a single open transaction is slow on shared hosting
+// and, because nothing commits until the very end, an interrupted run
+// shows zero progress and leaves no clue where it stopped. Batching also
+// means a killed run keeps the chunks that already committed, and the
+// content hash makes re-running pick up where it left off.
+const BATCH = 250;
 
-$pdo->beginTransaction();
-$n = 0;
-foreach ($parsed as $row) {
-    $row['proposer_id']  = $resolved[$row['season'] . ':' . $row['proposer_mfl_id']] ?? null;
-    $row['recipient_id'] = $resolved[$row['season'] . ':' . $row['recipient_mfl_id']] ?? null;
-    $stmt->execute($row);
-    $n++;
+$cols = ['season', 'league_id', 'status', 'proposer_mfl_id', 'recipient_mfl_id',
+         'proposer_id', 'recipient_id', 'proposer_gave', 'recipient_gave',
+         'reason', 'occurred_at', 'expires_at', 'row_hash'];
+
+function rotc_to_insert_sql(array $cols, int $rows): string {
+    $tuple = '(' . implode(',', array_fill(0, count($cols), '?')) . ')';
+    return "INSERT INTO rotchist_trade_offers (" . implode(',', $cols) . ")
+            VALUES " . implode(',', array_fill(0, $rows, $tuple)) . "
+            ON DUPLICATE KEY UPDATE
+               proposer_id    = VALUES(proposer_id),
+               recipient_id   = VALUES(recipient_id),
+               proposer_gave  = VALUES(proposer_gave),
+               recipient_gave = VALUES(recipient_gave),
+               reason         = VALUES(reason),
+               expires_at     = VALUES(expires_at)";
 }
-$pdo->commit();
+
+$n = 0;
+$stmtCache = [];
+try {
+    foreach (array_chunk($parsed, BATCH) as $chunk) {
+        $flat = [];
+        foreach ($chunk as $row) {
+            $row['proposer_id']  = $resolved[$row['season'] . ':' . $row['proposer_mfl_id']] ?? null;
+            $row['recipient_id'] = $resolved[$row['season'] . ':' . $row['recipient_mfl_id']] ?? null;
+            foreach ($cols as $c) $flat[] = $row[$c];
+        }
+        // Only two statement shapes ever occur (a full batch and the final
+        // short one), so caching by size keeps this to two prepares.
+        $size = count($chunk);
+        if (!isset($stmtCache[$size])) {
+            $stmtCache[$size] = $pdo->prepare(rotc_to_insert_sql($cols, $size));
+        }
+        $pdo->beginTransaction();
+        $stmtCache[$size]->execute($flat);
+        $pdo->commit();
+
+        $n += $size;
+        printf("  ... %d / %d\n", $n, count($parsed));
+        flush();
+    }
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    fwrite(STDERR, "\nFAILED after $n rows: " . $e->getMessage() . "\n");
+    exit(1);
+}
 
 printf("ingested %d rows into rotchist_trade_offers\n", $n);
 $total = $pdo->query("SELECT COUNT(*) FROM rotchist_trade_offers")->fetchColumn();
