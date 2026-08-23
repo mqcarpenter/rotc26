@@ -22,8 +22,14 @@
 // MFL id when that resolution wasn't available -- franchise 0004 has been
 // Sexual Chocolate, Philippine Seminoles and Krypton Knights, so grouping on
 // the season name would split one franchise into three.
-const ROTC_TO_KEY_PROPOSER  = "COALESCE(CAST(t.proposer_id AS CHAR), CONCAT('m', t.proposer_mfl_id))";
-const ROTC_TO_KEY_RECIPIENT = "COALESCE(CAST(t.recipient_id AS CHAR), CONCAT('m', t.recipient_mfl_id))";
+//
+// The trailing COLLATE is required, not cosmetic: CAST(int AS CHAR) yields a
+// string in the connection's collation while the CHAR(4) column carries the
+// table's utf8mb4_unicode_ci, and UNION-ing the two halves then fails with
+// "Illegal mix of collations for operation 'UNION'". Pinning both sides to
+// one collation makes the halves compatible.
+const ROTC_TO_KEY_PROPOSER  = "COALESCE(CAST(t.proposer_id AS CHAR), CONCAT('m', t.proposer_mfl_id)) COLLATE utf8mb4_unicode_ci";
+const ROTC_TO_KEY_RECIPIENT = "COALESCE(CAST(t.recipient_id AS CHAR), CONCAT('m', t.recipient_mfl_id)) COLLATE utf8mb4_unicode_ci";
 
 function rotc_trade_offers_available(PDO $db): bool {
     try {
