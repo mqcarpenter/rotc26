@@ -108,10 +108,26 @@ if ($hasConfig) {
 // tabs otherwise snap back to the default (Lineup) on every submit or
 // week/target change. Forms carry a hidden `tab`; a trade-target GET
 // (?to=) implies the Trade tab.
-$validTabs = ['lineup', 'drop', 'trade', 'nfl', 'rotc'];
+$validTabs = ['lineup', 'drop', 'trade', 'nfl', 'rotc', 'live'];
 $activeTab = (string) ($_POST['tab'] ?? $_GET['tab'] ?? '');
 if (!in_array($activeTab, $validTabs, true)) {
     $activeTab = ((string) ($_GET['to'] ?? '') !== '') ? 'trade' : 'lineup';
+}
+
+// ---- LIVE: Live Wire panel (mirrors scores/live-scoring.php) ----
+// Same state builder and same markup as the full-site page (see
+// includes/live-wire-view.php) so the two can't drift; only the chrome
+// differs. Failure is swallowed -- a dead upstream must not take down
+// the whole dashboard, which is also the lineup/drop/trade surface.
+$liveState = null;
+if ($hasConfig) {
+    require_once __DIR__ . '/../includes/live-wire.php';
+    require_once __DIR__ . '/../includes/live-wire-view.php';
+    try {
+        $liveState = rotc_live_wire_state();
+    } catch (Throwable $e) {
+        error_log('mobile live-wire: ' . $e->getMessage());
+    }
 }
 
 // ---- Write-action handler ----
@@ -604,6 +620,8 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
 <?php $cssVer2 = @filemtime(dirname(__DIR__) . '/assets/mobile-dashboard.css') ?: time(); ?>
 <link rel="stylesheet" href="<?= $base ?>/assets/mfl26.css?v=<?= $cssVer1 ?>">
 <link rel="stylesheet" href="<?= $base ?>/assets/mobile-dashboard.css?v=<?= $cssVer2 ?>">
+<?php $cssVerLW = @filemtime(dirname(__DIR__) . '/assets/live-wire.css') ?: time(); ?>
+<link rel="stylesheet" href="<?= $base ?>/assets/live-wire.css?v=<?= $cssVerLW ?>">
 </head>
 <body>
 <?php if (!$hasConfig): ?>
@@ -623,6 +641,7 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-trade"<?= $activeTab === 'trade' ? ' checked' : '' ?>>
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-nfl"<?= $activeTab === 'nfl' ? ' checked' : '' ?>>
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-rotc"<?= $activeTab === 'rotc' ? ' checked' : '' ?>>
+  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-live"<?= $activeTab === 'live' ? ' checked' : '' ?>>
 
   <header class="rotc-mapp-topbar">
     <div class="rotc-mapp-brand">
@@ -976,6 +995,25 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
       <?php endif; ?>
     </section>
 
+
+    <!-- ================= LIVE WIRE ================= -->
+    <section class="rotc-mapp-panel panel-live lw-page lw-embed">
+      <div class="rotc-mapp-panel-head">
+        <h1 class="rotc-mapp-panel-title">Live Wire</h1>
+      </div>
+      <?php if (!$liveState): ?>
+        <div class="lw-empty">
+          <h2>Nothing on the field yet</h2>
+          <p>MFL doesn't publish live scoring until games kick off.
+             Your matchup shows up here as its own field once they do.</p>
+        </div>
+      <?php else: ?>
+        <?php rotc_lw_render_wire($liveState); ?>
+        <?php rotc_lw_render_cards($liveState, $ownerFranchiseId ?: null); ?>
+        <?php rotc_lw_render_script($base); ?>
+      <?php endif; ?>
+    </section>
+
   </main>
 
   <nav class="rotc-mapp-tabbar">
@@ -999,6 +1037,10 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
     <label class="tab-rotc" for="mtab-rotc">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9 12 2"/></svg>
       ROTC
+    </label>
+    <label class="tab-live" for="mtab-live">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 6v12"/><path d="M6 10v4M18 10v4"/></svg>
+      Live
     </label>
   </nav>
 

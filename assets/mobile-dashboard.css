@@ -157,21 +157,24 @@
 #mtab-drop:checked   ~ .rotc-mapp-panels .panel-drop,
 #mtab-trade:checked  ~ .rotc-mapp-panels .panel-trade,
 #mtab-nfl:checked    ~ .rotc-mapp-panels .panel-nfl,
-#mtab-rotc:checked   ~ .rotc-mapp-panels .panel-rotc{
+#mtab-rotc:checked   ~ .rotc-mapp-panels .panel-rotc,
+#mtab-live:checked   ~ .rotc-mapp-panels .panel-live{
   display:block;
 }
 #mtab-lineup:checked ~ .rotc-mapp-tabbar .tab-lineup,
 #mtab-drop:checked   ~ .rotc-mapp-tabbar .tab-drop,
 #mtab-trade:checked  ~ .rotc-mapp-tabbar .tab-trade,
 #mtab-nfl:checked    ~ .rotc-mapp-tabbar .tab-nfl,
-#mtab-rotc:checked   ~ .rotc-mapp-tabbar .tab-rotc{
+#mtab-rotc:checked   ~ .rotc-mapp-tabbar .tab-rotc,
+#mtab-live:checked   ~ .rotc-mapp-tabbar .tab-live{
   color:var(--on-ink);
 }
 #mtab-lineup:checked ~ .rotc-mapp-tabbar .tab-lineup svg,
 #mtab-drop:checked   ~ .rotc-mapp-tabbar .tab-drop svg,
 #mtab-trade:checked  ~ .rotc-mapp-tabbar .tab-trade svg,
 #mtab-nfl:checked    ~ .rotc-mapp-tabbar .tab-nfl svg,
-#mtab-rotc:checked   ~ .rotc-mapp-tabbar .tab-rotc svg{
+#mtab-rotc:checked   ~ .rotc-mapp-tabbar .tab-rotc svg,
+#mtab-live:checked   ~ .rotc-mapp-tabbar .tab-live svg{
   color:var(--accent);
 }
 

@@ -1,0 +1,177 @@
+/* ============================================================
+   assets/live-wire.css — scores/live-scoring.php + the /mobile module.
+
+   Loaded on its own rather than appended to mfl26.css: this is the one
+   dark surface on the site, and keeping a self-contained dark palette
+   out of the global sheet stops it bleeding into every other page.
+
+   The field IS the matchup (see includes/live-wire.php): ball = margin,
+   marker = projected final, lit end zone = leader. Turf greens and the
+   amber are the only colours here that don't descend from the site
+   palette — they have to read as a football field, and amber is
+   reserved exclusively for the ball and big plays.
+   ============================================================ */
+.lw-page{
+  --lw-bg:#15100D; --lw-surface:#221813; --lw-surface-2:#2C201A; --lw-line:#3A2A22;
+  --lw-text:#F6F1EA; --lw-muted:#A08D7E;
+  --lw-accent:#E0531B; --lw-big:#F2A93B;
+  --lw-turf:#1E4630; --lw-turf-2:#24523A;
+  --lw-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
+  --lw-disp:"Roboto Condensed",Arial,sans-serif;
+  background:var(--lw-bg); color:var(--lw-text);
+  padding:16px 14px 48px;
+}
+.lw-page *{box-sizing:border-box;}
+
+.lw-mast{display:flex; align-items:center; gap:11px; flex-wrap:wrap; margin-bottom:14px;}
+.lw-brand{font-family:var(--lw-disp); font-size:30px; font-weight:700; margin:0; line-height:1;
+  text-transform:uppercase; letter-spacing:.01em; color:var(--lw-text);}
+.lw-brand span{color:var(--lw-accent);}
+.lw-pill{display:inline-flex; align-items:center; gap:6px;
+  background:rgba(224,83,27,.14); border:1px solid rgba(224,83,27,.45);
+  color:var(--lw-accent); border-radius:999px; padding:3px 11px;
+  font-family:var(--lw-disp); font-size:12.5px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.1em;}
+.lw-dot{width:6px; height:6px; border-radius:50%; background:var(--lw-accent);
+  animation:lw-pulse 1.7s ease-in-out infinite;}
+@keyframes lw-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.3;transform:scale(.7);}}
+.lw-updated{margin-left:auto; font-family:var(--lw-mono); font-size:11px; color:var(--lw-muted);}
+
+.lw-empty{background:var(--lw-surface); border:1px solid var(--lw-line);
+  border-radius:14px; padding:26px 20px; color:var(--lw-muted);}
+.lw-empty h2{font-family:var(--lw-disp); color:var(--lw-text); margin:0 0 6px; font-size:20px;}
+.lw-empty p{margin:0; font-size:14px; line-height:1.55;}
+
+/* ---- big play wire ---------------------------------------------- */
+.lw-wire{background:var(--lw-surface); border:1px solid var(--lw-line);
+  border-radius:14px; margin-bottom:14px; overflow:hidden;}
+.lw-wire-head{display:flex; align-items:center; gap:9px; padding:8px 14px;
+  border-bottom:1px solid var(--lw-line);}
+.lw-wire-title{font-family:var(--lw-disp); font-size:15px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.1em; color:var(--lw-big);}
+.lw-wire-sub{margin-left:auto; font-size:11.5px; color:var(--lw-muted);}
+.lw-wire-body{display:flex; gap:9px; padding:10px 14px; overflow-x:auto;}
+.lw-play{display:flex; align-items:center; gap:8px; flex:none;
+  background:var(--lw-surface-2); border:1px solid var(--lw-line);
+  border-left:3px solid var(--lw-big); border-radius:10px; padding:6px 11px 6px 8px;}
+.lw-play img,.lw-play .lw-av{width:34px; height:25px; border-radius:5px;
+  object-fit:cover; object-position:top center; flex:none;}
+.lw-play-txt{line-height:1.25; white-space:nowrap;}
+.lw-play-n{display:block; font-weight:700; font-size:13px;}
+.lw-play-m{display:block; font-size:10.5px; color:var(--lw-muted);}
+.lw-play-p{font-family:var(--lw-mono); font-weight:700; font-size:16px; color:var(--lw-big);}
+
+/* ---- matchup card ------------------------------------------------ */
+.lw-game{background:var(--lw-surface); border:1px solid var(--lw-line);
+  border-radius:14px; margin-bottom:10px; overflow:hidden; transition:border-color .3s;}
+.lw-game.redzone{border-color:rgba(224,83,27,.5);}
+/* One DOM, two layouts: a broadcast bug on desktop, stacked rows on a
+   phone. Any other approach loses the franchise names at 375px. */
+.lw-row{display:grid; grid-template-columns:1fr auto 1fr; align-items:center;
+  gap:10px; padding:9px 14px 7px; grid-template-areas:"a state b";}
+.lw-tm{display:flex; align-items:center; gap:9px; min-width:0;}
+.lw-tm.away{grid-area:a; justify-content:flex-end; text-align:right;}
+.lw-tm:not(.away){grid-area:b;}
+.lw-name{font-family:var(--lw-disp); font-size:18px; font-weight:700;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.lw-score{font-family:var(--lw-mono); font-size:22px; font-weight:700; flex:none;
+  font-variant-numeric:tabular-nums;}
+.lw-tm.trail .lw-name,.lw-tm.trail .lw-score{color:var(--lw-muted);}
+.lw-score.bump{animation:lw-bump .55s ease;}
+@keyframes lw-bump{0%{transform:scale(1);}35%{transform:scale(1.14); color:var(--lw-big);}100%{transform:scale(1);}}
+.lw-state{grid-area:state; text-align:center; min-width:92px;}
+.lw-q{display:block; font-family:var(--lw-mono); font-size:12.5px; font-weight:700; color:var(--lw-accent);}
+.lw-dd{display:block; font-family:var(--lw-mono); font-size:10px; color:var(--lw-muted);}
+
+/* Helmets are transparent PNGs (see includes/helmets.php) so they sit
+   straight on the card -- no plate, no backing box. Left and right load
+   genuinely different art so the teams face each other; only the four
+   single-direction helmets get mirrored. */
+.lw-helm{flex:none; width:46px; height:36px; display:flex; align-items:center; justify-content:center;}
+.lw-helm img{max-width:100%; max-height:100%; object-fit:contain;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));}
+.lw-helm img.flip{transform:scaleX(-1);}
+.lw-tm.trail .lw-helm img{filter:grayscale(.6) brightness(.72);}
+
+/* ---- the field ---------------------------------------------------- */
+.lw-field{position:relative; height:32px; margin:0 14px; border-radius:4px; overflow:hidden;
+  background:repeating-linear-gradient(90deg,var(--lw-turf) 0 10%,var(--lw-turf-2) 10% 20%);}
+.lw-game.redzone .lw-field{box-shadow:inset 0 0 22px rgba(224,83,27,.5);}
+.lw-ez{position:absolute; top:0; bottom:0; width:9%; display:flex; align-items:center;
+  justify-content:center; font-family:var(--lw-disp); font-size:10px; font-weight:700;
+  color:#fff; letter-spacing:.04em; background:#3A2A22;}
+.lw-ez.l{left:0;} .lw-ez.r{right:0;}
+.lw-ez.hi{background:var(--lw-accent); color:#1a0f08;}
+.lw-yl{position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.32);}
+.lw-yl.mid{width:2px; background:rgba(255,255,255,.6);}
+.lw-proj{position:absolute; top:0; bottom:0; width:2px; background:#F5E96B; opacity:.85;
+  transition:left .7s cubic-bezier(.3,.8,.4,1);}
+.lw-ball{position:absolute; top:0; bottom:0; width:3px; background:var(--lw-big);
+  box-shadow:0 0 9px rgba(242,169,59,.95); transition:left .7s cubic-bezier(.3,.8,.4,1);}
+
+/* ---- on the field ------------------------------------------------- */
+.lw-onfield{display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:7px 14px 11px;}
+.lw-of-lbl{font-family:var(--lw-disp); font-size:9.5px; text-transform:uppercase;
+  letter-spacing:.1em; color:var(--lw-muted); flex:none;}
+.lw-pl{display:flex; align-items:center; gap:6px; background:var(--lw-surface-2);
+  border:1px solid var(--lw-line); border-radius:999px; padding:2px 9px 2px 2px;}
+.lw-pl.a{border-color:rgba(224,83,27,.5);}
+.lw-pl img,.lw-pl .lw-av{width:23px; height:23px; border-radius:50%;
+  object-fit:cover; object-position:top center; flex:none;}
+.lw-av{display:flex; align-items:center; justify-content:center; background:#3A2A22;
+  color:var(--lw-muted); font-family:var(--lw-disp); font-size:9.5px; font-weight:700;}
+.lw-pl-n{font-size:11.5px; white-space:nowrap;}
+.lw-pl-s{font-family:var(--lw-mono); font-size:12px; font-weight:700; color:var(--lw-big);
+  font-variant-numeric:tabular-nums;}
+.lw-none{font-size:11.5px; color:var(--lw-muted); font-style:italic;}
+
+@media (max-width:680px){
+  .lw-page{padding:12px 9px 36px;}
+  .lw-brand{font-size:23px;}
+  /* Stack the teams; state sits to the right across both rows. */
+  .lw-row{grid-template-columns:1fr auto; grid-template-areas:"a state" "b state";
+    gap:2px 10px; padding:8px 12px 6px;}
+  .lw-tm.away,.lw-tm:not(.away){justify-content:space-between; text-align:left;}
+  /* Home row is score-then-name in the DOM; reverse so both rows read
+     name-then-score once stacked. */
+  .lw-tm:not(.away){flex-direction:row-reverse;}
+  .lw-name{font-size:16px; flex:1; min-width:0;}
+  .lw-score{font-size:19px;}
+  .lw-state{min-width:0; text-align:right; align-self:center;}
+  /* Helmets off: two 46px slots cost more width than the names can spare,
+     and the name is what identifies a matchup on a phone. */
+  .lw-helm{display:none;}
+  .lw-field{height:34px; margin:2px 12px 0;}
+  .lw-ez{width:14%;}
+  /* Chips scroll rather than wrap, so card height stays fixed no matter
+     how many players are active. */
+  .lw-onfield{flex-wrap:nowrap; overflow-x:auto; padding:6px 12px 10px; scrollbar-width:none;}
+  .lw-onfield::-webkit-scrollbar{display:none;}
+  .lw-of-lbl{position:sticky; left:0; background:var(--lw-surface); padding-right:4px; z-index:1;}
+  .lw-pl{flex:none; padding:2px 9px;}
+  .lw-pl img,.lw-pl .lw-av{display:none;}
+}
+@media (max-width:360px){
+  .lw-name{font-size:15px;} .lw-score{font-size:17px;} .lw-dd{display:none;}
+}
+@media (prefers-reduced-motion:reduce){
+  .lw-page *{animation:none !important; transition:none !important;}
+}
+
+/* ---- embedded in the /mobile hub -----------------------------------
+   The dashboard supplies its own page chrome and bottom tab bar, so the
+   panel drops the standalone page's outer padding and leaves room for
+   the fixed tab bar. Colours stay: this panel is the one dark surface
+   in the hub, exactly as the full-site page is on the main site. */
+.lw-embed{padding:0 0 78px; background:transparent;}
+.lw-embed .lw-game{background:var(--lw-surface);}
+.lw-embed .lw-wire{margin-bottom:12px;}
+
+/* The viewer's own matchup, pinned to the top of the list. */
+.lw-game.mine{border-color:rgba(224,83,27,.55);}
+.lw-mine-tag{font-family:var(--lw-disp); font-size:9.5px; letter-spacing:.13em;
+  text-transform:uppercase; color:var(--lw-accent); padding:7px 14px 0;}
+/* Explains the field metaphor once, at the foot, rather than cluttering
+   every card with a legend. */
+.lw-note{color:var(--lw-muted); font-size:12.5px; line-height:1.55;
+  margin:14px 2px 0; max-width:64ch;}
