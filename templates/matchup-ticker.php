@@ -25,7 +25,9 @@
 <script>
 (function(){
   var TICKER_ENDPOINT = '<?= $base ?>/api/matchup-ticker.php';
-  var HELMET_BASE = 'https://www.returnofthechampions.com/img/img/helmetsfinished/';
+  // Kept in sync with ROTC_HELMET_BASE in includes/helmets.php -- see the
+  // note there on why the art moved and why these are .png.
+  var HELMET_BASE = 'https://www.returnofthechampions.com/img/helmets-optimized/';
   // Franchise ID -> team prefix used to build helmet image filenames.
   var HELMETS = {
     '0001':'AOH','0002':'CB','0003':'DB','0004':'KK','0005':'FEC','0006':'SW',
@@ -55,7 +57,7 @@
   };
   function helmetSrc(prefix, side) {
     if (SINGLE_ART[prefix]) return HELMET_BASE + SINGLE_ART[prefix].file;
-    return HELMET_BASE + prefix + '_' + (side === 'left' ? 'R' : 'L') + '_01.jpg';
+    return HELMET_BASE + prefix + '_' + (side === 'left' ? 'R' : 'L') + '_01.png';
   }
   function helmetStyle(prefix, side) {
     if (SINGLE_ART[prefix] && SINGLE_ART[prefix].facing === side) return 'transform:scaleX(-1);';

@@ -12,7 +12,14 @@
  * Keep both mappings in sync if a franchise's art or ID changes.
  */
 
-const ROTC_HELMET_BASE = 'https://www.returnofthechampions.com/img/img/helmetsfinished/';
+// Transparent, resized art (2026-08-24). The previous
+// img/img/helmetsfinished/ set was white-background JPEGs that needed a
+// light plate to sit on any dark surface, and two files (EH, JP) were
+// 2048px+ PNGs weighing ~4MB EACH -- the full 16-helmet set was 8.8MB.
+// These are alpha PNGs capped at 300px: the same set is now ~1MB, and
+// helmets composite cleanly on light or dark without a backing plate.
+// The old files are still in place; nothing points at them.
+const ROTC_HELMET_BASE = 'https://www.returnofthechampions.com/img/helmets-optimized/';
 
 const ROTC_HELMET_PREFIX = [
     '0001' => 'AOH', '0002' => 'CB',  '0003' => 'DB',  '0004' => 'KK',
@@ -99,7 +106,11 @@ function rotc_helmet_src_by_prefix(string $prefix, string $side): string {
     if (isset(ROTC_HELMET_SINGLE_ART[$prefix])) {
         return ROTC_HELMET_BASE . ROTC_HELMET_SINGLE_ART[$prefix]['file'];
     }
-    return ROTC_HELMET_BASE . $prefix . '_' . ($side === 'left' ? 'R' : 'L') . '_01.jpg';
+    // .png, not .jpg: the whole set is transparent now. Both facings
+    // exist for every dual-direction prefix, so this picks the real
+    // art rather than mirroring one image in CSS (which would reverse
+    // logos and lettering).
+    return ROTC_HELMET_BASE . $prefix . '_' . ($side === 'left' ? 'R' : 'L') . '_01.png';
 }
 
 function rotc_helmet_flip_by_prefix(string $prefix, string $side): bool {
