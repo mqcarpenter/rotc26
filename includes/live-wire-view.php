@@ -263,7 +263,7 @@ function rotc_lw_render_script(string $base): void {
  * DETAILS=1 for the bench, plus an ESPN summary per NFL team involved.
  * Fine for an explicit click; unthinkable every 30s across eight cards.
  */
-function rotc_lw_render_matchup(array $m, array $statlines, string $base, bool $demo): void {
+function rotc_lw_render_matchup(array $m, array $events, string $base, bool $demo): void {
     [$a, $b] = $m['sides'];
     ?>
     <a class="lw-back" href="<?= $base ?>/scores/live-scoring<?= $demo ? '?demo=1' : '' ?>">&larr; All matchups</a>
@@ -307,8 +307,8 @@ function rotc_lw_render_matchup(array $m, array $statlines, string $base, bool $
         <section class="lw-roster">
           <h2 class="lw-roster-h"><?= htmlspecialchars($s['name']) ?>
             <span><?= number_format($s['score'], 2) ?></span></h2>
-          <?php rotc_lw_render_roster($starters, $statlines, 'Starters'); ?>
-          <?php if ($bench) rotc_lw_render_roster($bench, $statlines, 'Bench', true); ?>
+          <?php rotc_lw_render_roster($starters, $events, 'Starters'); ?>
+          <?php if ($bench) rotc_lw_render_roster($bench, $events, 'Bench', true); ?>
         </section>
       <?php endforeach; ?>
     </div>
@@ -316,34 +316,62 @@ function rotc_lw_render_matchup(array $m, array $statlines, string $base, bool $
 }
 
 /** One roster block. $muted dims the bench, which scores nothing. */
-function rotc_lw_render_roster(array $players, array $statlines, string $heading, bool $muted = false): void {
+function rotc_lw_render_roster(array $players, array $events, string $heading, bool $muted = false): void {
     usort($players, fn($x, $y) => $y['score'] <=> $x['score']);
     ?>
     <h3 class="lw-roster-sub"><?= htmlspecialchars($heading) ?></h3>
     <div class="lw-plist<?= $muted ? ' muted' : '' ?>">
       <?php foreach ($players as $p):
-        $line = $p['espn'] !== '' ? ($statlines[$p['espn']] ?? '') : '';
         // Three states worth distinguishing at a glance: still to start,
         // on the field now, done for the week.
-        $state = $p['yet'] ? 'yet' : ($p['live'] ? 'live' : 'done'); ?>
+        $state = $p['yet'] ? 'yet' : ($p['live'] ? 'live' : 'done');
+        $ev = ($p['espn'] !== '' && isset($events[$p['espn']])) ? $events[$p['espn']] : [];
+        $bd = $ev ? rotc_lw_breakdown($p['pos'], $ev, (float) $p['score']) : null; ?>
         <div class="lw-prow <?= $state ?>">
-          <?= rotc_lw_avatar($p) ?>
-          <span class="lw-prow-main">
-            <span class="lw-prow-n"><?= htmlspecialchars($p['name']) ?>
-              <span class="lw-prow-meta"><?= htmlspecialchars(trim($p['pos'] . ' ' . $p['team'])) ?></span>
+          <div class="lw-prow-top">
+            <?= rotc_lw_avatar($p) ?>
+            <span class="lw-prow-main">
+              <span class="lw-prow-n"><?= htmlspecialchars($p['name']) ?>
+                <span class="lw-prow-meta"><?= htmlspecialchars(trim($p['pos'] . ' ' . $p['team'])) ?></span>
+              </span>
+              <?php if (!$bd && $state === 'yet'): ?>
+                <span class="lw-prow-stat dim">yet to play</span>
+              <?php elseif (!$bd): ?>
+                <span class="lw-prow-stat dim">no stats reported</span>
+              <?php endif; ?>
             </span>
-            <?php if ($line !== ''): ?>
-              <span class="lw-prow-stat"><?= htmlspecialchars($line) ?></span>
-            <?php elseif ($state === 'yet'): ?>
-              <span class="lw-prow-stat dim">yet to play</span>
-            <?php endif; ?>
-          </span>
-          <span class="lw-prow-nums">
-            <span class="lw-prow-pts"><?= number_format($p['score'], 2) ?></span>
-            <?php if ($p['proj'] !== null): ?>
-              <span class="lw-prow-proj">proj <?= number_format((float) $p['proj'], 1) ?></span>
-            <?php endif; ?>
-          </span>
+            <span class="lw-prow-nums">
+              <span class="lw-prow-pts"><?= number_format($p['score'], 2) ?></span>
+              <?php if ($p['proj'] !== null): ?>
+                <span class="lw-prow-proj">proj <?= number_format((float) $p['proj'], 1) ?></span>
+              <?php endif; ?>
+            </span>
+          </div>
+
+          <?php if ($bd && $bd['rows']): ?>
+            <?php // Each stat with the points it earned under THIS league's
+                  // rules. MFL publishes no breakdown, so these are computed
+                  // from ESPN's box score against TYPE=rules -- see
+                  // includes/live-wire-scoring.php. ?>
+            <div class="lw-calc">
+              <?php foreach ($bd['rows'] as $r): ?>
+                <span class="lw-calc-item">
+                  <span class="lw-calc-stat"><?= htmlspecialchars($r['stat']) ?></span>
+                  <span class="lw-calc-lbl"><?= htmlspecialchars($r['label']) ?></span>
+                  <span class="lw-calc-pts"><?= ($r['pts'] >= 0 ? '+' : '') . number_format($r['pts'], 2) ?></span>
+                </span>
+              <?php endforeach; ?>
+              <?php if (abs($bd['other']) >= 0.01): ?>
+                <?php // Length-of-TD bonuses and kick distances aren't in a
+                      // box score, so the difference from MFL's official
+                      // score is shown rather than quietly absorbed. ?>
+                <span class="lw-calc-item other">
+                  <span class="lw-calc-lbl">bonuses &amp; other</span>
+                  <span class="lw-calc-pts"><?= ($bd['other'] >= 0 ? '+' : '') . number_format($bd['other'], 2) ?></span>
+                </span>
+              <?php endif; ?>
+            </div>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>

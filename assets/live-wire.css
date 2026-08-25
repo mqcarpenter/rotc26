@@ -249,8 +249,8 @@
   letter-spacing:.11em; color:var(--lw-muted); margin:12px 0 5px; font-weight:700;}
 .lw-plist{display:flex; flex-direction:column;}
 .lw-plist.muted{opacity:.62;}   /* the bench scores nothing */
-.lw-prow{display:flex; align-items:center; gap:9px; padding:6px 0;
-  border-top:1px solid rgba(58,42,34,.55);}
+.lw-prow{padding:7px 0; border-top:1px solid rgba(58,42,34,.55);}
+.lw-prow-top{display:flex; align-items:center; gap:9px;}
 .lw-prow:first-child{border-top:none;}
 .lw-prow img,.lw-prow .lw-av{width:32px; height:24px; border-radius:4px;
   object-fit:cover; object-position:top center; flex:none;}
@@ -277,3 +277,24 @@
   .lw-prow img,.lw-prow .lw-av{display:none;}
   .lw-roster{padding:11px 12px 12px;}
 }
+
+/* ---- how the score was earned --------------------------------------
+   Each stat with the points it produced under this league's rules.
+   Chips rather than a table: the list is short, ragged per position, and
+   has to survive a narrow column beside a second roster. */
+.lw-calc{display:flex; flex-wrap:wrap; gap:4px; margin:5px 0 1px 41px;}
+.lw-prow.yet .lw-calc{display:none;}
+.lw-calc-item{display:inline-flex; align-items:baseline; gap:4px;
+  background:rgba(0,0,0,.22); border:1px solid var(--lw-line);
+  border-radius:6px; padding:2px 6px; font-size:10.5px; line-height:1.5;}
+.lw-calc-stat{font-family:var(--lw-mono); font-weight:700; color:var(--lw-text);
+  font-variant-numeric:tabular-nums;}
+.lw-calc-lbl{color:var(--lw-muted);}
+.lw-calc-pts{font-family:var(--lw-mono); font-weight:700; color:var(--lw-big);
+  font-variant-numeric:tabular-nums;}
+/* The reconciliation line: what MFL's score contains that a box score
+   can't explain. Muted, because it's an admission, not a stat. */
+.lw-calc-item.other{border-style:dashed;}
+.lw-calc-item.other .lw-calc-pts{color:var(--lw-muted);}
+.lw-calc-note{font-size:11px; color:var(--lw-muted); margin:10px 2px 0; line-height:1.5;}
+@media (max-width:680px){ .lw-calc{margin-left:0;} }

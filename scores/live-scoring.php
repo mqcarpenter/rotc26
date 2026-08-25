@@ -38,6 +38,7 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/helmets.php';
     require_once __DIR__ . '/../includes/live-wire.php';
     require_once __DIR__ . '/../includes/live-wire-espn.php';
+    require_once __DIR__ . '/../includes/live-wire-scoring.php';
     require_once __DIR__ . '/../includes/live-wire-view.php';
 
     // ?demo=1 previews the page against a real completed week, for the
@@ -69,7 +70,7 @@ if (!$fetchError) {
 
     // Resolve the requested matchup, and pull box score lines only for the
     // NFL teams actually involved in it.
-    $detail = null; $statlines = [];
+    $detail = null; $playerEvents = [];
     if ($wantDetail && $state) {
         foreach ($state['matchups'] as $m) {
             $ids = [$m['sides'][0]['id'], $m['sides'][1]['id']];
@@ -81,11 +82,11 @@ if (!$fetchError) {
                 foreach ($s['players'] as $pl) if ($pl['team'] !== '') $teams[$pl['team']] = true;
             }
             try {
-                $statlines = rotc_lw_espn_statlines(array_keys($teams),
+                $playerEvents = rotc_lw_espn_events(array_keys($teams),
                                                     $isDemo ? ROTC_LW_DEMO_DATE : null);
             } catch (Throwable $e) {
                 // Box score is a bonus; the fantasy numbers stand alone.
-                error_log('live-wire statlines: ' . $e->getMessage());
+                error_log('live-wire stats: ' . $e->getMessage());
             }
         }
     }
@@ -131,7 +132,7 @@ if (!$fetchError) {
       </div>
     <?php endif; ?>
     <?php if ($detail): ?>
-      <?php rotc_lw_render_matchup($detail, $statlines, $base, !empty($state['demo'])); ?>
+      <?php rotc_lw_render_matchup($detail, $playerEvents, $base, !empty($state['demo'])); ?>
     <?php else: ?>
       <?php rotc_lw_render_wire($state); ?>
       <div id="lw-games">
