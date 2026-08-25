@@ -128,12 +128,14 @@ function rotc_lw_detect_big_plays(array $players, int $week): array {
  * Full state for the Live Wire. Returns null when MFL has no live scoring
  * for this week (preseason, or a week that hasn't kicked off).
  */
-function rotc_live_wire_state(?int $week = null): ?array {
-    $raw = mfl_cached_get('liveScoring', ROTC_LW_TTL, $week ? ['W' => $week] : []);
+function rotc_live_wire_state(?int $week = null, bool $details = false): ?array {
+    $params = $week ? ['W' => $week] : [];
+    if ($details) $params['DETAILS'] = 1;
+    $raw = mfl_cached_get('liveScoring', ROTC_LW_TTL, $params);
     $matchupsRaw = mfl_normalize_list($raw['liveScoring']['matchup'] ?? null);
     if (!$matchupsRaw) return null;
     $week = (int) ($raw['liveScoring']['week'] ?? ($week ?: MFL_YEAR));
-    return rotc_lw_build($matchupsRaw, $week, 0.0);
+    return rotc_lw_build($matchupsRaw, $week, 0.0, $details);
 }
 
 /**
@@ -151,12 +153,13 @@ function rotc_live_wire_state(?int $week = null): ?array {
  * demo must never pollute real detection -- so its feed is derived from
  * the same wind-back instead.
  */
-function rotc_live_wire_demo_state(float $progress = 0.62): ?array {
-    $raw = mfl_cached_get_year('liveScoring', ROTC_LW_DEMO_YEAR, 86400,
-                               ['W' => ROTC_LW_DEMO_WEEK]);
+function rotc_live_wire_demo_state(float $progress = 0.62, bool $details = false): ?array {
+    $params = ['W' => ROTC_LW_DEMO_WEEK];
+    if ($details) $params['DETAILS'] = 1;
+    $raw = mfl_cached_get_year('liveScoring', ROTC_LW_DEMO_YEAR, 86400, $params);
     $matchupsRaw = mfl_normalize_list($raw['liveScoring']['matchup'] ?? null);
     if (!$matchupsRaw) return null;
-    $state = rotc_lw_build($matchupsRaw, ROTC_LW_DEMO_WEEK, $progress);
+    $state = rotc_lw_build($matchupsRaw, ROTC_LW_DEMO_WEEK, $progress, $details);
     $state['demo'] = true;
     return $state;
 }
@@ -166,7 +169,8 @@ function rotc_live_wire_demo_state(float $progress = 0.62): ?array {
  * (the live path); anything above 0 winds a completed week back to that
  * fraction for the demo.
  */
-function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0): ?array {
+function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0,
+                       bool $details = false): ?array {
     $demo = $progress > 0;
 
     $franchises = mfl_franchises();
@@ -202,7 +206,11 @@ function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0): ?a
             $players = [];
             foreach (mfl_normalize_list($f['players']['player'] ?? null) as $p) {
                 $pid = (string) ($p['id'] ?? '');
-                if ($pid === '' || ($p['status'] ?? '') !== 'starter') continue;
+                $status = (string) ($p['status'] ?? '');
+                if ($pid === '') continue;
+                // The board only ever shows starters; the drill-down wants
+                // the bench too, which is what DETAILS=1 adds.
+                if (!$details && $status !== 'starter') continue;
                 $md = $meta[$pid] ?? [];
                 $secs  = (int) ($p['gameSecondsRemaining'] ?? 0);
                 $score = (float) ($p['score'] ?? 0);
@@ -231,8 +239,9 @@ function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0): ?a
                     'proj'  => $proj[$pid] ?? null,
                     'secs'  => $secs,
                     // "Playing" = clock still running on their NFL game.
-                    'live'  => $secs > 0 && $score > 0,
-                    'yet'   => $secs >= 3600,
+                    'live'   => $secs > 0 && $score > 0,
+                    'yet'    => $secs >= 3600,
+                    'starter'=> $status === 'starter',
                 ];
                 $players[] = $row;
                 $flatPlayers[$pid] = $row + ['owner' => $franchises[$fid]['name'] ?? ''];
@@ -243,11 +252,15 @@ function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0): ?a
             // ones, so they have to be recomputed from the wound-back
             // players or the cards would show final scores over mid-game
             // fields.
+            // Bench players never count toward a franchise's score, so the
+            // demo recompute has to filter to starters -- otherwise loading
+            // the drill-down would inflate the totals it is drilling into.
+            $starters = array_filter($players, fn($x) => $x['starter']);
             $sideScore = $demo
-                ? round(array_sum(array_column($players, 'score')), 2)
+                ? round(array_sum(array_column($starters, 'score')), 2)
                 : round((float) ($f['score'] ?? 0), 2);
             $sideSecs = $demo
-                ? (int) array_sum(array_column($players, 'secs'))
+                ? (int) array_sum(array_column($starters, 'secs'))
                 : (int) ($f['gameSecondsRemaining'] ?? 0);
 
             $sideName = $franchises[$fid]['name'] ?? ('Franchise ' . $fid);
@@ -259,10 +272,10 @@ function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0): ?a
                 'score'     => $sideScore,
                 'secs'      => $sideSecs,
                 'yetToPlay' => $demo
-                    ? count(array_filter($players, fn($x) => $x['yet']))
+                    ? count(array_filter($starters, fn($x) => $x['yet']))
                     : (int) ($f['playersYetToPlay'] ?? 0),
                 'playing'   => $demo
-                    ? count(array_filter($players, fn($x) => $x['live']))
+                    ? count(array_filter($starters, fn($x) => $x['live']))
                     : (int) ($f['playersCurrentlyPlaying'] ?? 0),
                 'players'   => $players,
             ];

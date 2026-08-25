@@ -46,8 +46,17 @@ if (!$fetchError) {
     // the season starts -- same reasoning as /draft-board?demo=1.
     $isDemo = ($_GET['demo'] ?? '') === '1';
     $week = isset($_GET['week']) && ctype_digit((string) $_GET['week']) ? (int) $_GET['week'] : null;
+
+    // ?m=0006-0013 drills into one matchup. Keyed by franchise ids rather
+    // than a list index so a link stays valid when the board reorders
+    // (it sorts the viewer's own matchup first).
+    $detailKey = (string) ($_GET['m'] ?? '');
+    $wantDetail = (bool) preg_match('/^(\d{4})-(\d{4})$/', $detailKey, $mk);
+
     try {
-        $state = $isDemo ? rotc_live_wire_demo_state() : rotc_live_wire_state($week);
+        $state = $isDemo
+            ? rotc_live_wire_demo_state(0.62, $wantDetail)
+            : rotc_live_wire_state($week, $wantDetail);
     } catch (Throwable $e) {
         // A live page must never 500 on a bad upstream response.
         error_log('live-wire: ' . $e->getMessage());
@@ -56,6 +65,29 @@ if (!$fetchError) {
     // Pin the viewer's own matchup to the top when they're logged in.
     if (function_exists('rotc_mfl_franchise_id')) {
         $myFranchiseId = rotc_mfl_franchise_id() ?: null;
+    }
+
+    // Resolve the requested matchup, and pull box score lines only for the
+    // NFL teams actually involved in it.
+    $detail = null; $statlines = [];
+    if ($wantDetail && $state) {
+        foreach ($state['matchups'] as $m) {
+            $ids = [$m['sides'][0]['id'], $m['sides'][1]['id']];
+            if (in_array($mk[1], $ids, true) && in_array($mk[2], $ids, true)) { $detail = $m; break; }
+        }
+        if ($detail) {
+            $teams = [];
+            foreach ($detail['sides'] as $s) {
+                foreach ($s['players'] as $pl) if ($pl['team'] !== '') $teams[$pl['team']] = true;
+            }
+            try {
+                $statlines = rotc_lw_espn_statlines(array_keys($teams),
+                                                    $isDemo ? ROTC_LW_DEMO_DATE : null);
+            } catch (Throwable $e) {
+                // Box score is a bonus; the fantasy numbers stand alone.
+                error_log('live-wire statlines: ' . $e->getMessage());
+            }
+        }
     }
 }
 ?>
@@ -98,17 +130,21 @@ if (!$fetchError) {
         <a href="<?= $base ?>/scores/live-scoring">Back to live</a>
       </div>
     <?php endif; ?>
-    <?php rotc_lw_render_wire($state); ?>
-    <div id="lw-games">
-      <?php rotc_lw_render_cards($state, $myFranchiseId); ?>
-    </div>
+    <?php if ($detail): ?>
+      <?php rotc_lw_render_matchup($detail, $statlines, $base, !empty($state['demo'])); ?>
+    <?php else: ?>
+      <?php rotc_lw_render_wire($state); ?>
+      <div id="lw-games">
+        <?php rotc_lw_render_cards($state, $myFranchiseId, $base); ?>
+      </div>
+    <?php endif; ?>
     <p class="lw-note">
       The field is the matchup, not an NFL game. Midfield is a tie; the leader
       drives toward the trailing team's end zone. The yellow marker is the
       projected final, and the clock is how much roster game-time is left.
     </p>
     <?php // A demo is a still: polling would overwrite it with live (empty) data.
-          if (empty($state['demo'])) rotc_lw_render_script($base); ?>
+          if (empty($state['demo']) && !$detail) rotc_lw_render_script($base); ?>
   <?php endif; ?>
 </div>
 

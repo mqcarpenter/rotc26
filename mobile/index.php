@@ -1011,7 +1011,7 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
         </div>
       <?php else: ?>
         <?php rotc_lw_render_wire($liveState); ?>
-        <?php rotc_lw_render_cards($liveState, $ownerFranchiseId ?: null); ?>
+        <?php rotc_lw_render_cards($liveState, $ownerFranchiseId ?: null, $base); ?>
         <?php rotc_lw_render_script($base); ?>
       <?php endif; ?>
     </section>

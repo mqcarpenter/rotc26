@@ -71,7 +71,7 @@ function rotc_lw_render_wire(array $state): void {
 }
 
 /** One card per matchup. $highlightId pins the viewer's own franchise first. */
-function rotc_lw_render_cards(array $state, ?string $highlightId = null): void {
+function rotc_lw_render_cards(array $state, ?string $highlightId = null, string $base = ''): void {
     $matchups = $state['matchups'];
     if ($highlightId !== null) {
         usort($matchups, function ($x, $y) use ($highlightId) {
@@ -119,6 +119,11 @@ function rotc_lw_render_cards(array $state, ?string $highlightId = null): void {
           // thing anyone wants to know. Each column sits under the team it
           // belongs to, matching the scoreboard directly above it.
           ?>
+          <?php // Whole card is the target: on a phone a small "details"
+                // link would be a poor tap target next to a 34px field. ?>
+          <a class="lw-open" href="<?= $base ?>/scores/live-scoring?m=<?= urlencode($a['id'] . '-' . $b['id']) ?><?= !empty($state['demo']) ? '&amp;demo=1' : '' ?>">
+            <span class="lw-open-lbl">Full box score &rarr;</span>
+          </a>
           <div class="lw-onfield">
             <?php foreach ($m['sides'] as $si => $s):
               $live = array_slice(array_values(array_filter($s['players'], fn($p) => $p['live'])), 0, 4); ?>
@@ -246,5 +251,101 @@ function rotc_lw_render_script(string $base): void {
       });
     })();
     </script>
+    <?php
+}
+
+/**
+ * Drill-down: one matchup, every player on both rosters, with real box
+ * score lines where ESPN can supply them.
+ *
+ * This is the view for actually watching a game rather than scanning the
+ * slate, so it costs what the board deliberately won't: MFL with
+ * DETAILS=1 for the bench, plus an ESPN summary per NFL team involved.
+ * Fine for an explicit click; unthinkable every 30s across eight cards.
+ */
+function rotc_lw_render_matchup(array $m, array $statlines, string $base, bool $demo): void {
+    [$a, $b] = $m['sides'];
+    ?>
+    <a class="lw-back" href="<?= $base ?>/scores/live-scoring<?= $demo ? '?demo=1' : '' ?>">&larr; All matchups</a>
+
+    <article class="lw-game lw-game-detail<?= $m['redzone'] ? ' redzone' : '' ?>">
+      <div class="lw-row">
+        <span class="lw-tm away<?= $m['margin'] < 0 ? ' trail' : '' ?>">
+          <?= rotc_lw_helmet($a['id'], 'left') ?>
+          <span class="lw-name"><?= htmlspecialchars($a['name']) ?></span>
+          <span class="lw-score"><?= number_format($a['score'], 2) ?></span>
+        </span>
+        <span class="lw-state">
+          <span class="lw-q"><?= htmlspecialchars($m['quarter']) ?></span>
+          <span class="lw-dd"><?= number_format(abs($m['margin']), 1) ?> margin</span>
+        </span>
+        <span class="lw-tm<?= $m['margin'] > 0 ? ' trail' : '' ?>">
+          <span class="lw-score"><?= number_format($b['score'], 2) ?></span>
+          <span class="lw-name"><?= htmlspecialchars($b['name']) ?></span>
+          <?= rotc_lw_helmet($b['id'], 'right') ?>
+        </span>
+      </div>
+      <div class="lw-field">
+        <?php for ($y = 10; $y < 100; $y += 10): $x = 9 + ($y / 100) * 82; ?>
+          <span class="lw-yl<?= $y === 50 ? ' mid' : '' ?>" style="left:<?= $x ?>%"></span>
+        <?php endfor; ?>
+        <span class="lw-ez l<?= $m['margin'] > 0 ? ' hi' : '' ?>"><?= htmlspecialchars($a['tag']) ?></span>
+        <span class="lw-ez r<?= $m['margin'] < 0 ? ' hi' : '' ?>"><?= htmlspecialchars($b['tag']) ?></span>
+        <span class="lw-proj" style="left:<?= $m['projBall'] ?>%"></span>
+        <span class="lw-ball" style="left:<?= $m['ball'] ?>%"></span>
+      </div>
+      <div class="lw-proj-line">
+        Projected <strong><?= number_format($m['proj'][0], 1) ?></strong> &ndash;
+        <strong><?= number_format($m['proj'][1], 1) ?></strong>
+      </div>
+    </article>
+
+    <div class="lw-rosters">
+      <?php foreach ($m['sides'] as $s):
+        $starters = array_filter($s['players'], fn($p) => $p['starter']);
+        $bench    = array_filter($s['players'], fn($p) => !$p['starter']); ?>
+        <section class="lw-roster">
+          <h2 class="lw-roster-h"><?= htmlspecialchars($s['name']) ?>
+            <span><?= number_format($s['score'], 2) ?></span></h2>
+          <?php rotc_lw_render_roster($starters, $statlines, 'Starters'); ?>
+          <?php if ($bench) rotc_lw_render_roster($bench, $statlines, 'Bench', true); ?>
+        </section>
+      <?php endforeach; ?>
+    </div>
+    <?php
+}
+
+/** One roster block. $muted dims the bench, which scores nothing. */
+function rotc_lw_render_roster(array $players, array $statlines, string $heading, bool $muted = false): void {
+    usort($players, fn($x, $y) => $y['score'] <=> $x['score']);
+    ?>
+    <h3 class="lw-roster-sub"><?= htmlspecialchars($heading) ?></h3>
+    <div class="lw-plist<?= $muted ? ' muted' : '' ?>">
+      <?php foreach ($players as $p):
+        $line = $p['espn'] !== '' ? ($statlines[$p['espn']] ?? '') : '';
+        // Three states worth distinguishing at a glance: still to start,
+        // on the field now, done for the week.
+        $state = $p['yet'] ? 'yet' : ($p['live'] ? 'live' : 'done'); ?>
+        <div class="lw-prow <?= $state ?>">
+          <?= rotc_lw_avatar($p) ?>
+          <span class="lw-prow-main">
+            <span class="lw-prow-n"><?= htmlspecialchars($p['name']) ?>
+              <span class="lw-prow-meta"><?= htmlspecialchars(trim($p['pos'] . ' ' . $p['team'])) ?></span>
+            </span>
+            <?php if ($line !== ''): ?>
+              <span class="lw-prow-stat"><?= htmlspecialchars($line) ?></span>
+            <?php elseif ($state === 'yet'): ?>
+              <span class="lw-prow-stat dim">yet to play</span>
+            <?php endif; ?>
+          </span>
+          <span class="lw-prow-nums">
+            <span class="lw-prow-pts"><?= number_format($p['score'], 2) ?></span>
+            <?php if ($p['proj'] !== null): ?>
+              <span class="lw-prow-proj">proj <?= number_format((float) $p['proj'], 1) ?></span>
+            <?php endif; ?>
+          </span>
+        </div>
+      <?php endforeach; ?>
+    </div>
     <?php
 }

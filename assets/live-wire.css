@@ -199,13 +199,17 @@
    anyone asks looking at a live card. */
 .lw-onfield{display:grid; grid-template-columns:1fr 1fr; gap:6px 14px;
   align-items:start; padding:8px 14px 12px;}
-.lw-of-col{display:flex; flex-direction:column; gap:5px; min-width:0;}
-.lw-of-col.b{align-items:flex-end;}
+/* Chips fill their column so both sides are the same width. Sizing them
+   to their content made the two teams' rows visibly different lengths,
+   which read as a bug rather than as a layout. */
+.lw-of-col{display:flex; flex-direction:column; gap:5px; min-width:0; align-items:stretch;}
+.lw-of-col.b .lw-of-lbl{text-align:right;}
 .lw-of-lbl{font-family:var(--lw-disp); font-size:9.5px; text-transform:uppercase;
   letter-spacing:.11em; color:var(--lw-muted);}
 .lw-of-col.a .lw-of-lbl{color:var(--lw-accent);}
-.lw-pl{max-width:100%;}
-.lw-pl-n{overflow:hidden; text-overflow:ellipsis;}
+.lw-pl{width:100%; max-width:100%; justify-content:flex-start;}
+.lw-pl-n{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;}
+.lw-pl-s{margin-left:auto; padding-left:6px;}
 
 /* ---- the play behind a jump (ESPN) ---------------------------------
    Only present when ESPN could name it; the feed reads fine without. */
@@ -217,3 +221,59 @@
   color:var(--lw-big); border:1px solid rgba(242,169,59,.4); border-radius:4px;
   padding:0 4px; margin-right:5px; vertical-align:1px;}
 .lw-play-txt{white-space:normal;}
+
+/* ---- drill-down: one matchup, full box score ------------------------ */
+.lw-open{display:block; padding:5px 14px 0; text-align:center; text-decoration:none;}
+.lw-open-lbl{font-family:var(--lw-disp); font-size:10px; text-transform:uppercase;
+  letter-spacing:.1em; color:var(--lw-muted); border-bottom:1px solid transparent;}
+.lw-open:hover .lw-open-lbl{color:var(--lw-accent); border-bottom-color:var(--lw-accent);}
+.lw-open:focus-visible{outline:2px solid var(--lw-accent); outline-offset:-2px;}
+
+.lw-back{display:inline-block; margin-bottom:10px; color:var(--lw-accent);
+  font-family:var(--lw-disp); text-transform:uppercase; letter-spacing:.07em;
+  font-size:12.5px; font-weight:700; text-decoration:none;}
+.lw-back:hover{color:var(--lw-big);}
+.lw-game-detail{margin-bottom:14px;}
+.lw-proj-line{padding:9px 14px 11px; font-family:var(--lw-mono); font-size:12px;
+  color:var(--lw-muted); text-align:center;}
+.lw-proj-line strong{color:var(--lw-text);}
+
+.lw-rosters{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start;}
+.lw-roster{background:var(--lw-surface); border:1px solid var(--lw-line);
+  border-radius:14px; padding:12px 14px 14px; min-width:0;}
+.lw-roster-h{font-family:var(--lw-disp); font-size:17px; margin:0 0 2px;
+  display:flex; align-items:baseline; gap:8px; color:var(--lw-text);}
+.lw-roster-h span{margin-left:auto; font-family:var(--lw-mono); font-size:15px;
+  color:var(--lw-accent); font-variant-numeric:tabular-nums;}
+.lw-roster-sub{font-family:var(--lw-disp); font-size:10px; text-transform:uppercase;
+  letter-spacing:.11em; color:var(--lw-muted); margin:12px 0 5px; font-weight:700;}
+.lw-plist{display:flex; flex-direction:column;}
+.lw-plist.muted{opacity:.62;}   /* the bench scores nothing */
+.lw-prow{display:flex; align-items:center; gap:9px; padding:6px 0;
+  border-top:1px solid rgba(58,42,34,.55);}
+.lw-prow:first-child{border-top:none;}
+.lw-prow img,.lw-prow .lw-av{width:32px; height:24px; border-radius:4px;
+  object-fit:cover; object-position:top center; flex:none;}
+.lw-prow-main{flex:1; min-width:0;}
+.lw-prow-n{display:block; font-size:13px; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis;}
+.lw-prow-meta{color:var(--lw-muted); font-size:11px; margin-left:4px;}
+.lw-prow-stat{display:block; font-family:var(--lw-mono); font-size:10.5px;
+  color:var(--lw-big); margin-top:1px; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis;}
+.lw-prow-stat.dim{color:var(--lw-muted);}
+.lw-prow-nums{flex:none; text-align:right;}
+.lw-prow-pts{display:block; font-family:var(--lw-mono); font-size:14px; font-weight:700;
+  font-variant-numeric:tabular-nums;}
+.lw-prow-proj{display:block; font-family:var(--lw-mono); font-size:9.5px; color:var(--lw-muted);}
+/* A live player is the one worth looking at; done and yet-to-play recede. */
+.lw-prow.live .lw-prow-n{color:var(--lw-text); font-weight:600;}
+.lw-prow.live{box-shadow:inset 2px 0 0 var(--lw-accent); padding-left:7px;}
+.lw-prow.yet .lw-prow-n,.lw-prow.yet .lw-prow-pts{color:var(--lw-muted);}
+
+@media (max-width:680px){
+  /* Rosters stack: two columns of box score at 375px is unreadable. */
+  .lw-rosters{grid-template-columns:1fr;}
+  .lw-prow img,.lw-prow .lw-av{display:none;}
+  .lw-roster{padding:11px 12px 12px;}
+}
