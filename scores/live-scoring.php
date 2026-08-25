@@ -39,9 +39,14 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/live-wire.php';
     require_once __DIR__ . '/../includes/live-wire-view.php';
 
+    // ?demo=1 previews the page against a real completed week, for the
+    // eleven months a year when MFL publishes no live scoring at all.
+    // Managers otherwise have no way to see what this page does before
+    // the season starts -- same reasoning as /draft-board?demo=1.
+    $isDemo = ($_GET['demo'] ?? '') === '1';
     $week = isset($_GET['week']) && ctype_digit((string) $_GET['week']) ? (int) $_GET['week'] : null;
     try {
-        $state = rotc_live_wire_state($week);
+        $state = $isDemo ? rotc_live_wire_demo_state() : rotc_live_wire_state($week);
     } catch (Throwable $e) {
         // A live page must never 500 on a bad upstream response.
         error_log('live-wire: ' . $e->getMessage());
@@ -59,7 +64,9 @@ if (!$fetchError) {
 <div class="lw-page">
   <div class="lw-mast">
     <h1 class="lw-brand">Live <span>Wire</span></h1>
-    <?php if ($state): ?>
+    <?php if ($state && !empty($state['demo'])): ?>
+      <span class="lw-pill demo">Demo</span>
+    <?php elseif ($state): ?>
       <span class="lw-pill"><span class="lw-dot"></span>Week <?= (int) $state['week'] ?></span>
     <?php endif; ?>
     <span class="lw-updated" id="lw-updated"></span>
@@ -75,9 +82,21 @@ if (!$fetchError) {
       <p>MFL doesn't publish live scoring until the season is underway.
          Once games kick off, every matchup shows up here as its own field —
          the ball is the margin, and it moves as the scores do.</p>
+      <p><a class="lw-demo-btn" href="<?= $base ?>/scores/live-scoring?demo=1"
+            target="_blank" rel="noopener"
+            onclick="window.open(this.href,'rotc_lw_demo','width=1100,height=900,resizable=yes,scrollbars=yes'); return false;">
+        See how it works &rarr;</a></p>
+      <p class="lw-demo-note">Opens a preview built from a real week last season.</p>
     </div>
 
   <?php else: ?>
+    <?php if (!empty($state['demo'])): ?>
+      <div class="lw-demo-bar">
+        <strong>Demo.</strong> A real week from last season, wound back to
+        mid-afternoon so you can see the page working. Scores here are not live.
+        <a href="<?= $base ?>/scores/live-scoring">Back to live</a>
+      </div>
+    <?php endif; ?>
     <?php rotc_lw_render_wire($state); ?>
     <div id="lw-games">
       <?php rotc_lw_render_cards($state, $myFranchiseId); ?>
@@ -87,7 +106,8 @@ if (!$fetchError) {
       drives toward the trailing team's end zone. The yellow marker is the
       projected final, and the clock is how much roster game-time is left.
     </p>
-    <?php rotc_lw_render_script($base); ?>
+    <?php // A demo is a still: polling would overwrite it with live (empty) data.
+          if (empty($state['demo'])) rotc_lw_render_script($base); ?>
   <?php endif; ?>
 </div>
 

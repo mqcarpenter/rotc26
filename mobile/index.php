@@ -1006,6 +1006,7 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
           <h2>Nothing on the field yet</h2>
           <p>MFL doesn't publish live scoring until games kick off.
              Your matchup shows up here as its own field once they do.</p>
+          <p><a class="lw-demo-btn" href="<?= $base ?>/scores/live-scoring?demo=1">See how it works &rarr;</a></p>
         </div>
       <?php else: ?>
         <?php rotc_lw_render_wire($liveState); ?>

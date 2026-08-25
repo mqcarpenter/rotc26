@@ -39,6 +39,10 @@ if (!defined('ROTC_LW_BIG_PLAY'))   define('ROTC_LW_BIG_PLAY', 5.0);
 // ball on the goal line; anything wider just stays pinned.
 if (!defined('ROTC_LW_FIELD_SCALE')) define('ROTC_LW_FIELD_SCALE', 40.0);
 if (!defined('ROTC_LW_TTL'))        define('ROTC_LW_TTL', 25);
+// The completed week the ?demo=1 preview replays. Any real week works;
+// this one is a full 8-matchup slate with a wide spread of outcomes.
+if (!defined('ROTC_LW_DEMO_YEAR'))  define('ROTC_LW_DEMO_YEAR', 2025);
+if (!defined('ROTC_LW_DEMO_WEEK'))  define('ROTC_LW_DEMO_WEEK', 1);
 
 /** Where the rolling snapshot lives. Same dir/permissions as the MFL cache. */
 function rotc_lw_state_path(): string {
@@ -111,6 +115,41 @@ function rotc_live_wire_state(?int $week = null): ?array {
     $matchupsRaw = mfl_normalize_list($raw['liveScoring']['matchup'] ?? null);
     if (!$matchupsRaw) return null;
     $week = (int) ($raw['liveScoring']['week'] ?? ($week ?: MFL_YEAR));
+    return rotc_lw_build($matchupsRaw, $week, 0.0);
+}
+
+/**
+ * Sample state for the ?demo=1 preview, built from a real completed week
+ * of the PREVIOUS season (see ROTC_LW_DEMO_YEAR/WEEK).
+ *
+ * Why a real week rather than invented numbers: the whole page is a set
+ * of derived quantities -- margin, projection, quarter, who is on the
+ * field -- and fake inputs produce combinations that can't occur, which
+ * is exactly what a preview shouldn't teach people to expect.
+ *
+ * Scores are wound back to $progress of their final value so the week
+ * reads as mid-afternoon: balls off midfield, clocks mid-game, players
+ * still on the field. Nothing here touches the big-play snapshot -- a
+ * demo must never pollute real detection -- so its feed is derived from
+ * the same wind-back instead.
+ */
+function rotc_live_wire_demo_state(float $progress = 0.62): ?array {
+    $raw = mfl_cached_get_year('liveScoring', ROTC_LW_DEMO_YEAR, 86400,
+                               ['W' => ROTC_LW_DEMO_WEEK]);
+    $matchupsRaw = mfl_normalize_list($raw['liveScoring']['matchup'] ?? null);
+    if (!$matchupsRaw) return null;
+    $state = rotc_lw_build($matchupsRaw, ROTC_LW_DEMO_WEEK, $progress);
+    $state['demo'] = true;
+    return $state;
+}
+
+/**
+ * Shared builder. $progress of 0 means "use MFL's numbers as they are"
+ * (the live path); anything above 0 winds a completed week back to that
+ * fraction for the demo.
+ */
+function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0): ?array {
+    $demo = $progress > 0;
 
     $franchises = mfl_franchises();
 
@@ -147,18 +186,34 @@ function rotc_live_wire_state(?int $week = null): ?array {
                 $pid = (string) ($p['id'] ?? '');
                 if ($pid === '' || ($p['status'] ?? '') !== 'starter') continue;
                 $md = $meta[$pid] ?? [];
-                $secs = (int) ($p['gameSecondsRemaining'] ?? 0);
+                $secs  = (int) ($p['gameSecondsRemaining'] ?? 0);
+                $score = (float) ($p['score'] ?? 0);
+
+                if ($demo) {
+                    // Wind a finished week back to mid-afternoon. Each player
+                    // gets his own progress, spread deterministically off his
+                    // id, so the slate shows a realistic mix of finished,
+                    // playing and not-yet-started rather than every player
+                    // sitting at the same fraction. crc32 (not rand) keeps a
+                    // reload identical, which matters when someone is being
+                    // shown the page and asks "what's that?".
+                    $r  = (crc32($pid) % 100) / 100;
+                    $pr = max(0.0, min(1.0, $progress * 1.7 - $r * 0.85));
+                    $score = round($score * $pr, 2);
+                    $secs  = (int) round(3600 * (1 - $pr));
+                }
+
                 $row = [
                     'id'    => $pid,
                     'name'  => $md['name'] ?? ('Player ' . $pid),
                     'pos'   => $md['pos'] ?? '',
                     'team'  => $md['team'] ?? '',
                     'espn'  => $md['espn'] ?? '',
-                    'score' => (float) ($p['score'] ?? 0),
+                    'score' => $score,
                     'proj'  => $proj[$pid] ?? null,
                     'secs'  => $secs,
                     // "Playing" = clock still running on their NFL game.
-                    'live'  => $secs > 0 && (float) ($p['score'] ?? 0) > 0,
+                    'live'  => $secs > 0 && $score > 0,
                     'yet'   => $secs >= 3600,
                 ];
                 $players[] = $row;
@@ -166,13 +221,28 @@ function rotc_live_wire_state(?int $week = null): ?array {
             }
             usort($players, fn($a, $b) => $b['score'] <=> $a['score']);
 
+            // In demo the franchise totals MFL reports are the finished
+            // ones, so they have to be recomputed from the wound-back
+            // players or the cards would show final scores over mid-game
+            // fields.
+            $sideScore = $demo
+                ? round(array_sum(array_column($players, 'score')), 2)
+                : round((float) ($f['score'] ?? 0), 2);
+            $sideSecs = $demo
+                ? (int) array_sum(array_column($players, 'secs'))
+                : (int) ($f['gameSecondsRemaining'] ?? 0);
+
             $sides[] = [
                 'id'        => $fid,
                 'name'      => $franchises[$fid]['name'] ?? ('Franchise ' . $fid),
-                'score'     => round((float) ($f['score'] ?? 0), 2),
-                'secs'      => (int) ($f['gameSecondsRemaining'] ?? 0),
-                'yetToPlay' => (int) ($f['playersYetToPlay'] ?? 0),
-                'playing'   => (int) ($f['playersCurrentlyPlaying'] ?? 0),
+                'score'     => $sideScore,
+                'secs'      => $sideSecs,
+                'yetToPlay' => $demo
+                    ? count(array_filter($players, fn($x) => $x['yet']))
+                    : (int) ($f['playersYetToPlay'] ?? 0),
+                'playing'   => $demo
+                    ? count(array_filter($players, fn($x) => $x['live']))
+                    : (int) ($f['playersCurrentlyPlaying'] ?? 0),
                 'players'   => $players,
             ];
         }
@@ -213,8 +283,34 @@ function rotc_live_wire_state(?int $week = null): ?array {
         'week'     => $week,
         'updated'  => time(),
         'matchups' => $matchups,
-        'bigPlays' => rotc_lw_detect_big_plays($flatPlayers, $week),
+        // Demo never touches the snapshot file: polluting it would corrupt
+        // real big-play detection for whoever opens the live page next.
+        'bigPlays' => $demo
+            ? rotc_lw_demo_big_plays($flatPlayers)
+            : rotc_lw_detect_big_plays($flatPlayers, $week),
     ];
+}
+
+/**
+ * A plausible big-play feed for the demo: the highest-scoring players who
+ * are still on the field, presented as if each had just broken one. Real
+ * detection needs two snapshots, which a stateless preview doesn't have.
+ */
+function rotc_lw_demo_big_plays(array $players): array {
+    $live = array_filter($players, fn($p) => $p['live'] && $p['score'] >= ROTC_LW_BIG_PLAY);
+    usort($live, fn($a, $b) => $b['score'] <=> $a['score']);
+    $out = [];
+    foreach (array_slice($live, 0, 6) as $i => $p) {
+        $out[] = [
+            'id' => $p['id'], 'name' => $p['name'], 'pos' => $p['pos'],
+            'team' => $p['team'], 'espn' => $p['espn'], 'owner' => $p['owner'] ?? '',
+            // A believable slice of the player's total, not the whole thing.
+            'pts' => round(max(ROTC_LW_BIG_PLAY, $p['score'] * 0.45), 1),
+            'total' => $p['score'],
+            'ts' => time() - $i * 240,
+        ];
+    }
+    return $out;
 }
 
 /** Margin -> 0-100 field position. 50 is a tie; clamped inside the end zones. */
