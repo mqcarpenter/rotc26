@@ -43,6 +43,24 @@ if (!defined('ROTC_LW_TTL'))        define('ROTC_LW_TTL', 25);
 // this one is a full 8-matchup slate with a wide spread of outcomes.
 if (!defined('ROTC_LW_DEMO_YEAR'))  define('ROTC_LW_DEMO_YEAR', 2025);
 if (!defined('ROTC_LW_DEMO_WEEK'))  define('ROTC_LW_DEMO_WEEK', 1);
+// The real calendar date of that week, so the demo's play descriptions
+// come from the actual games rather than being invented.
+if (!defined('ROTC_LW_DEMO_DATE'))  define('ROTC_LW_DEMO_DATE', '20250907');
+
+/**
+ * Short franchise label for an end zone or column heading: first word, or
+ * initials when that word is too long for the space.
+ *
+ * Lives here rather than in the view because the JSON endpoint ships it
+ * too -- the client repaint needs the same label the server rendered.
+ */
+function rotc_lw_tag(string $name): string {
+    $w = preg_split('/[\s.]+/', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [$name];
+    if (mb_strlen($w[0]) <= 7) return mb_strtoupper($w[0]);
+    $ini = '';
+    foreach ($w as $part) $ini .= mb_substr($part, 0, 1);
+    return mb_strtoupper(mb_substr($ini, 0, 4));
+}
 
 /** Where the rolling snapshot lives. Same dir/permissions as the MFL cache. */
 function rotc_lw_state_path(): string {
@@ -232,9 +250,12 @@ function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0): ?a
                 ? (int) array_sum(array_column($players, 'secs'))
                 : (int) ($f['gameSecondsRemaining'] ?? 0);
 
+            $sideName = $franchises[$fid]['name'] ?? ('Franchise ' . $fid);
             $sides[] = [
                 'id'        => $fid,
-                'name'      => $franchises[$fid]['name'] ?? ('Franchise ' . $fid),
+                'name'      => $sideName,
+                // Short label for the end zone and the on-field column head.
+                'tag'       => rotc_lw_tag($sideName),
                 'score'     => $sideScore,
                 'secs'      => $sideSecs,
                 'yetToPlay' => $demo
@@ -285,10 +306,35 @@ function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0): ?a
         'matchups' => $matchups,
         // Demo never touches the snapshot file: polluting it would corrupt
         // real big-play detection for whoever opens the live page next.
-        'bigPlays' => $demo
-            ? rotc_lw_demo_big_plays($flatPlayers)
-            : rotc_lw_detect_big_plays($flatPlayers, $week),
+        'bigPlays' => rotc_lw_explain_plays(
+            $demo ? rotc_lw_demo_big_plays($flatPlayers)
+                  : rotc_lw_detect_big_plays($flatPlayers, $week),
+            $demo ? ROTC_LW_DEMO_DATE : null
+        ),
     ];
+}
+
+/**
+ * Attach the actual play behind each jump, where ESPN can identify it.
+ *
+ * Only the newest few are enriched: each one may cost a game-summary
+ * fetch, and nobody reads the bottom of the feed. Anything unexplained
+ * simply keeps showing its points jump, which is what MFL alone supports.
+ */
+function rotc_lw_explain_plays(array $plays, ?string $date): array {
+    if (!$plays || !function_exists('rotc_lw_espn_explain')) return $plays;
+    foreach ($plays as $i => $p) {
+        if ($i >= 6) break;                       // newest handful only
+        if (!empty($p['detail'])) continue;       // already resolved
+        if (empty($p['team']) || empty($p['name'])) continue;
+        try {
+            $d = rotc_lw_espn_explain((string) $p['team'], (string) $p['name'], $date);
+            if ($d) $plays[$i]['detail'] = $d;
+        } catch (Throwable $e) {
+            // Never let the garnish break the feed.
+        }
+    }
+    return $plays;
 }
 
 /**

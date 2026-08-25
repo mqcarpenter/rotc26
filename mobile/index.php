@@ -122,6 +122,7 @@ if (!in_array($activeTab, $validTabs, true)) {
 $liveState = null;
 if ($hasConfig) {
     require_once __DIR__ . '/../includes/live-wire.php';
+    require_once __DIR__ . '/../includes/live-wire-espn.php';
     require_once __DIR__ . '/../includes/live-wire-view.php';
     try {
         $liveState = rotc_live_wire_state();

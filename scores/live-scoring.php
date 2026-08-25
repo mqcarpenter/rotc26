@@ -37,6 +37,7 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/mfl-auth.php';
     require_once __DIR__ . '/../includes/helmets.php';
     require_once __DIR__ . '/../includes/live-wire.php';
+    require_once __DIR__ . '/../includes/live-wire-espn.php';
     require_once __DIR__ . '/../includes/live-wire-view.php';
 
     // ?demo=1 previews the page against a real completed week, for the

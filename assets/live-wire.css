@@ -143,13 +143,15 @@
   .lw-helm{display:none;}
   .lw-field{height:34px; margin:2px 12px 0;}
   .lw-ez{width:14%;}
-  /* Chips scroll rather than wrap, so card height stays fixed no matter
-     how many players are active. */
-  .lw-onfield{flex-wrap:nowrap; overflow-x:auto; padding:6px 12px 10px; scrollbar-width:none;}
-  .lw-onfield::-webkit-scrollbar{display:none;}
-  .lw-of-lbl{position:sticky; left:0; background:var(--lw-surface); padding-right:4px; z-index:1;}
-  .lw-pl{flex:none; padding:2px 9px;}
+  /* Two columns still, one per team -- with headshots off the chips are
+     just a name and a number, which fits at 375px and keeps ownership
+     obvious. Capped at three a side so card height stays predictable and
+     four matchups still fit a screen. */
+  .lw-onfield{grid-template-columns:1fr 1fr; gap:5px 10px; padding:6px 12px 10px;}
+  .lw-pl{padding:2px 8px;}
   .lw-pl img,.lw-pl .lw-av{display:none;}
+  .lw-pl-n{font-size:11px;}
+  .lw-of-col .lw-pl:nth-of-type(n+4){display:none;}
 }
 @media (max-width:360px){
   .lw-name{font-size:15px;} .lw-score{font-size:17px;} .lw-dd{display:none;}
@@ -190,3 +192,28 @@
 .lw-demo-btn:hover{filter:brightness(1.08); color:#1a0f08;}
 .lw-demo-btn:focus-visible{outline:2px solid var(--lw-big); outline-offset:2px;}
 .lw-demo-note{font-size:11.5px; margin:7px 0 0; color:var(--lw-muted);}
+
+/* ---- on-field, split by team ---------------------------------------
+   Two columns under the scoreboard they belong to. A border colour alone
+   never answered "whose player is that?", which is the first thing
+   anyone asks looking at a live card. */
+.lw-onfield{display:grid; grid-template-columns:1fr 1fr; gap:6px 14px;
+  align-items:start; padding:8px 14px 12px;}
+.lw-of-col{display:flex; flex-direction:column; gap:5px; min-width:0;}
+.lw-of-col.b{align-items:flex-end;}
+.lw-of-lbl{font-family:var(--lw-disp); font-size:9.5px; text-transform:uppercase;
+  letter-spacing:.11em; color:var(--lw-muted);}
+.lw-of-col.a .lw-of-lbl{color:var(--lw-accent);}
+.lw-pl{max-width:100%;}
+.lw-pl-n{overflow:hidden; text-overflow:ellipsis;}
+
+/* ---- the play behind a jump (ESPN) ---------------------------------
+   Only present when ESPN could name it; the feed reads fine without. */
+.lw-play{align-items:flex-start;}
+.lw-play.has-detail{max-width:420px;}
+.lw-play-d{display:block; margin-top:3px; font-size:11px; line-height:1.4;
+  color:var(--lw-text); white-space:normal;}
+.lw-play-when{display:inline-block; font-family:var(--lw-mono); font-size:9.5px;
+  color:var(--lw-big); border:1px solid rgba(242,169,59,.4); border-radius:4px;
+  padding:0 4px; margin-right:5px; vertical-align:1px;}
+.lw-play-txt{white-space:normal;}

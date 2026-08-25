@@ -28,6 +28,7 @@ if (!file_exists($configPath)) {
 require_once $configPath;
 require_once __DIR__ . '/../includes/mfl-api.php';
 require_once __DIR__ . '/../includes/live-wire.php';
+require_once __DIR__ . '/../includes/live-wire-espn.php';
 
 // Never let a browser cache a live feed.
 header('Cache-Control: no-store, max-age=0');

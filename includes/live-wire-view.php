@@ -12,15 +12,6 @@
  * Requires includes/helmets.php and includes/live-wire.php.
  */
 
-/** Franchise tag for an end zone: first word, or initials if it won't fit. */
-function rotc_lw_tag(string $name): string {
-    $w = preg_split('/[\s.]+/', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [$name];
-    if (mb_strlen($w[0]) <= 7) return mb_strtoupper($w[0]);
-    $ini = '';
-    foreach ($w as $part) $ini .= mb_substr($part, 0, 1);
-    return mb_strtoupper(mb_substr($ini, 0, 4));
-}
-
 /** Helmet facing into the middle of the card. */
 function rotc_lw_helmet(string $fid, string $side): string {
     $src = rotc_helmet_src($fid, $side);
@@ -55,11 +46,21 @@ function rotc_lw_render_wire(array $state): void {
       </div>
       <div class="lw-wire-body" id="lw-wire-body">
         <?php foreach ($state['bigPlays'] as $p): ?>
-          <div class="lw-play">
+          <div class="lw-play<?= !empty($p['detail']) ? ' has-detail' : '' ?>">
             <?= rotc_lw_avatar($p) ?>
             <span class="lw-play-txt">
               <span class="lw-play-n"><?= htmlspecialchars($p['name']) ?></span>
               <span class="lw-play-m"><?= htmlspecialchars($p['pos']) ?> &middot; <?= htmlspecialchars($p['owner']) ?></span>
+              <?php if (!empty($p['detail'])): ?>
+                <?php // What actually happened, from ESPN -- MFL knows only
+                      // that the number moved. See includes/live-wire-espn.php. ?>
+                <span class="lw-play-d">
+                  <?php if (!empty($p['detail']['period'])): ?>
+                    <span class="lw-play-when">Q<?= (int) $p['detail']['period'] ?><?= $p['detail']['clock'] !== '' ? ' ' . htmlspecialchars($p['detail']['clock']) : '' ?></span>
+                  <?php endif; ?>
+                  <?= htmlspecialchars($p['detail']['text']) ?>
+                </span>
+              <?php endif; ?>
             </span>
             <span class="lw-play-p">+<?= number_format($p['pts'], 1) ?></span>
           </div>
@@ -112,22 +113,28 @@ function rotc_lw_render_cards(array $state, ?string $highlightId = null): void {
             <span class="lw-ball" style="left:<?= $m['ball'] ?>%"></span>
           </div>
 
+          <?php
+          // Split by side rather than one mixed row: a border colour alone
+          // doesn't tell you whose player is whose, and that is the first
+          // thing anyone wants to know. Each column sits under the team it
+          // belongs to, matching the scoreboard directly above it.
+          ?>
           <div class="lw-onfield">
-            <span class="lw-of-lbl">On the field</span>
-            <?php
-            $any = false;
-            foreach ($m['sides'] as $si => $s) {
-                $live = array_slice(array_values(array_filter($s['players'], fn($p) => $p['live'])), 0, 3);
-                foreach ($live as $p) {
-                    $any = true;
-                    echo '<span class="lw-pl ' . ($si ? 'b' : 'a') . '">'
-                       . rotc_lw_avatar($p)
-                       . '<span class="lw-pl-n">' . htmlspecialchars($p['name']) . '</span>'
-                       . '<span class="lw-pl-s">' . number_format($p['score'], 1) . '</span></span>';
-                }
-            }
-            if (!$any) echo '<span class="lw-none">nobody playing right now</span>';
-            ?>
+            <?php foreach ($m['sides'] as $si => $s):
+              $live = array_slice(array_values(array_filter($s['players'], fn($p) => $p['live'])), 0, 4); ?>
+              <div class="lw-of-col <?= $si ? 'b' : 'a' ?>">
+                <span class="lw-of-lbl"><?= htmlspecialchars(rotc_lw_tag($s['name'])) ?></span>
+                <?php if ($live): foreach ($live as $p): ?>
+                  <span class="lw-pl <?= $si ? 'b' : 'a' ?>">
+                    <?= rotc_lw_avatar($p) ?>
+                    <span class="lw-pl-n"><?= htmlspecialchars($p['name']) ?></span>
+                    <span class="lw-pl-s"><?= number_format($p['score'], 1) ?></span>
+                  </span>
+                <?php endforeach; else: ?>
+                  <span class="lw-none">none playing</span>
+                <?php endif; ?>
+              </div>
+            <?php endforeach; ?>
           </div>
         </article>
     <?php endforeach;
@@ -185,25 +192,35 @@ function rotc_lw_render_script(string $base): void {
           card.querySelector('.lw-ez.l').classList.toggle('hi', m.margin > 0);
           card.querySelector('.lw-ez.r').classList.toggle('hi', m.margin < 0);
 
-          var chips = [];
-          m.sides.forEach(function(s, si){
-            (s.players || []).filter(function(p){ return p.live; }).slice(0,3).forEach(function(p){
-              chips.push('<span class="lw-pl ' + (si ? 'b' : 'a') + '">' + avatar(p)
+          card.querySelector('.lw-onfield').innerHTML = m.sides.map(function(s, si){
+            var live = (s.players || []).filter(function(p){ return p.live; }).slice(0,4);
+            var chips = live.map(function(p){
+              return '<span class="lw-pl ' + (si ? 'b' : 'a') + '">' + avatar(p)
                 + '<span class="lw-pl-n">' + esc(p.name) + '</span>'
-                + '<span class="lw-pl-s">' + Number(p.score).toFixed(1) + '</span></span>');
+                + '<span class="lw-pl-s">' + Number(p.score).toFixed(1) + '</span></span>';
             });
-          });
-          card.querySelector('.lw-onfield').innerHTML =
-            '<span class="lw-of-lbl">On the field</span>' +
-            (chips.length ? chips.join('') : '<span class="lw-none">nobody playing right now</span>');
+            return '<div class="lw-of-col ' + (si ? 'b' : 'a') + '">'
+              + '<span class="lw-of-lbl">' + esc(s.tag || '') + '</span>'
+              + (chips.length ? chips.join('') : '<span class="lw-none">none playing</span>')
+              + '</div>';
+          }).join('');
         });
 
         if (wire && body && d.bigPlays && d.bigPlays.length){
           wire.hidden = false;
           body.innerHTML = d.bigPlays.map(function(p){
-            return '<div class="lw-play">' + avatar(p)
+            var det = '';
+            if (p.detail && p.detail.text){
+              var when = p.detail.period
+                ? '<span class="lw-play-when">Q' + p.detail.period
+                  + (p.detail.clock ? ' ' + esc(p.detail.clock) : '') + '</span>'
+                : '';
+              det = '<span class="lw-play-d">' + when + esc(p.detail.text) + '</span>';
+            }
+            return '<div class="lw-play' + (det ? ' has-detail' : '') + '">' + avatar(p)
               + '<span class="lw-play-txt"><span class="lw-play-n">' + esc(p.name) + '</span>'
-              + '<span class="lw-play-m">' + esc(p.pos) + ' &middot; ' + esc(p.owner) + '</span></span>'
+              + '<span class="lw-play-m">' + esc(p.pos) + ' &middot; ' + esc(p.owner) + '</span>'
+              + det + '</span>'
               + '<span class="lw-play-p">+' + Number(p.pts).toFixed(1) + '</span></div>';
           }).join('');
         }
