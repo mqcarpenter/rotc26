@@ -151,7 +151,14 @@ $nav_items = [
     // Same page as Franchise -> Make an Auction Bid. Was a popup out to
     // MFL's O=43; it's a local page now, so it stays in the site.
     ['Auction Bid', "$base/draft-auction/auction-bid"],
-    ['AAV Report', "$base/draft-auction/aav-report"],
+    // AAV Report unlinked: it's the average price other MFL leagues paid,
+    // and this league shares almost nothing with the average one (IDP,
+    // dynasty keeper, 27-man rosters, a $500 budget against AAV's $1,000
+    // baseline), so the number reads as guidance while meaning nothing
+    // here. draft-auction/aav-report.php still exists, just unlinked --
+    // same treatment keepers.php got, and reversible by restoring this
+    // one row.
+    // ['AAV Report', "$base/draft-auction/aav-report"],
   ]],
   'League' => ['wide' => false, 'sub' => [
     ['League Calendar', "$base/league/league-calendar"],

@@ -49,6 +49,9 @@ if (!$fetchError) {
         if ($faOnly && !isset($faIds[$row['id']])) continue;
         if ($posFilter && ($p['position'] ?? '') !== $posFilter) continue;
         $rows[] = [
+            // id carried through so the row can show an injury tag --
+            // see rotc_injury_tag() in includes/player-hover.php.
+            'id' => (string) $row['id'],
             'name' => $p['name'] ?? ('Player #' . $row['id']),
             'position' => $p['position'] ?? '',
             'team' => $p['team'] ?? '',
@@ -96,7 +99,7 @@ function rotc_qs2(array $overrides): string {
             <?php foreach ($rows as $i => $r): ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= $i + 1 ?></td>
-                <td><?= rotc_team_logo_img($r['team']) ?></td><td><?= htmlspecialchars($r['name']) ?></td>
+                <td><?= rotc_team_logo_img($r['team']) ?></td><td><?= htmlspecialchars($r['name']) ?><?= rotc_injury_tag((string) ($r['id'] ?? '')) ?></td>
                 <td><?= htmlspecialchars($r['position']) ?></td>
                 <td><?= htmlspecialchars($r['team']) ?></td>
                 <td><?= htmlspecialchars($r['score']) ?></td>

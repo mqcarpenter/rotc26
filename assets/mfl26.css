@@ -1167,3 +1167,28 @@ a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; background:none !importan
 @media (max-width:720px){
   .rotc-auction-nominate .rotc-btn{ width:auto; }
 }
+
+
+/* ---- INJURY STATUS TAGS ------------------------------------
+   The short code MFL prints after a player's name -- (Q), (O), (IR).
+   Rendered by rotc_injury_tag() in includes/player-hover.php, which
+   rotc_player_hover_span() appends automatically, so these appear
+   anywhere the site lists players.
+
+   Three colours, by what the status means for game day rather than one
+   per MFL string: red = not playing, amber = might not play, grey =
+   not a fantasy asset right now (retired/suspended/holdout). Grey
+   matters -- a retired player marked in red would read as an urgent
+   game-day problem, which it isn't.
+
+   Small and unbold-able: this rides directly after a name inside table
+   cells and feed rows, so it has to read as an annotation, never as
+   part of the name. */
+.rotc-inj{
+  font-family:"Roboto Condensed", sans-serif;
+  font-size:11px; font-weight:700; letter-spacing:.02em;
+  white-space:nowrap; cursor:help; vertical-align:baseline;
+}
+.rotc-inj-out{  color:#b3261e; }
+.rotc-inj-warn{ color:#8a5a00; }
+.rotc-inj-gone{ color:#8A7A6C; }

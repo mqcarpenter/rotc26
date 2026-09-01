@@ -88,6 +88,70 @@ function mfl_fetch(string $type, array $params = [], bool $includeLeague = true,
     return $data;
 }
 
+/* ---- INJURY STATUS ------------------------------------------
+ * Lives here, in the data layer, rather than next to the rendering
+ * helper: the live-scoring feed (api/live-wire.php) needs the status
+ * without loading any of the player-name/photo rendering code, and
+ * every entry point already requires this file. The matching display
+ * helper is rotc_injury_tag() in includes/player-hover.php.
+ *
+ * Source is TYPE=injuries (league-agnostic, no L param). Confirmed
+ * live 2026-09-01, week 1: 445 rows, and the statuses MFL actually
+ * emits are Questionable, IR, IR-R, IR-PUP, IR-NFI, Out, Suspended,
+ * RETIRED and Holdout -- NOT the tidy Q/D/O set you'd expect, which is
+ * why the map below matches real strings and falls back rather than
+ * assuming. Each row also carries `details` ("Hamstring") and
+ * `exp_return` ("Sep 13, 2026").
+ */
+
+/**
+ * [playerId => ['status'=>, 'details'=>, 'exp_return'=>]], cached for
+ * the request AND on disk (30 min, same TTL the injury report uses).
+ * Static so a page listing 200 players costs one fetch, not 200.
+ */
+function rotc_injury_map(): array {
+    static $map = null;
+    if ($map !== null) return $map;
+    $map = [];
+    if (!function_exists('mfl_cached_get')) return $map;
+    $raw = mfl_cached_get('injuries', 1800, [], false);
+    foreach (mfl_normalize_list($raw['injuries']['injury'] ?? null) as $inj) {
+        if (empty($inj['id'])) continue;
+        $map[(string) $inj['id']] = [
+            'status'     => (string) ($inj['status'] ?? ''),
+            'details'    => (string) ($inj['details'] ?? ''),
+            'exp_return' => (string) ($inj['exp_return'] ?? ''),
+        ];
+    }
+    return $map;
+}
+
+/**
+ * Status string -> ['abbr' => 'IR', 'key' => 'ir'] for display.
+ * 'key' drives the colour class (see .rotc-inj-* in mfl26.css):
+ *   out  = red      -- not playing (Out, IR and its variants)
+ *   warn = amber    -- might not play (Questionable, Doubtful)
+ *   gone = grey     -- not a fantasy asset right now (Retired,
+ *                      Suspended, Holdout) -- no game-day meaning, so
+ *                      it must not read as urgent the way red does.
+ * Anything unrecognised still gets a tag (first two letters, grey)
+ * rather than vanishing -- MFL has added statuses before.
+ */
+function rotc_injury_badge(string $status): ?array {
+    $s = strtoupper(trim($status));
+    if ($s === '') return null;
+    if ($s === 'QUESTIONABLE')        return ['abbr' => 'Q',   'key' => 'warn'];
+    if ($s === 'DOUBTFUL')            return ['abbr' => 'D',   'key' => 'warn'];
+    if ($s === 'PROBABLE')            return ['abbr' => 'P',   'key' => 'warn'];
+    if ($s === 'OUT')                 return ['abbr' => 'O',   'key' => 'out'];
+    if (strpos($s, 'IR') === 0)       return ['abbr' => 'IR',  'key' => 'out'];
+    if ($s === 'PUP')                 return ['abbr' => 'PUP', 'key' => 'out'];
+    if ($s === 'SUSPENDED')           return ['abbr' => 'SUS', 'key' => 'gone'];
+    if ($s === 'RETIRED')             return ['abbr' => 'RET', 'key' => 'gone'];
+    if ($s === 'HOLDOUT')             return ['abbr' => 'HO',  'key' => 'gone'];
+    return ['abbr' => substr($s, 0, 2), 'key' => 'gone'];
+}
+
 /**
  * MFL collapses single-result lists to a bare associative array instead
  * of a one-item list (confirmed live: TYPE=players with one match

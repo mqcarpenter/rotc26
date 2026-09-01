@@ -58,8 +58,6 @@ $openAuctions = [];
 $minBid      = 1.0;
 $bidIncrement = 0.0;
 $myRosterLimit = 0;
-$startAmount = 0.0;
-$budget      = 0.0;
 $mflAuctionUrl = '';
 $positions   = ['QB', 'RB', 'WR', 'TE', 'DT', 'DE', 'LB', 'CB', 'S'];
 $q       = trim((string) ($_GET['q'] ?? ''));
@@ -122,7 +120,6 @@ if ($hasConfig) {
     $minBid = rotc_auction_money((string) ($leagueRaw['league']['minBid'] ?? ''));
     if ($minBid <= 0) $minBid = 1.0;
     $bidIncrement = rotc_auction_money((string) ($leagueRaw['league']['bidIncrement'] ?? ''));
-    $startAmount = rotc_auction_money((string) ($leagueRaw['league']['auctionStartAmount'] ?? ''));
     $myRosterLimit = (int) ($leagueRaw['league']['rosterSize'] ?? 0);
 
     if (isset($_GET['debug']) && $_GET['debug'] === 'xml') {
@@ -136,35 +133,39 @@ if ($hasConfig) {
     $faParams = $posFilter ? ['POSITION' => $posFilter] : [];
     $faRaw = mfl_cached_get('freeAgents', 900, $faParams);
     $faIds = array_column(mfl_normalize_list($faRaw['freeAgents']['leagueUnit']['player'] ?? null), 'id');
-    $faSet = array_flip($faIds);
 
-    // Auction value, league-wide, as the default ordering -- on an
-    // auction page "who is worth money" beats alphabetical. MFL's AAV is
-    // quoted against a $1,000 budget, so it's rescaled to this league's
-    // actual starting funds before being shown as a dollar figure.
-    $aavRaw = mfl_cached_get('aav', 3600, ['PERIOD' => 'RECENT'], false);
-    $budget = $startAmount;
-    foreach ($live['franchises'] as $f) { $budget = max($budget, $f['startingFunds']); }
-    $scale = $budget > 0 ? $budget / 1000.0 : 1.0;
-    $aavById = [];
-    foreach (mfl_normalize_list($aavRaw['aav']['player'] ?? null) as $a) {
-        if (!empty($a['id'])) $aavById[(string) $a['id']] = (float) ($a['averageValue'] ?? 0) * $scale;
+    // Prior-year fantasy points, in THIS league's scoring, as both the
+    // default ordering and the one value column.
+    //
+    // Deliberately NOT MFL's AAV. That's an average of what other
+    // leagues paid, and this league shares almost nothing with the
+    // average MFL auction league: IDP, dynasty keeper, 27-man rosters,
+    // a $500 budget against AAV's $1,000 baseline. Rescaling the number
+    // made it look local without making it mean anything, which is worse
+    // than not showing it -- an owner would anchor their opening bid to
+    // a figure computed from leagues that don't play this game. Points
+    // this league actually awarded are a real number.
+    $prevPtsById = [];
+    $prevRaw = mfl_cached_get_year('playerScores', (int) MFL_YEAR - 1, 86400, ['W' => 'YTD', 'COUNT' => 3000]);
+    foreach (mfl_normalize_list($prevRaw['playerScores']['playerScore'] ?? null) as $r) {
+        if (!empty($r['id'])) $prevPtsById[$r['id']] = $r['score'] ?? '';
     }
 
-    // Rank the free agents: anyone with an AAV first (highest money
-    // first), then everyone else. Name/team filtering needs player
-    // records, so the candidate set is trimmed to a workable size by AAV
-    // BEFORE the detail lookup -- except when there's a name search,
-    // where the whole free agent pool has to be searchable.
+    // Rank by those points, highest first; anyone who didn't score last
+    // year (rookies, and there are a lot of them in a post-draft free
+    // agent pool) sorts to the bottom rather than being dropped. The
+    // candidate set is trimmed by this ranking BEFORE the detail lookup,
+    // except when there's a name or team filter, where the whole free
+    // agent pool has to be searchable.
     $ranked = $faIds;
-    usort($ranked, function ($a, $b) use ($aavById) {
-        return ($aavById[$b] ?? -1) <=> ($aavById[$a] ?? -1);
+    usort($ranked, function ($a, $b) use ($prevPtsById) {
+        return ((float) ($prevPtsById[$b] ?? -1)) <=> ((float) ($prevPtsById[$a] ?? -1));
     });
     $lookupIds = ($q !== '' || $teamFilter !== '') ? $ranked : array_slice($ranked, 0, ROTC_AUCTION_FINDER_LIMIT * 2);
     // Every player with an open auction, ALWAYS -- they're what the table
     // above is about, and they are not necessarily inside the finder's
-    // by-value slice. Without this an auction on a low-AAV player renders
-    // as a bare "Player #16704" (seen live).
+    // ranked slice. Without this an auction on a low-scoring player
+    // renders as a bare "Player #16704" (seen live).
     foreach ($openAuctions as $a) $lookupIds[] = $a['player'];
     $lookupIds = array_values(array_unique($lookupIds));
     foreach (array_chunk($lookupIds, 150) as $chunk) {
@@ -177,12 +178,6 @@ if ($hasConfig) {
     foreach (mfl_normalize_list($byeRaw['nflByeWeeks']['team'] ?? null) as $t) {
         if (!empty($t['id'])) $byeByTeam[$t['id']] = $t['bye_week'] ?? '';
     }
-    $prevPtsById = [];
-    $prevRaw = mfl_cached_get_year('playerScores', (int) MFL_YEAR - 1, 86400, ['W' => 'YTD', 'COUNT' => 3000]);
-    foreach (mfl_normalize_list($prevRaw['playerScores']['playerScore'] ?? null) as $r) {
-        if (!empty($r['id'])) $prevPtsById[$r['id']] = $r['score'] ?? '';
-    }
-
     // Players already up for auction are off the table -- nominating one
     // twice is just an error round-trip to MFL.
     $alreadyUp = [];
@@ -206,7 +201,6 @@ if ($hasConfig) {
             'pos'   => (string) ($pd['position'] ?? ''),
             'team'  => $team,
             'bye'   => $byeByTeam[$pd['team'] ?? ''] ?? '',
-            'aav'   => $aavById[$pid] ?? null,
             'prev'  => $prevPtsById[$pid] ?? '',
         ];
     }
@@ -461,7 +455,6 @@ include __DIR__ . '/../templates/header.php';
                 <th class="rotc-sortable-th" data-type="text">Pos</th>
                 <th class="rotc-sortable-th" data-type="text">Team</th>
                 <th class="rotc-sortable-th" data-type="number">Bye</th>
-                <th class="rotc-sortable-th" data-type="number">Est. Value</th>
                 <th class="rotc-sortable-th" data-type="number"><?= (int) MFL_YEAR - 1 ?> Pts</th>
               </tr></thead>
               <tbody>
@@ -470,20 +463,17 @@ include __DIR__ . '/../templates/header.php';
                       'Position'  => $r['pos'],
                       'Team'      => $r['team'],
                       'Bye'       => $r['bye'],
-                      'Est. Value'=> $r['aav'] !== null ? rotc_auction_fmt_money($r['aav']) : '',
                       ((int) MFL_YEAR - 1) . ' Pts' => $r['prev'],
                   ];
                 ?>
                   <tr>
                     <td><input type="radio" name="player" value="<?= htmlspecialchars($r['id']) ?>"
-                               data-name="<?= htmlspecialchars($r['name']) ?>"
-                               data-value="<?= $r['aav'] !== null ? htmlspecialchars(number_format($r['aav'], 2, '.', '')) : '' ?>"></td>
+                               data-name="<?= htmlspecialchars($r['name']) ?>"></td>
                     <td><?= rotc_team_logo_img($r['team']) ?></td>
                     <td data-sort-value="<?= htmlspecialchars($r['name']) ?>"><?= rotc_player_hover_span($r['name'], $r['pd'], $statLines) ?></td>
                     <td><?= htmlspecialchars($r['pos']) ?></td>
                     <td><?= htmlspecialchars($r['team']) ?></td>
                     <td data-sort-value="<?= $r['bye'] !== '' ? htmlspecialchars((string) $r['bye']) : '99' ?>"><?= htmlspecialchars($r['bye'] !== '' ? (string) $r['bye'] : '--') ?></td>
-                    <td data-sort-value="<?= $r['aav'] !== null ? htmlspecialchars((string) $r['aav']) : '-1' ?>"><?= $r['aav'] !== null ? htmlspecialchars(rotc_auction_fmt_money($r['aav'])) : '--' ?></td>
                     <td data-sort-value="<?= $r['prev'] !== '' ? htmlspecialchars((string) $r['prev']) : '-1' ?>"><?= htmlspecialchars($r['prev'] !== '' ? (string) $r['prev'] : '--') ?></td>
                   </tr>
                 <?php endforeach; ?>
@@ -505,17 +495,18 @@ include __DIR__ . '/../templates/header.php';
               Opening bid must be at least <?= htmlspecialchars(rotc_auction_fmt_money($minBid)) ?><?php
                 if ($bidIncrement > 0): ?>, and bids go up in <?= htmlspecialchars(rotc_auction_fmt_money($bidIncrement)) ?> steps<?php
                 endif; ?>.
-              Est. Value is MyFantasyLeague's league-wide average auction value, rescaled to this league's
-              <?= htmlspecialchars(rotc_auction_fmt_money($budget)) ?> budget — a guide, not this league's price.
+              Sorted by <?= (int) MFL_YEAR - 1 ?> points in this league's own scoring — what the
+              player was actually worth here, not what other leagues paid for him.
             </p>
           </form>
 
           <script>
           (function () {
-            // Selected-player readout + a sensible opening bid: pre-fill
-            // with the player's estimated value when there is one, so the
-            // common case is one click and Start Auction. Never below the
-            // league minimum.
+            // Selected-player readout. The opening bid stays at the league
+            // minimum rather than being pre-filled from a suggested value:
+            // the only value MFL offers is an average across other leagues,
+            // which doesn't apply here (see the finder query above), and a
+            // wrong suggestion on a money field is worse than none.
             var minBid = <?= json_encode(round($minBid, 2)) ?>;
             var label = document.getElementById('rotc-auction-pick');
             var bid = document.getElementById('rotc-auction-bid');
@@ -525,8 +516,7 @@ include __DIR__ . '/../templates/header.php';
               var r = e.target;
               if (!r || r.name !== 'player') return;
               label.textContent = r.dataset.name || '';
-              var v = parseFloat(r.dataset.value || '');
-              bid.value = (isFinite(v) && v > minBid ? v : minBid).toFixed(2);
+              if (!bid.value || parseFloat(bid.value) < minBid) bid.value = minBid.toFixed(2);
             });
             window.rotcConfirmAuction = function () {
               var sel = form.querySelector('input[name="player"]:checked');

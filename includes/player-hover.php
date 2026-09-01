@@ -84,6 +84,55 @@ function rotc_player_bio_bits(?array $pd): array {
     return $bits;
 }
 
+/* ============================================================
+   INJURY STATUS TAGS
+   MFL prints a short coloured code after a player's name -- (Q), (O),
+   (IR) -- everywhere it lists players, and this reproduces that so the
+   same signal is available site-wide instead of only on the injury
+   report. Wired into rotc_player_hover_span() below, which means every
+   page that renders a player name through the shared helper picks it up
+   for free (rosters, free agents, lineups, trades, drops, transactions,
+   trending, recaps, the auction page).
+
+   The data behind it -- rotc_injury_map() and rotc_injury_badge() --
+   lives in includes/mfl-api.php, so the live-scoring feed can read
+   statuses without pulling in any rendering code. This is only the
+   display half.
+   ============================================================ */
+
+/**
+ * The rendered "(Q)" tag for a player id, or '' when they're healthy.
+ * Always returns safe HTML (or an empty string), so call sites can
+ * concatenate it straight onto a name with no further escaping.
+ *
+ * Pass $status directly to skip the lookup -- players/injury-report.php
+ * already has the row in hand and shouldn't re-resolve it.
+ */
+function rotc_injury_tag(?string $playerId, ?string $status = null): string {
+    if ($status === null) {
+        if ($playerId === null || $playerId === '') return '';
+        $row = rotc_injury_map()[$playerId] ?? null;
+        if (!$row) return '';
+        $status = $row['status'];
+        $detail = $row['details'];
+        $return = $row['exp_return'];
+    } else {
+        $detail = '';
+        $return = '';
+    }
+    $badge = rotc_injury_badge((string) $status);
+    if (!$badge) return '';
+    // "back Feb 15, 2027" on a RETIRED player is nonsense -- MFL parks a
+    // placeholder date on the statuses that aren't a real return. Only
+    // the ones someone is actually waiting on get a return date.
+    if ($badge['key'] === 'gone') $return = '';
+    if ($return !== '') $detail = trim($detail . ($detail !== '' ? ' — ' : '') . 'back ' . $return);
+    $title = trim($status . ($detail !== '' ? ' (' . $detail . ')' : ''));
+    return ' <span class="rotc-inj rotc-inj-' . $badge['key'] . '"'
+         . ' title="' . htmlspecialchars($title) . '">'
+         . '(' . htmlspecialchars($badge['abbr']) . ')</span>';
+}
+
 /**
  * Wraps $displayName in the hoverable span. $statLines is an
  * associative array of label => value (e.g. ['2025 Total' => '413.20
@@ -97,12 +146,18 @@ function rotc_player_hover_span(string $displayName, ?array $pd, array $statLine
         if ($value === '' || $value === null) continue;
         $lines[] = htmlspecialchars($label) . ': <strong>' . htmlspecialchars((string) $value) . '</strong>';
     }
+    // Injury tag sits OUTSIDE the hover trigger, so it keeps its own
+    // tooltip (the full status + body part + expected return) instead of
+    // being swallowed by the photo card. Every page rendering names
+    // through this helper gets it without touching a single call site.
+    $inj = rotc_injury_tag(isset($pd['id']) ? (string) $pd['id'] : null);
+
     return '<span class="rotc-player-hover"'
         . ' data-name="' . htmlspecialchars($displayName) . '"'
         . ' data-photo="' . htmlspecialchars($photo ?? '') . '"'
         . ' data-bio="' . htmlspecialchars($bio) . '"'
         . ' data-stats="' . htmlspecialchars(implode('<br>', $lines)) . '">'
-        . htmlspecialchars($displayName) . '</span>';
+        . htmlspecialchars($displayName) . '</span>' . $inj;
 }
 
 /**

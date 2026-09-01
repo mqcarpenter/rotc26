@@ -101,6 +101,7 @@ function rotc_lw_detect_big_plays(array $players, int $week): array {
             if ($delta < ROTC_LW_BIG_PLAY) continue;
             $feed[] = [
                 'id'    => (string) $pid,
+                'inj'   => $players[$pid]['inj'] ?? null,
                 'name'  => $players[$pid]['name'] ?? ('Player ' . $pid),
                 'pos'   => $players[$pid]['pos'] ?? '',
                 'team'  => $players[$pid]['team'] ?? '',
@@ -231,6 +232,12 @@ function rotc_lw_build(array $matchupsRaw, int $week, float $progress = 0.0,
 
                 $row = [
                     'id'    => $pid,
+                    // Injury badge travels WITH the row so both render
+                    // paths get it: the PHP view below and the JSON feed
+                    // the page polls (api/live-wire.php), which rebuilds
+                    // these rows in JS and can't call a PHP helper.
+                    // ['abbr'=>'Q','key'=>'warn'] or null.
+                    'inj'   => rotc_injury_badge(rotc_injury_map()[$pid]['status'] ?? ''),
                     'name'  => $md['name'] ?? ('Player ' . $pid),
                     'pos'   => $md['pos'] ?? '',
                     'team'  => $md['team'] ?? '',
@@ -361,7 +368,8 @@ function rotc_lw_demo_big_plays(array $players): array {
     $out = [];
     foreach (array_slice($live, 0, 6) as $i => $p) {
         $out[] = [
-            'id' => $p['id'], 'name' => $p['name'], 'pos' => $p['pos'],
+            'id' => $p['id'], 'inj' => $p['inj'] ?? null,
+            'name' => $p['name'], 'pos' => $p['pos'],
             'team' => $p['team'], 'espn' => $p['espn'], 'owner' => $p['owner'] ?? '',
             // A believable slice of the player's total, not the whole thing.
             'pts' => round(max(ROTC_LW_BIG_PLAY, $p['score'] * 0.45), 1),

@@ -12,6 +12,19 @@
  * Requires includes/helmets.php and includes/live-wire.php.
  */
 
+/**
+ * Injury tag for a live-wire row. The badge already rides on the row
+ * (see 'inj' in includes/live-wire.php), so this is only markup -- kept
+ * local so live-scoring.php and mobile/ don't have to pull in the whole
+ * player-name/photo rendering include for one span. Same .rotc-inj
+ * classes the rest of the site uses, so it looks identical here.
+ */
+function rotc_lw_inj(?array $inj): string {
+    if (!$inj) return '';
+    return ' <span class="rotc-inj rotc-inj-' . htmlspecialchars($inj['key']) . '">('
+         . htmlspecialchars($inj['abbr']) . ')</span>';
+}
+
 /** Helmet facing into the middle of the card. */
 function rotc_lw_helmet(string $fid, string $side): string {
     $src = rotc_helmet_src($fid, $side);
@@ -49,7 +62,7 @@ function rotc_lw_render_wire(array $state): void {
           <div class="lw-play<?= !empty($p['detail']) ? ' has-detail' : '' ?>">
             <?= rotc_lw_avatar($p) ?>
             <span class="lw-play-txt">
-              <span class="lw-play-n"><?= htmlspecialchars($p['name']) ?></span>
+              <span class="lw-play-n"><?= htmlspecialchars($p['name']) ?><?= rotc_lw_inj($p['inj'] ?? null) ?></span>
               <span class="lw-play-m"><?= htmlspecialchars($p['pos']) ?> &middot; <?= htmlspecialchars($p['owner']) ?></span>
               <?php if (!empty($p['detail'])): ?>
                 <?php // What actually happened, from ESPN -- MFL knows only
@@ -132,7 +145,7 @@ function rotc_lw_render_cards(array $state, ?string $highlightId = null, string 
                 <?php if ($live): foreach ($live as $p): ?>
                   <span class="lw-pl <?= $si ? 'b' : 'a' ?>">
                     <?= rotc_lw_avatar($p) ?>
-                    <span class="lw-pl-n"><?= htmlspecialchars($p['name']) ?></span>
+                    <span class="lw-pl-n"><?= htmlspecialchars($p['name']) ?><?= rotc_lw_inj($p['inj'] ?? null) ?></span>
                     <span class="lw-pl-s"><?= number_format($p['score'], 1) ?></span>
                   </span>
                 <?php endforeach; else: ?>
@@ -161,6 +174,16 @@ function rotc_lw_render_script(string $base): void {
 
       function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
         return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+      // Injury tag, mirroring rotc_lw_inj() in PHP. The feed carries the
+      // badge already resolved ({abbr, key}) so this never has to know
+      // MFL's status strings -- if the two drifted, the server-rendered
+      // card and the first poll's repaint would disagree.
+      function injTag(p){
+        if (!p || !p.inj) return '';
+        return ' <span class="rotc-inj rotc-inj-' + esc(p.inj.key) + '">('
+             + esc(p.inj.abbr) + ')</span>';
+      }
 
       function avatar(p){
         if (p.espn) return '<img src="https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/'
@@ -201,7 +224,7 @@ function rotc_lw_render_script(string $base): void {
             var live = (s.players || []).filter(function(p){ return p.live; }).slice(0,4);
             var chips = live.map(function(p){
               return '<span class="lw-pl ' + (si ? 'b' : 'a') + '">' + avatar(p)
-                + '<span class="lw-pl-n">' + esc(p.name) + '</span>'
+                + '<span class="lw-pl-n">' + esc(p.name) + injTag(p) + '</span>'
                 + '<span class="lw-pl-s">' + Number(p.score).toFixed(1) + '</span></span>';
             });
             return '<div class="lw-of-col ' + (si ? 'b' : 'a') + '">'
@@ -223,7 +246,7 @@ function rotc_lw_render_script(string $base): void {
               det = '<span class="lw-play-d">' + when + esc(p.detail.text) + '</span>';
             }
             return '<div class="lw-play' + (det ? ' has-detail' : '') + '">' + avatar(p)
-              + '<span class="lw-play-txt"><span class="lw-play-n">' + esc(p.name) + '</span>'
+              + '<span class="lw-play-txt"><span class="lw-play-n">' + esc(p.name) + injTag(p) + '</span>'
               + '<span class="lw-play-m">' + esc(p.pos) + ' &middot; ' + esc(p.owner) + '</span>'
               + det + '</span>'
               + '<span class="lw-play-p">+' + Number(p.pts).toFixed(1) + '</span></div>';
@@ -331,7 +354,7 @@ function rotc_lw_render_roster(array $players, array $events, string $heading, b
           <div class="lw-prow-top">
             <?= rotc_lw_avatar($p) ?>
             <span class="lw-prow-main">
-              <span class="lw-prow-n"><?= htmlspecialchars($p['name']) ?>
+              <span class="lw-prow-n"><?= htmlspecialchars($p['name']) ?><?= rotc_lw_inj($p['inj'] ?? null) ?>
                 <span class="lw-prow-meta"><?= htmlspecialchars(trim($p['pos'] . ' ' . $p['team'])) ?></span>
               </span>
               <?php if (!$bd && $state === 'yet'): ?>

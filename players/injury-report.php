@@ -90,7 +90,10 @@ if (!$fetchError) {
             <tbody>
               <?php foreach ($rows as $i => $r): ?>
                 <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                  <td><?= htmlspecialchars($r['name']) ?></td>
+                  <?php // Status already has its own column here, but the tag
+                        // still goes beside the name so this page reads the
+                        // same way as every other player list on the site. ?>
+                  <td><?= htmlspecialchars($r['name']) ?><?= rotc_injury_tag(null, $r['status']) ?></td>
                   <td><?= htmlspecialchars($r['pos']) ?></td>
                   <td><?= htmlspecialchars($r['status']) ?></td>
                   <td><?= htmlspecialchars($r['details']) ?></td>
