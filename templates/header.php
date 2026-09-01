@@ -92,11 +92,14 @@ $mfl = 'https://www42.myfantasyleague.com/2026';
 // own live draft/auction room, so there's no real write action to
 // build here even though the site now has real login.
 //
-// "Make a Draft Pick" is now ACTIVE and opens MFL's own pick page
-// (O=52) in a popup -- the draft is underway, and while we still can't
-// submit a pick through the API, sending the owner straight to the one
-// place that can is better than a greyed-out row. "Open an Auction"
-// stays inactive until an auction is actually running.
+// STATUS (2026-09-01): the snake draft is done and the league has moved
+// to the live AUCTION, so the two rows swapped states. "Make a Draft
+// Pick" is now INACTIVE -- greyed out AND non-clickable (see
+// rotc_nav_sub_item() below, which renders an inactive row as a <span>,
+// not a dead <a>). "Make an Auction Bid" is ACTIVE and points at this
+// site's own page, draft-auction/auction-bid.php, which reproduces
+// MFL's O=43 flow (find a free agent, put them up for auction) against
+// the owner's own MFL session.
 $nav_items = [
   'Scores' => ['wide' => true, 'sub' => [
     ['Live Scoring', "$base/scores/live-scoring"],
@@ -115,12 +118,9 @@ $nav_items = [
   'Franchise' => ['wide' => true, 'sub' => [
     ['Submit Lineup', "$base/franchise/submit-lineup.php"],
     ['Trade Bait', "$base/franchise/trade-bait"],
-    // Live on MFL rather than reimplemented here: making a pick has to
-    // happen in MFL's own draft UI (it holds the clock and pick order), so
-    // this opens there in a popup. Any absolute http(s) entry in this menu
-    // gets that treatment -- see rotc_nav_sub_attrs() below.
-    ['Make a Draft Pick', "$mfl/options?L=67102&O=52"],
-    ['Open an Auction', "$mfl/options?L=67102&O=44", true],
+    // Draft is over -- greyed out and unclickable, not merely styled.
+    ['Make a Draft Pick', "$mfl/options?L=67102&O=52", true],
+    ['Make an Auction Bid', "$base/draft-auction/auction-bid"],
     ['Offer a Trade', "$base/franchise/offer-trade.php"],
     ['Drop a Player', "$base/franchise/drop-player.php"],
     ['Make a Pool Pick', "$base/franchise/pool-pick.php"],
@@ -148,7 +148,9 @@ $nav_items = [
     ['Draft Results', "$base/draft-auction/draft-results"],
     ['ADP Report', "$base/draft-auction/adp-report"],
     ['Auction Results', "$base/draft-auction/auction-results"],
-    ['Auction Bid', "$mfl/options?L=67102&O=43"],
+    // Same page as Franchise -> Make an Auction Bid. Was a popup out to
+    // MFL's O=43; it's a local page now, so it stays in the site.
+    ['Auction Bid', "$base/draft-auction/auction-bid"],
     ['AAV Report', "$base/draft-auction/aav-report"],
   ]],
   'League' => ['wide' => false, 'sub' => [
@@ -199,19 +201,32 @@ $nav_items = [
 // 'season-deets' and 'auction' removed per Matteo's request -- unneeded,
 // neither ever had a real page behind it (no auction.php exists).
 /**
- * Attributes for one submenu link. $row is [label, href, inactiveFlag?].
+ * One rendered submenu row. $row is [label, href, inactiveFlag?].
  *
- * Absolute http(s) targets are MFL's own pages (making a draft pick,
- * opening an auction) -- things MFL has to own because it holds the draft
- * clock and pick order. Those open in a popup window so the owner keeps
- * this site behind them, matching the live-draft-room CTA on index.php.
+ * An inactive row is a <span>, not an <a> -- greying out a live link
+ * still leaves it clickable (and still lets a screen reader announce it
+ * as a link), which is exactly the trap "Make a Draft Pick" was in once
+ * the draft ended: it looked disabled but would happily send an owner to
+ * MFL's pick page for a draft that is over. aria-disabled says the same
+ * thing to assistive tech that the muted styling says visually.
+ *
+ * Absolute http(s) targets are MFL's own pages -- things MFL has to own
+ * because it holds the clock. Those open in a popup window so the owner
+ * keeps this site behind them.
  */
-function rotc_nav_sub_attrs(array $row): string {
-    $classes = !empty($row[2]) ? ' class="rotc-nav-inactive"' : '';
-    if (!preg_match('~^https?://~i', (string) $row[1])) return $classes;
-    return $classes . ' target="_blank" rel="noopener"'
-         . ' onclick="window.open(this.href,\'rotc_mfl\','
-         . '\'width=1200,height=900,resizable=yes,scrollbars=yes\'); return false;"';
+function rotc_nav_sub_item(array $row): string {
+    $label = htmlspecialchars((string) $row[0]);
+    if (!empty($row[2])) {
+        return '<span class="rotc-nav-inactive" aria-disabled="true">' . $label . '</span>';
+    }
+    $href = htmlspecialchars((string) $row[1]);
+    $attrs = '';
+    if (preg_match('~^https?://~i', (string) $row[1])) {
+        $attrs = ' target="_blank" rel="noopener"'
+               . ' onclick="window.open(this.href,\'rotc_mfl\','
+               . '\'width=1200,height=900,resizable=yes,scrollbars=yes\'); return false;"';
+    }
+    return '<a href="' . $href . '"' . $attrs . '>' . $label . '</a>';
 }
 
 $tabs = [
@@ -258,13 +273,13 @@ $tabs = [
               <?php foreach ($cols as $col): ?>
                 <ul class="rotc-sub-col">
                   <?php foreach ($col as $subRow): ?>
-                    <li><a href="<?= htmlspecialchars($subRow[1]) ?>"<?= rotc_nav_sub_attrs($subRow) ?>><?= htmlspecialchars($subRow[0]) ?></a></li>
+                    <li><?= rotc_nav_sub_item($subRow) ?></li>
                   <?php endforeach; ?>
                 </ul>
               <?php endforeach; ?>
             <?php else: ?>
               <?php foreach ($item['sub'] as $subRow): ?>
-                <li><a href="<?= htmlspecialchars($subRow[1]) ?>"<?= rotc_nav_sub_attrs($subRow) ?>><?= htmlspecialchars($subRow[0]) ?></a></li>
+                <li><?= rotc_nav_sub_item($subRow) ?></li>
               <?php endforeach; ?>
             <?php endif; ?>
           </ul>

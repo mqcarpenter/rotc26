@@ -195,7 +195,8 @@ a:hover{ color:var(--accent); }
   .rotc-coach-pill{ padding:10px 16px !important; }
 }
 .rotc-sub{ list-style:none; margin:0; padding:6px; position:absolute; top:100%; left:0; width:240px; max-width:90vw; background:var(--card); border:1px solid var(--line); box-shadow:0 8px 20px rgba(42,24,16,.18); display:none; z-index:10000; box-sizing:border-box; overflow:hidden; }
-.rotc-sub a{ overflow-wrap:break-word; word-break:break-word; display:block; padding:7px 10px; font-size:13px; color:var(--ink-2); }
+.rotc-sub a,
+.rotc-sub span.rotc-nav-inactive{ overflow-wrap:break-word; word-break:break-word; display:block; padding:7px 10px; font-size:13px; color:var(--ink-2); }
 /* Open-on-hover is for real hover devices only. On a touchscreen the
    first tap simulates :hover on the <li>, which -- combined with the
    mobile hover-hide rules that used to live below -- fought the
@@ -244,6 +245,7 @@ a:hover{ color:var(--accent); }
   .rotc-item.wide .rotc-sub{ width:auto; }
   .rotc-sub-col{ flex:none; }
   .rotc-sub a{ color:var(--paper); }
+  .rotc-sub span.rotc-nav-inactive{ color:#c9bcae66 !important; }
 }
 /* Same (hover:hover) guard as above, mobile colors -- kept as its own
    combined query rather than nested inside (max-width:1100px) above for
@@ -535,12 +537,18 @@ a.rotc-btn{ display:inline-block; text-decoration:none; }
 .rotc-pool-matchup span{ flex:0 0 110px; font-weight:700; }
 .rotc-pool-matchup label{ display:flex; align-items:center; gap:4px; }
 
-/* "Open an Auction" -- listed in the Franchise menu per Matteo's call
-   even while inactive (no live auction running), styled shadowy/muted
-   rather than removed so owners know it exists without it looking
-   like a normal live link. */
+/* Menu rows that are listed but not usable right now -- "Make a Draft
+   Pick" while the league is in the auction, previously "Open an Auction"
+   while it was in the draft. Kept visible so owners know the option
+   exists, styled shadowy/muted so it doesn't read as a live link. The
+   nav renders these as a <span>, not an <a> (see rotc_nav_sub_item() in
+   templates/header.php), so they are genuinely unclickable, not just
+   dimmed; the a.* selector stays for franchise/index.php's action cards,
+   which are real anchors. */
+.rotc-nav-inactive,
 a.rotc-nav-inactive{ color:#8a7a6c99 !important; font-style:italic; cursor:default; }
-a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; }
+.rotc-nav-inactive:hover,
+a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; background:none !important; }
 
 /* franchise/index.php soft-landing grid of action cards. */
 .rotc-franchise-actions{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; margin-top:10px; }
@@ -548,8 +556,9 @@ a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; }
 .rotc-franchise-action:hover{ background:var(--sand); }
 .rotc-franchise-action-title{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-weight:700; font-size:14px; color:var(--ink); }
 .rotc-franchise-action-desc{ font-size:12px; color:var(--muted); }
-a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-title,
-a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a7a6c99 !important; }
+.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-title,
+.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a7a6c99 !important; }
+.rotc-franchise-action.rotc-nav-inactive:hover{ background:none; }
 
 /* Submit Lineup table (franchise/submit-lineup.php) -- section header
    rows double as the horizontal divider between position groups (QB,
@@ -941,8 +950,17 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
   font-family:"Roboto Condensed", sans-serif; font-size:11px; fill:var(--ink-2);
 }
 
-/* ---- FRONT-PAGE ON-THE-CLOCK MODULE (index.php) --------------
-   Replaces the Draft Day announcement once the draft is underway.
+/* ---- FRONT-PAGE ON-THE-CLOCK MODULE --------------
+   NOT CURRENTLY RENDERED. index.php shows the auction status strip in
+   this slot now (see the end of this file); the draft module's markup
+   was removed from the front page when the league moved to the auction.
+   Kept because the state builder behind it (includes/draft-board.php)
+   still exists and this is the styling it needs if the module ever comes
+   back next preseason. .rotc-onclock-secondary IS still live -- the
+   auction strip reuses it for its Results button.
+
+   Originally: replaced the Draft Day announcement once the draft was
+   underway.
 
    The banner is a horizontal gradient, not a flat dark fill: the helmet
    art is a white-background PNG, so it needs a light panel to sit on.
@@ -1032,4 +1050,120 @@ a.rotc-franchise-action.rotc-nav-inactive .rotc-franchise-action-desc{ color:#8a
   .rotc-onclock-team{ font-size:17px; }
   .rotc-onclock-actions{ flex:1 1 100%; }
   .rotc-onclock-actions .rotc-draft-cta{ flex:1; text-align:center; }
+}
+
+
+/* ---- FRONT-PAGE AUCTION STATUS STRIP (index.php) --------------
+   Replaced the on-the-clock draft module in the same slot, and
+   deliberately reuses its shell: same dark bar, same height, same
+   .rotc-draft-cta / .rotc-onclock-secondary buttons, so the front page
+   didn't change shape when the league moved from draft to auction. No
+   helmet plate here, though, so this one is a flat ink fill rather than
+   the cream->ink gradient the draft module needed.
+
+   Four pills, one line, tight: active auctions, dollars bid on them,
+   auctions closed, dollars spent. */
+.rotc-auction-strip{
+  display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px;
+  background:var(--ink); color:var(--on-ink);
+  border-radius:var(--radius); padding:10px 16px; margin-bottom:14px;
+  border:1px solid rgba(42,24,16,.28);
+  box-shadow:0 1px 3px rgba(42,24,16,.10);
+}
+.rotc-auction-strip-head{ flex:0 1 auto; min-width:0; }
+.rotc-auction-eyebrow{
+  margin:0; font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
+  letter-spacing:.08em; font-size:10px; font-weight:700; color:var(--accent);
+}
+.rotc-auction-title{
+  margin:0; font-family:"Roboto Condensed",sans-serif; font-size:19px;
+  line-height:1.15; font-weight:700; white-space:nowrap;
+}
+.rotc-auction-pills{ display:flex; flex-wrap:wrap; gap:8px; flex:1 1 auto; }
+.rotc-auction-pill{
+  display:inline-flex; align-items:baseline; gap:5px;
+  padding:4px 12px; border-radius:999px;
+  background:rgba(253,251,247,.08); border:1px solid rgba(253,251,247,.18);
+  font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
+  letter-spacing:.05em; font-size:10.5px; font-weight:700;
+  color:rgba(253,251,247,.62); white-space:nowrap;
+}
+/* Tabular digits so a pill doesn't jump width as a bid ticks up. */
+.rotc-auction-pill b{
+  font-size:16px; font-weight:700; letter-spacing:0; color:var(--on-ink);
+  font-variant-numeric:tabular-nums;
+}
+/* Live bidding is the one number worth shouting about. */
+.rotc-auction-pill.hot{ background:rgba(224,83,27,.18); border-color:var(--accent); }
+.rotc-auction-pill.hot b{ color:var(--accent); }
+/* Next hard deadline, under the strip's headline. Auctions stop 24h
+   after their opening bid, so this is a real countdown, not an estimate.
+   Goes red inside the last 10% -- the same point MFL flags a row. */
+.rotc-auction-closes{
+  margin:1px 0 0; font-size:11.5px; color:rgba(253,251,247,.7);
+  font-variant-numeric:tabular-nums;
+}
+.rotc-auction-closes.closing{ color:var(--accent); font-weight:700; }
+.rotc-auction-actions{ display:flex; align-items:center; gap:8px; flex:none; }
+.rotc-auction-actions .rotc-draft-cta{ padding:7px 14px; font-size:12px; }
+@media (max-width:720px){
+  .rotc-auction-title{ font-size:17px; white-space:normal; }
+  .rotc-auction-actions{ flex:1 1 100%; }
+  .rotc-auction-actions .rotc-draft-cta{ flex:1; text-align:center; }
+}
+
+/* ---- AUCTION BID PAGE (draft-auction/auction-bid.php) ----------
+   Budget/roster panel above the player finder. Card-on-card, so it sits
+   on --sand rather than --card to separate from the enclosing .card. */
+.rotc-auction-status{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:10px; margin:0 0 16px;
+}
+.rotc-auction-stat{
+  background:var(--sand); border:1px solid var(--line); border-radius:var(--radius);
+  padding:9px 12px;
+}
+.rotc-auction-stat .l{
+  display:block; font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
+  letter-spacing:.05em; font-size:10px; font-weight:700; color:var(--muted);
+}
+.rotc-auction-stat .v{
+  display:block; font-family:"Roboto Condensed",sans-serif; font-size:19px;
+  font-weight:700; font-variant-numeric:tabular-nums;
+}
+.rotc-auction-stat.warn .v{ color:#b3261e; }
+/* Player finder: filter row above the sortable results table. */
+.rotc-auction-filters{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+.rotc-auction-filters input[type="search"],
+.rotc-auction-filters select{
+  padding:7px 9px; border:1px solid var(--line); border-radius:8px; font-size:13px;
+}
+.rotc-auction-filters input[type="search"]{ flex:1 1 220px; min-width:0; }
+.rotc-auction-count{ font-size:12px; color:var(--muted); margin-left:auto; }
+/* The nomination bar sticks to the bottom of the finder so the opening
+   bid and the submit button stay reachable however far the owner has
+   scrolled through free agents. */
+.rotc-auction-nominate{
+  position:sticky; bottom:0; z-index:2;
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  background:var(--card); border-top:2px solid var(--ink);
+  padding:12px 2px; margin-top:4px;
+}
+.rotc-auction-nominate .pick{ font-size:13px; flex:1 1 200px; min-width:0; }
+.rotc-auction-nominate .pick b{ font-family:"Roboto Condensed",sans-serif; font-size:15px; }
+.rotc-auction-nominate label{
+  font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
+  letter-spacing:.04em; font-size:11px; font-weight:700; color:var(--muted);
+}
+.rotc-auction-nominate input[type="text"]{
+  width:90px; padding:7px 9px; border:1px solid var(--line); border-radius:8px;
+  font-size:14px; font-variant-numeric:tabular-nums;
+}
+.rotc-auction-hint{ font-size:12px; color:var(--muted); margin:6px 0 0; }
+/* Time Left cell in the open-auctions table. Tabular digits so the
+   column doesn't jitter as the countdown ticks over. */
+.rotc-auction-left{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+.rotc-auction-left.closing{ color:#b3261e; font-weight:700; }
+@media (max-width:720px){
+  .rotc-auction-nominate .rotc-btn{ width:auto; }
 }
