@@ -2,7 +2,8 @@
 /**
  * index.php — the front page.
  *
- * Layout: hero carousel, then Hall of Fame spotlight, Fantasy Recap
+ * Layout: auction status strip, hero carousel, then Hall of Fame
+ * spotlight, Fantasy Recap
  * (interactive hero+list hub -- commented out at season start, see
  * below), and Final NFL Scores in the main column; Smack Feed / Top
  * Adds-Drops tabs plus the Top Free Agents/Draft Trends tabbed widget
@@ -42,6 +43,7 @@ if ($hasConfig) {
     require_once __DIR__ . '/includes/trending-players.php';
     require_once __DIR__ . '/includes/hall-of-fame.php';
     require_once __DIR__ . '/includes/transactions.php';
+    require_once __DIR__ . '/includes/auction.php';
 
     $current = rotc_current_recap_week((int) MFL_YEAR);
     if ($current) {
@@ -81,157 +83,28 @@ const ROTC_HOME_NFL_ABBR = [
 <div class="home-grid">
  <main class="home-main">
     <?php
-    // Draft Day announcement. Shown until the draft start passes, then
-    // auto-hides. Edit the date/time and league draft-room URL here.
-    $draftStartTs   = strtotime('2026-08-22 19:00:00 America/New_York');
-    $draftRoomUrl   = 'https://www42.myfantasyleague.com/2026/ajax_ld?L=' . (defined('MFL_LEAGUE_ID') ? MFL_LEAGUE_ID : '67102');
-    // Once the draft is underway the announcement is replaced by a live
-    // on-the-clock module: whose pick it is, how long they've been on the
-    // clock, and the last three picks made. Same state builder the big board
-    // at /draft-board uses (includes/draft-board.php), so both agree and
-    // share its MFL response caching rather than double-fetching.
-    $draftState = null;
-    // mfl_cached_get() only exists once config.php was found and
-    // includes/mfl-api.php loaded above; without it the state builder has
-    // nothing to fetch with.
-    if (time() >= $draftStartTs && function_exists('mfl_cached_get')
-        && file_exists(__DIR__ . '/includes/draft-board.php')) {
+    // Auction status strip. Replaced the draft's on-the-clock module and
+    // the Draft Day countdown banner that used to live here: this league
+    // runs player acquisition as a live AUCTION, so the front-page status
+    // a visitor actually wants is how many auctions are open, what has
+    // been bid, what has closed, and what it has cost -- not a snake-draft
+    // clock. Four pills, nothing more (templates/auction-summary.php).
+    // The draft module itself isn't lost: includes/draft-board.php still
+    // backs the full /draft-board page.
+    //
+    // A feed hiccup must never take the front page down -- same guard the
+    // draft module carried.
+    $auctionSummary = null;
+    if ($hasConfig && function_exists('rotc_auction_summary')) {
         try {
-            require_once __DIR__ . '/includes/draft-board.php';
-            $draftState = rotc_draft_build_state(false);
-            // Nothing drafted and nobody on the clock means MFL hasn't
-            // opened the draft yet -- fall through to the announcement
-            // rather than render an empty module.
-            if (($draftState['madeCount'] ?? 0) === 0 && empty($draftState['onClock'])) {
-                $draftState = null;
-            }
+            $auctionSummary = rotc_auction_summary();
         } catch (Throwable $e) {
-            // Never let a draft-feed hiccup take down the front page.
-            $draftState = null;
-            error_log('front-page draft module: ' . $e->getMessage());
+            $auctionSummary = null;
+            error_log('front-page auction strip: ' . $e->getMessage());
         }
     }
-
-    if ($draftState !== null):
-        $oc = $draftState['onClock'] ?? null;
-        // Last three completed picks, most recent first.
-        $recent = array_values(array_filter($draftState['picks'], fn($p) => $p['made']));
-        $recent = array_slice(array_reverse($recent), 0, 3);
-        // Timestamp of the previous completed pick. The module reports
-        // elapsed time SINCE that pick rather than time remaining: MFL's
-        // league data exposes no pick time limit, so a countdown would be
-        // inventing a deadline that does not exist.
-        $sinceTs = 0;
-        foreach ($draftState['picks'] as $p) {
-            if ($p['made'] && $p['ts'] > $sinceTs) $sinceTs = (int) $p['ts'];
-        }
+    if ($auctionSummary !== null) include __DIR__ . '/templates/auction-summary.php';
     ?>
-    <div class="rotc-onclock" data-since="<?= (int) $sinceTs ?>">
-      <?php if ($draftState['complete'] ?? false): ?>
-        <div class="rotc-onclock-main">
-          <p class="rotc-onclock-eyebrow">🏈 Draft Complete</p>
-          <h2 class="rotc-onclock-team">That's a wrap</h2>
-          <p class="rotc-onclock-meta"><?= (int) $draftState['madeCount'] ?> picks made.</p>
-        </div>
-      <?php elseif ($oc): ?>
-        <?php if (!empty($oc['helmet'])): ?>
-          <?php // Helmet art is a white-background PNG, so it can't sit
-                // directly on the dark banner. The wrapper carries a light
-                // panel that the banner gradient fades out of, making the
-                // white read as part of the design instead of a cut-out. ?>
-          <span class="rotc-onclock-helmet-wrap">
-            <img class="rotc-onclock-helmet<?= !empty($oc['helmetFlip']) ? ' flip' : '' ?>"
-                 src="<?= htmlspecialchars($oc['helmet']) ?>" alt="">
-          </span>
-        <?php endif; ?>
-        <div class="rotc-onclock-main">
-          <p class="rotc-onclock-eyebrow">🪖 On the Clock</p>
-          <h2 class="rotc-onclock-team"><?= htmlspecialchars($oc['teamName']) ?></h2>
-          <p class="rotc-onclock-meta">
-            Round <?= (int) $oc['round'] ?> · Pick <?= (int) $oc['pick'] ?>
-            <span class="rotc-onclock-dim">(Overall <?= (int) $oc['overall'] ?>)</span>
-          </p>
-        </div>
-        <div class="rotc-onclock-timer">
-          <span class="t" id="rotc-onclock-timer">—</span>
-          <span class="l">since last pick</span>
-        </div>
-      <?php endif; ?>
-
-      <?php if ($recent): ?>
-      <div class="rotc-onclock-recent">
-        <p class="rotc-onclock-recent-label">Last picks</p>
-        <?php foreach ($recent as $rp): $pl = $rp['player']; ?>
-          <div class="rotc-onclock-pick">
-            <?php if (!empty($pl['photo'])): ?>
-              <img class="rotc-onclock-photo" src="<?= htmlspecialchars($pl['photo']) ?>"
-                   alt="" loading="lazy" onerror="this.style.display='none'">
-            <?php endif; ?>
-            <span class="rotc-onclock-pick-text">
-              <strong><?= htmlspecialchars($pl['name'] ?? '') ?></strong>
-              <span class="rotc-onclock-dim"><?= htmlspecialchars(trim(($pl['pos'] ?? '') . ' ' . ($pl['team'] ?? ''))) ?></span>
-              <span class="rotc-onclock-to"><?= htmlspecialchars($rp['teamAbbr']) ?> · <?= (int) $rp['round'] ?>.<?= (int) $rp['pick'] ?></span>
-            </span>
-          </div>
-        <?php endforeach; ?>
-      </div>
-      <?php endif; ?>
-
-      <div class="rotc-onclock-actions">
-        <?php
-        // Not the live draft room (ajax_ld): that closes once the draft
-        // moves to slow/offline picks, which is where this league is now.
-        // O=52 is MFL's Make Draft Pick page, the same target as the
-        // Franchise menu item -- see templates/header.php.
-        $makePickUrl = 'https://www42.myfantasyleague.com/2026/options?L='
-                     . (defined('MFL_LEAGUE_ID') ? MFL_LEAGUE_ID : '67102') . '&O=52';
-        ?>
-        <a class="rotc-draft-cta" href="<?= htmlspecialchars($makePickUrl) ?>" target="_blank" rel="noopener"
-           onclick="window.open(this.href,'rotc_mfl','width=1200,height=900,resizable=yes,scrollbars=yes'); return false;">
-          Make Your Pick &rarr;
-        </a>
-        <a class="rotc-onclock-secondary" href="<?= $base ?>/draft-board">📺 Live Big Board</a>
-      </div>
-    </div>
-    <script>
-    (function () {
-      var box = document.querySelector('.rotc-onclock');
-      var el = document.getElementById('rotc-onclock-timer');
-      if (!box || !el) return;
-      var since = parseInt(box.dataset.since || '0', 10);
-      if (!since) { el.textContent = '—'; return; }
-      // Hours and minutes, not m:ss. This measures time SINCE THE LAST
-      // PICK, not time remaining -- MFL exposes no pick time limit, so
-      // there is no deadline to count down to. At the scale this actually
-      // runs (slow/offline picks, often many hours) seconds are noise.
-      function tick() {
-        var s = Math.max(0, Math.floor(Date.now() / 1000) - since);
-        var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-        el.textContent = h ? h + 'h ' + m + 'm' : m + 'm';
-      }
-      tick();
-      // Ticks the displayed minute over while the page sits open. Does NOT
-      // reload the page: picks land far too slowly to justify pulling the
-      // front page out from under whoever is reading it.
-      setInterval(tick, 60000);
-    })();
-    </script>
-    <?php elseif (time() < $draftStartTs): ?>
-    <div class="rotc-draft-banner">
-      <div class="rotc-draft-banner-body">
-        <p class="rotc-draft-eyebrow">🏈 Draft Day</p>
-        <h2 class="rotc-draft-title">The 2026 Draft Is Set</h2>
-        <p class="rotc-draft-when"><strong>Friday, August 22 · 7:00 PM ET.</strong> Get your rankings ready — the live draft room opens right here.</p>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px;flex:none;">
-        <a class="rotc-draft-cta" href="<?= htmlspecialchars($draftRoomUrl) ?>" target="_blank" rel="noopener"
-           onclick="window.open(this.href,'rotc_live_draft','width=1200,height=850,resizable=yes,scrollbars=yes'); return false;">
-          Enter Draft Room &rarr;
-        </a>
-        <a href="<?= $base ?>/draft-board" style="text-align:center;font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;letter-spacing:.06em;font-weight:700;font-size:12px;color:rgba(253,251,247,.85);text-decoration:none;border:1px solid rgba(253,251,247,.3);border-radius:8px;padding:8px 14px;">📺 Live Big Board</a>
-      </div>
-    </div>
-    <?php endif; ?>
 
     <?php
     require_once __DIR__ . '/includes/wp-hero-feed.php';

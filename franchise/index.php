@@ -40,8 +40,10 @@ $mflBase = "https://www42.myfantasyleague.com/{$mflYear}";
 $actions = [
     ['Submit Lineup', "$pageBase/franchise/submit-lineup.php", 'Set your starters for an upcoming week.'],
     ['Trade Bait', "$pageBase/franchise/trade-bait.php", 'List players you\'re open to trading, or browse everyone else\'s.'],
-    ['Make a Draft Pick', "$mflBase/options?L={$mflLeagueId}&O=52", 'Opens MyFantasyLeague\'s live draft room.'],
-    ['Open an Auction', "$mflBase/options?L={$mflLeagueId}&O=44", 'Opens MyFantasyLeague\'s live auction room.', true],
+    // Draft's over, the auction is on -- these two swapped states, same
+    // as the Franchise nav dropdown (templates/header.php).
+    ['Make a Draft Pick', "$mflBase/options?L={$mflLeagueId}&O=52", 'The draft is finished for this season.', true],
+    ['Make an Auction Bid', "$pageBase/draft-auction/auction-bid", 'Put a free agent up for auction, or see what\'s open for bidding.'],
     ['Offer a Trade', "$pageBase/franchise/offer-trade.php", 'Propose a player-for-player trade to another team.'],
     ['Drop a Player', "$pageBase/franchise/drop-player.php", 'Immediately drop a player from your roster.'],
     ['Make a Pool Pick', "$pageBase/franchise/pool-pick.php", 'Pick winners for this week\'s NFL pool.'],
@@ -64,10 +66,20 @@ include __DIR__ . '/../templates/header.php';
         <p class="rotc-login-blurb">Logged in as <?= htmlspecialchars($ownerUsername ?? '') ?>.</p>
         <div class="rotc-franchise-actions">
           <?php foreach ($actions as $a): $inactive = !empty($a[3]); ?>
-            <a class="rotc-franchise-action<?= $inactive ? ' rotc-nav-inactive' : '' ?>" href="<?= htmlspecialchars($a[1]) ?>">
-              <span class="rotc-franchise-action-title"><?= htmlspecialchars($a[0]) ?></span>
-              <span class="rotc-franchise-action-desc"><?= htmlspecialchars($a[2]) ?></span>
-            </a>
+            <?php // Inactive cards render as a <div>, not a dimmed link --
+                  // same reasoning as rotc_nav_sub_item() in the header:
+                  // a greyed-out anchor is still clickable. ?>
+            <?php if ($inactive): ?>
+              <div class="rotc-franchise-action rotc-nav-inactive" aria-disabled="true">
+                <span class="rotc-franchise-action-title"><?= htmlspecialchars($a[0]) ?></span>
+                <span class="rotc-franchise-action-desc"><?= htmlspecialchars($a[2]) ?></span>
+              </div>
+            <?php else: ?>
+              <a class="rotc-franchise-action" href="<?= htmlspecialchars($a[1]) ?>">
+                <span class="rotc-franchise-action-title"><?= htmlspecialchars($a[0]) ?></span>
+                <span class="rotc-franchise-action-desc"><?= htmlspecialchars($a[2]) ?></span>
+              </a>
+            <?php endif; ?>
           <?php endforeach; ?>
         </div>
       <?php endif; ?>
