@@ -50,7 +50,7 @@ $auctionPageUrl = ($base ?? '') . '/draft-auction/auction-bid';
   </div>
 
   <div class="rotc-auction-actions">
-    <a class="rotc-draft-cta" href="<?= htmlspecialchars($auctionPageUrl) ?>">Bid &amp; Nominate &rarr;</a>
+    <a class="rotc-draft-cta" href="<?= htmlspecialchars($auctionPageUrl) ?>">Make a Bid &rarr;</a>
     <a class="rotc-onclock-secondary" href="<?= htmlspecialchars(($base ?? '') . '/draft-auction/auction-results') ?>">Results</a>
   </div>
 </div>
