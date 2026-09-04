@@ -63,7 +63,7 @@ if ($hasConfig) {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2A1810">
 <title><?= htmlspecialchars($page_title) ?></title>
-<link rel="icon" type="image/png" href="<?= $base ?>/assets/img/rotc-icon.png">
+<?php $appTitle = 'ROTC'; include __DIR__ . '/templates/app-icons.php'; ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700|Roboto:400,400i,700" rel="stylesheet">
 <style>

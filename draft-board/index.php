@@ -39,7 +39,7 @@ if ($hasConfig) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f1ede6">
 <title>Draft Board — <?= htmlspecialchars($leagueName) ?></title>
-<link rel="icon" type="image/png" href="<?= $base ?>/assets/img/rotc-icon.png">
+<?php $appTitle = 'ROTC Board'; include dirname(__DIR__) . '/templates/app-icons.php'; ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700|Roboto:400,700" rel="stylesheet">
 <?php $cssVer = @filemtime(dirname(__DIR__) . '/assets/draft-board.css') ?: time(); ?>

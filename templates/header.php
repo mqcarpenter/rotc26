@@ -247,9 +247,10 @@ $tabs = [
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2A1810">
 <title><?= $page_title ?? 'Return of the Champions' ?></title>
-<link rel="icon" type="image/png" href="<?= $base ?>/assets/img/rotc-icon.png">
+<?php $appTitle = 'ROTC'; include __DIR__ . '/app-icons.php'; ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,400i,700|Roboto+Condensed:400,700|Roboto:400,400i,700" rel="stylesheet">
 <?php $cssVer = @filemtime(__DIR__ . '/../assets/mfl26.css') ?: time(); ?>

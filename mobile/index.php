@@ -727,7 +727,8 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= htmlspecialchars($page_title) ?></title>
 <meta name="theme-color" content="#2A1810">
-<link rel="icon" type="image/png" href="<?= $base ?>/assets/img/rotc-icon.png">
+<?php $appTitle = 'ROTC Manage'; $appScope = 'mobile';
+      include dirname(__DIR__) . '/templates/app-icons.php'; ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700|Roboto:400,400i,700" rel="stylesheet">
 <?php $cssVer1 = @filemtime(dirname(__DIR__) . '/assets/mfl26.css') ?: time(); ?>
