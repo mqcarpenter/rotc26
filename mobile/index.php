@@ -5,9 +5,9 @@
  * shell, NOT another page hung off the full desktop site chrome. No
  * mega-menu, no WhatsApp icon, no three-column footer: a slim top
  * bar, one task panel visible at a time, and a bottom tab bar (same
- * shape as a native app). All five tasks are embedded directly on
+ * shape as a native app). Every task is embedded directly on
  * this one URL -- switching tabs never reloads the page. Tab
- * switching is pure CSS (5 hidden radio inputs + sibling selectors in
+ * switching is pure CSS (one hidden radio per tab + sibling selectors in
  * assets/mobile-dashboard.css), the same no-JS toggle technique
  * templates/header.php already uses for the desktop burger menu and
  * dropdowns, so this page works with JS off too.
@@ -31,7 +31,15 @@
  * franchise/pool-pick.php. The active tab is persisted across reloads
  * via a hidden `tab` field.
  *
- * ALL FIVE PANELS ARE NOW LIVE. One caveat carried over from
+ * The Auction panel (added when the league moved off the snake draft)
+ * is the phone shape of draft-auction/auction-bid.php: the same data
+ * layer (includes/auction.php) and the same two real writes -- open an
+ * auction on a free agent found by name, and raise the bid on ones
+ * already running. Deliberately NOT the desktop table: a 1,600-row
+ * free agent list is unusable on a phone, so search replaces browsing,
+ * and each auction is a two-line card instead of eight columns.
+ *
+ * EVERY PANEL IS LIVE. One caveat carried over from
  * franchise/rotc-pickem.php: the schedule.weeklySchedule.matchup key
  * path for the Fantasy pool isn't confirmed live -- hit
  * /mobile?tab=rotc&debug=rotcsched to dump TYPE=schedule and confirm the
@@ -73,6 +81,10 @@ if ($hasConfig) {
     require_once dirname(__DIR__) . '/includes/mfl-api.php';
     require_once dirname(__DIR__) . '/includes/mfl-auth.php';
     require_once dirname(__DIR__) . '/includes/helmets.php';
+    require_once dirname(__DIR__) . '/includes/auction.php';
+    // For rotc_injury_tag() -- the same (Q)/(O)/(IR) codes the rest of
+    // the site puts after a player's name.
+    require_once dirname(__DIR__) . '/includes/player-hover.php';
     rotc_require_login($base);
 
     // Past the gate the owner is logged in and their franchise resolved.
@@ -108,7 +120,7 @@ if ($hasConfig) {
 // tabs otherwise snap back to the default (Lineup) on every submit or
 // week/target change. Forms carry a hidden `tab`; a trade-target GET
 // (?to=) implies the Trade tab.
-$validTabs = ['lineup', 'drop', 'trade', 'nfl', 'rotc', 'live'];
+$validTabs = ['lineup', 'drop', 'trade', 'auction', 'nfl', 'rotc', 'live'];
 $activeTab = (string) ($_POST['tab'] ?? $_GET['tab'] ?? '');
 if (!in_array($activeTab, $validTabs, true)) {
     $activeTab = ((string) ($_GET['to'] ?? '') !== '') ? 'trade' : 'lineup';
@@ -221,6 +233,37 @@ if ($hasConfig && $_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $result = ['action' => 'trade', 'ok' => true, 'respond' => ['accept' => 'accepted', 'reject' => 'rejected', 'revoke' => 'revoked'][$respondAction] ?? 'updated'];
             }
+        }
+    } elseif ($action === 'auctionstart') {
+        // LIVE: posts MFL's own auction_bid form as this owner -- the
+        // same write draft-auction/auction-bid.php makes, and confirmed
+        // against the live feed afterwards. See includes/auction.php.
+        if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $result = ['action' => 'auction', 'ok' => false, 'error' => 'Your session expired — reload the page and try again.'];
+        } else {
+            $r = rotc_auction_nominate(
+                (string) $ownerFranchiseId,
+                trim((string) ($_POST['player'] ?? '')),
+                trim((string) ($_POST['opening_bid'] ?? '')),
+                trim((string) ($_POST['msg'] ?? ''))
+            );
+            $result = ['action' => 'auction', 'ok' => $r['ok'], 'error' => $r['error'] ?? '', 'kind' => 'start'];
+        }
+    } elseif ($action === 'auctionbid') {
+        // LIVE: raise the bid on auctions already running. Blank boxes
+        // are the normal case (you bid on one of several), so they're
+        // dropped rather than read as $0.
+        if (!rotc_csrf_check($_POST['csrf'] ?? null)) {
+            $result = ['action' => 'auction', 'ok' => false, 'error' => 'Your session expired — reload the page and try again.'];
+        } else {
+            $bids = [];
+            foreach ((array) ($_POST['bid'] ?? []) as $pid => $amt) {
+                $amt = trim((string) $amt);
+                if ($amt !== '') $bids[(string) $pid] = $amt;
+            }
+            $r = rotc_auction_bid((string) $ownerFranchiseId, $bids, (array) ($_POST['bid_msg'] ?? []));
+            $result = ['action' => 'auction', 'ok' => $r['ok'], 'error' => $r['error'] ?? '',
+                       'kind' => 'bid', 'placed' => $r['placed'] ?? []];
         }
     } elseif ($action === 'nflpick' || $action === 'rotcpick') {
         // LIVE: import?TYPE=poolPicks, same shape as franchise/pool-pick.php.
@@ -367,11 +410,6 @@ if ($hasConfig) {
         }
     }
 
-    $drInj = [];
-    $drInjRaw = mfl_cached_get('injuries', 1800, [], false);
-    foreach (mfl_normalize_list($drInjRaw['injuries']['injury'] ?? null) as $inj) {
-        if (!empty($inj['id'])) $drInj[$inj['id']] = $inj['status'] ?? '';
-    }
 
     $drYtd = [];
     $drYtdRaw = mfl_cached_get('playerScores', 1800, ['W' => 'YTD', 'COUNT' => 3000]);
@@ -388,7 +426,6 @@ if ($hasConfig) {
             'name' => $nm,
             'pos'  => $pd['position'] ?? '',
             'team' => $pd['team'] ?? '',
-            'inj'  => $drInj[$p['id']] ?? '',
             'ytd'  => ($drYtd[$p['id']] ?? '') !== '' ? (float) $drYtd[$p['id']] : null,
         ];
     }
@@ -535,6 +572,82 @@ function rotc_m_pool_selection(string $action, string $franchiseId, string $pool
     return [$set, (bool) $set];
 }
 
+// ---- LIVE: Auction panel (mirrors draft-auction/auction-bid.php) ----
+// Same data layer (includes/auction.php) and same two writes as the
+// desktop page, reshaped for a phone: the open auctions as tappable
+// rows with one bid box each, and a name search instead of a 1,600-row
+// table -- nobody scrolls a free agent list on a phone, they type a
+// name. Search is a GET (?tab=auction&aq=), so a result list survives
+// a reload and can be shared.
+$aucLive      = ['ok' => false, 'auctions' => [], 'closed' => [], 'franchises' => []];
+$aucOpen      = [];
+$aucMine      = null;
+$aucMinBid    = 1.0;
+$aucIncrement = 0.0;
+$aucRosterCap = 0;
+$aucQuery     = trim((string) ($_GET['aq'] ?? ''));
+$aucResults   = [];
+$aucMatches   = 0;
+$aucPlayers   = [];
+$aucRecent    = [];
+const ROTC_MAUCTION_LIMIT = 25;
+
+if ($hasConfig) {
+    // Force a fresh read straight after a write so the panel shows what
+    // just happened rather than a cached "no auctions".
+    $aucLive = rotc_auction_live(($result['action'] ?? '') === 'auction' ? 0 : 20);
+    $aucOpen = $aucLive['auctions'];
+    $aucMine = $aucLive['franchises'][$ownerFranchiseId] ?? null;
+
+    $aucMinBid    = rotc_auction_money((string) ($league['minBid'] ?? ''));
+    if ($aucMinBid <= 0) $aucMinBid = 1.0;
+    $aucIncrement = rotc_auction_money((string) ($league['bidIncrement'] ?? ''));
+    $aucRosterCap = (int) ($league['rosterSize'] ?? 0);
+
+    // Most recent closings, so the panel says something useful when
+    // nothing is open -- which, between auctions, is most of the time.
+    $aucRecent = $aucLive['closed'];
+    usort($aucRecent, fn($a, $b) => ($b['completed'] ?? 0) <=> ($a['completed'] ?? 0));
+    $aucRecent = array_slice($aucRecent, 0, 5);
+
+    // Player records for everything the panel names: open auctions,
+    // recent closings, and any search hits.
+    $aucNeed = [];
+    foreach ($aucOpen as $a)   $aucNeed[] = $a['player'];
+    foreach ($aucRecent as $a) $aucNeed[] = $a['player'];
+
+    if ($aucQuery !== '') {
+        // Search the whole free agent pool by name. Names live in the
+        // players export, not the free agent list, so the FA ids are the
+        // filter and the name match happens after the lookup.
+        $aucFaRaw = mfl_cached_get('freeAgents', 900);
+        $aucFaIds = array_column(mfl_normalize_list($aucFaRaw['freeAgents']['leagueUnit']['player'] ?? null), 'id');
+        $aucFaSet = array_flip($aucFaIds);
+        $hits = [];
+        foreach (array_chunk($aucFaIds, 150) as $chunk) {
+            $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk), 'DETAILS' => 1], false);
+            foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $pl) {
+                if (stripos((string) ($pl['name'] ?? ''), $aucQuery) === false) continue;
+                $hits[] = $pl;
+            }
+        }
+        // Players already up for auction can't be put up again.
+        $upNow = [];
+        foreach ($aucOpen as $a) $upNow[$a['player']] = true;
+        $hits = array_values(array_filter($hits, fn($pl) => !isset($upNow[$pl['id']]) && isset($aucFaSet[$pl['id']])));
+        usort($hits, fn($a, $b) => strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? '')));
+        $aucMatches = count($hits);
+        $aucResults = array_slice($hits, 0, ROTC_MAUCTION_LIMIT);
+        foreach ($aucResults as $pl) $aucPlayers[$pl['id']] = $pl;
+    }
+
+    foreach (array_chunk(array_values(array_unique($aucNeed)), 150) as $chunk) {
+        if (!$chunk) continue;
+        $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk), 'DETAILS' => 1], false);
+        foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $pl) { $aucPlayers[$pl['id']] = $pl; }
+    }
+}
+
 // ---- LIVE: NFL Pick 'Em panel (mirrors franchise/pool-pick.php) ----
 $nflStartWeek = 1; $nflEndWeek = 17; $nflWeek = 1; $nflMatchups = [];
 $nflPicked = []; $nflPickedFromMfl = false;
@@ -640,6 +753,7 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-lineup"<?= $activeTab === 'lineup' ? ' checked' : '' ?>>
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-drop"<?= $activeTab === 'drop' ? ' checked' : '' ?>>
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-trade"<?= $activeTab === 'trade' ? ' checked' : '' ?>>
+  <input class="rotc-mtab" type="radio" name="mtab" id="mtab-auction"<?= $activeTab === 'auction' ? ' checked' : '' ?>>
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-nfl"<?= $activeTab === 'nfl' ? ' checked' : '' ?>>
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-rotc"<?= $activeTab === 'rotc' ? ' checked' : '' ?>>
   <input class="rotc-mtab" type="radio" name="mtab" id="mtab-live"<?= $activeTab === 'live' ? ' checked' : '' ?>>
@@ -750,7 +864,7 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
           <?php foreach ($droppable as $i => $p): $fid = 'drop_' . $i; ?>
             <div class="rotc-mrow">
               <div class="rotc-mrow-body">
-                <div class="rotc-mrow-name"><?= htmlspecialchars($p['name']) ?><?= $p['inj'] ? ' <span style="color:var(--accent);font-size:11px;">' . htmlspecialchars($p['inj']) . '</span>' : '' ?></div>
+                <div class="rotc-mrow-name"><?= htmlspecialchars($p['name']) ?><?= rotc_injury_tag((string) $p['id']) ?></div>
                 <div class="rotc-mrow-meta"><?= htmlspecialchars($p['pos']) ?> &middot; <?= htmlspecialchars($p['team']) ?> &middot; <?= $p['ytd'] !== null ? htmlspecialchars(number_format((float) $p['ytd'], 1)) . ' YTD pts' : 'no YTD pts' ?></div>
               </div>
               <label class="rotc-mtoggle danger" for="<?= $fid ?>">
@@ -899,6 +1013,185 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
       <?php endif; ?>
     </section>
 
+    <!-- ================= AUCTION ================= -->
+    <section class="rotc-mapp-panel panel-auction">
+      <div class="rotc-mapp-panel-head">
+        <h1 class="rotc-mapp-panel-title">Auction</h1>
+      </div>
+
+      <?php if ($result && $result['action'] === 'auction'): ?>
+        <?php if ($result['ok']): ?>
+          <div class="rotc-mapp-banner ok">
+            <?php if (($result['kind'] ?? '') === 'bid'): ?>
+              Bid<?= count($result['placed'] ?? []) === 1 ? '' : 's' ?> in. You're the high bidder — for now.
+            <?php else: ?>
+              Auction opened. The league can bid now.
+            <?php endif; ?>
+          </div>
+        <?php else: ?>
+          <div class="rotc-mapp-banner err">
+            <?= nl2br(htmlspecialchars($result['error'])) ?>
+            <?php if (!empty($result['placed'])): ?><br>(<?= count($result['placed']) ?> of your bids did go through.)<?php endif; ?>
+          </div>
+        <?php endif; ?>
+      <?php endif; ?>
+
+      <?php if (!$aucLive['ok']): ?>
+        <div class="rotc-mapp-banner err">The live auction feed isn't answering right now, so what's below may be out of date.</div>
+      <?php endif; ?>
+
+      <?php // Money first: on a phone this is the number you check before
+            // you do anything else. ?>
+      <?php if ($aucMine): ?>
+        <div class="rotc-mauc-money">
+          <div class="rotc-mauc-money-cell">
+            <span class="l">Available</span>
+            <span class="v"><?= htmlspecialchars(rotc_auction_fmt_money($aucMine['startingFunds'] - $aucMine['spent'])) ?></span>
+          </div>
+          <div class="rotc-mauc-money-cell">
+            <span class="l">Max Bid</span>
+            <span class="v"><?= htmlspecialchars(rotc_auction_fmt_money($aucMine['max'])) ?></span>
+          </div>
+          <div class="rotc-mauc-money-cell<?= $aucMine['openSpots'] < 1 ? ' warn' : '' ?>">
+            <span class="l">Open Spots</span>
+            <span class="v"><?= (int) $aucMine['openSpots'] ?></span>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <?php // ---- Live auctions ---- ?>
+      <div class="rotc-mapp-section-title">Live Auctions (<?= count($aucOpen) ?>)</div>
+      <?php if (!$aucOpen): ?>
+        <div class="rotc-mapp-card">
+          <div class="rotc-mrow"><div class="rotc-mrow-body">
+            <div class="rotc-mrow-meta">Nothing up for bid right now. Search below to put someone up.</div>
+          </div></div>
+        </div>
+        <?php if ($aucRecent): ?>
+          <div class="rotc-mapp-section-title">Recently Won</div>
+          <div class="rotc-mapp-card">
+            <?php foreach ($aucRecent as $a):
+              $pd = $aucPlayers[$a['player']] ?? null;
+              $who = $franchises[$a['bidder']]['name'] ?? ('Franchise ' . $a['bidder']); ?>
+              <div class="rotc-mrow">
+                <div class="rotc-mrow-body">
+                  <div class="rotc-mrow-name"><?= htmlspecialchars($pd['name'] ?? ('Player #' . $a['player'])) ?><?= rotc_injury_tag((string) $a['player']) ?></div>
+                  <div class="rotc-mrow-meta"><?= htmlspecialchars(trim(($pd['position'] ?? '') . ' · ' . ($pd['team'] ?? ''))) ?> · <?= htmlspecialchars($who) ?></div>
+                </div>
+                <div class="rotc-mrow-stat"><?= htmlspecialchars(rotc_auction_fmt_money($a['bid'])) ?>
+                  <span class="rotc-mrow-stat-label">won</span>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      <?php else: ?>
+        <form method="post">
+          <input type="hidden" name="action" value="auctionbid">
+          <input type="hidden" name="tab" value="auction">
+          <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+          <div class="rotc-mapp-card">
+            <?php foreach ($aucOpen as $a):
+              $pd    = $aucPlayers[$a['player']] ?? null;
+              $mine  = $a['bidder'] === $ownerFranchiseId;
+              $who   = $franchises[$a['bidder']]['name'] ?? ('Franchise ' . $a['bidder']);
+              $next  = $a['bid'] + ($aucIncrement > 0 ? $aucIncrement : 1.0);
+              $close = rotc_auction_is_closing($a['ends']); ?>
+              <div class="rotc-mauc-row<?= $mine ? ' mine' : '' ?>">
+                <div class="rotc-mauc-row-top">
+                  <div class="rotc-mrow-body">
+                    <div class="rotc-mrow-name"><?= htmlspecialchars($pd['name'] ?? ('Player #' . $a['player'])) ?><?= rotc_injury_tag((string) $a['player']) ?></div>
+                    <div class="rotc-mrow-meta">
+                      <?= htmlspecialchars(trim(($pd['position'] ?? '') . ' · ' . ($pd['team'] ?? ''))) ?>
+                      · <?= $mine ? 'you lead' : htmlspecialchars($who) ?>
+                    </div>
+                  </div>
+                  <div class="rotc-mrow-stat"><?= htmlspecialchars(rotc_auction_fmt_money($a['bid'])) ?>
+                    <span class="rotc-mrow-stat-label">high bid</span>
+                  </div>
+                </div>
+                <div class="rotc-mauc-row-bottom">
+                  <span class="rotc-mauc-clock<?= $close ? ' closing' : '' ?>"><?= htmlspecialchars(rotc_auction_time_left($a['ends'])) ?> left</span>
+                  <input class="rotc-mauc-bid" type="text" inputmode="decimal"
+                         name="bid[<?= htmlspecialchars($a['player']) ?>]"
+                         placeholder="<?= htmlspecialchars(number_format($next, 2, '.', '')) ?>"
+                         aria-label="Your bid on <?= htmlspecialchars($pd['name'] ?? 'this player') ?>">
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <p class="rotc-mapp-blurb">
+            Leave a box blank to skip it. Minimum raise is the high bid plus
+            <?= htmlspecialchars(rotc_auction_fmt_money($aucIncrement > 0 ? $aucIncrement : 1.0)) ?>.
+            Bids are proxy bids, so bidding your real max only spends what it takes to stay on top.
+            Every auction is a hard stop 24 hours after its opening bid — bidding late doesn't extend it.
+          </p>
+          <button type="submit" class="rotc-mbtn rotc-mapp-sticky-submit">Place Bids</button>
+        </form>
+      <?php endif; ?>
+
+      <?php // ---- Start one ---- ?>
+      <div class="rotc-mapp-section-title">Put a Player Up</div>
+
+      <?php if ($aucMine && $aucMine['openSpots'] < 1): ?>
+        <p class="rotc-mapp-blurb">
+          No room to add anyone: <?= (int) $aucMine['numPlayers'] ?> rostered<?php
+            if ($aucRosterCap): ?> of <?= (int) $aucRosterCap ?><?php endif; ?>,
+          plus any auction you're already leading. Drop someone first.
+        </p>
+      <?php endif; ?>
+
+      <form method="get" class="rotc-mauc-search">
+        <input type="hidden" name="tab" value="auction">
+        <input type="search" name="aq" value="<?= htmlspecialchars($aucQuery) ?>"
+               placeholder="Search free agents by name" aria-label="Search free agents by name">
+        <button type="submit" class="rotc-mbtn rotc-mbtn-small">Find</button>
+      </form>
+
+      <?php if ($aucQuery === ''): ?>
+        <p class="rotc-mapp-blurb">Type a name to find a free agent and open bidding on him.</p>
+      <?php elseif (!$aucResults): ?>
+        <p class="rotc-mapp-blurb">No free agent matches “<?= htmlspecialchars($aucQuery) ?>”.</p>
+      <?php else: ?>
+        <form method="post">
+          <input type="hidden" name="action" value="auctionstart">
+          <input type="hidden" name="tab" value="auction">
+          <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
+          <div class="rotc-mapp-card">
+            <?php foreach ($aucResults as $i => $pl): $rid = 'auc_' . $i; ?>
+              <div class="rotc-mrow">
+                <div class="rotc-mrow-body">
+                  <div class="rotc-mrow-name"><?= htmlspecialchars($pl['name'] ?? '') ?><?= rotc_injury_tag((string) $pl['id']) ?></div>
+                  <div class="rotc-mrow-meta"><?= htmlspecialchars(trim(($pl['position'] ?? '') . ' · ' . ($pl['team'] ?? ''))) ?></div>
+                </div>
+                <label class="rotc-mtoggle" for="<?= $rid ?>">
+                  <input type="radio" id="<?= $rid ?>" name="player" value="<?= htmlspecialchars($pl['id']) ?>">
+                  <span class="rotc-mtoggle-pill">Pick</span>
+                </label>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <?php if ($aucMatches > count($aucResults)): ?>
+            <p class="rotc-mapp-blurb">Showing <?= count($aucResults) ?> of <?= $aucMatches ?> matches — type more of the name to narrow it.</p>
+          <?php endif; ?>
+          <div class="rotc-mauc-open">
+            <label for="auc-open-bid">Opening bid</label>
+            <input id="auc-open-bid" type="text" inputmode="decimal" name="opening_bid"
+                   value="<?= htmlspecialchars(number_format($aucMinBid, 2, '.', '')) ?>">
+          </div>
+          <input class="rotc-mapp-trade-target" type="text" name="msg" maxlength="255"
+                 placeholder="Trash talk (optional)" aria-label="Optional bid comment">
+          <p class="rotc-mapp-blurb">
+            Opening bid must be at least <?= htmlspecialchars(rotc_auction_fmt_money($aucMinBid)) ?><?php
+              if ($aucIncrement > 0): ?>, in <?= htmlspecialchars(rotc_auction_fmt_money($aucIncrement)) ?> steps<?php
+              endif; ?>. This opens bidding for the whole league.
+          </p>
+          <button type="submit" class="rotc-mbtn rotc-mapp-sticky-submit"
+                  onclick="return confirm('Open bidding on the selected player? The whole league can bid.');">Start Auction</button>
+        </form>
+      <?php endif; ?>
+    </section>
+
     <!-- ================= NFL PICK 'EM ================= -->
     <section class="rotc-mapp-panel panel-nfl">
       <div class="rotc-mapp-panel-head">
@@ -1031,6 +1324,13 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
       Trade
       <?php if ($pendingIncoming): ?><span class="rotc-mapp-tab-badge"><?= count($pendingIncoming) ?></span><?php endif; ?>
+    </label>
+    <label class="tab-auction" for="mtab-auction" style="position:relative;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 11l-8.5 8.5a2.1 2.1 0 0 1-3-3L11 8"/><path d="M11.5 5.5l7 7"/><path d="M15.5 1.5l7 7"/><path d="M18.5 3.5l-4 4"/><path d="M20.5 5.5l-4 4"/></svg>
+      Auction
+      <?php // Live count, not a notification: it's how you tell from any
+            // tab whether there's anything to bid on. ?>
+      <?php if ($aucOpen): ?><span class="rotc-mapp-tab-badge"><?= count($aucOpen) ?></span><?php endif; ?>
     </label>
     <label class="tab-nfl" for="mtab-nfl">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22V3"/></svg>

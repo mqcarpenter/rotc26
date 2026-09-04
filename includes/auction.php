@@ -24,17 +24,29 @@
  * per-franchise budget panel on draft-auction/auction-bid.php is real
  * data, not a scrape.
  *
- * OPEN AUCTIONS -- CONFIRMED LIVE 2026-09-01 against a running auction
- * (this was a guess until one actually started):
+ * AUCTION ELEMENTS -- CONFIRMED LIVE 2026-09-01 against a running
+ * auction, and again 2026-09-03 after four had closed:
  *
- *   <auction player="16704" timeStarted="1788270711" highBid="15.00"
- *            formattedHighBid="$15.00" highBidder="0001"
- *            lastBidTime="1788270711" />
+ *   open:   <auction player="16704" timeStarted="1788270711"
+ *                    highBid="15.00" formattedHighBid="$15.00"
+ *                    highBidder="0001" lastBidTime="1788270711" />
+ *   closed: ... same, plus completed="1788364670"
  *
- * and the root picks up currentPlayer / timeStarted / lastBidTime while
- * bidding is open. The confirmed names are tried FIRST below; the
- * alternates are kept behind them as cheap insurance, since only the
- * one-auction case has been seen so far.
+ * The root picks up currentPlayer / timeStarted / lastBidTime while
+ * bidding is open.
+ *
+ * CRITICAL: closed auctions are NOT removed from this file -- they stay
+ * forever and are distinguished ONLY by the `completed` attribute. The
+ * first version of this parser treated every <auction> as open, which
+ * (once four had closed) reported "4 Active, $60 bid" on a league with
+ * nothing running, double-counting the same auctions as both open and
+ * closed. `completed` is therefore the split, not a detail.
+ *
+ * The close timestamps also confirm the 24h rule from the data side:
+ * three of the four closed 24.0h / 24.1h / 24.8h after their opening
+ * bid. (The fourth ran 26.1h -- MFL sweeps periodically rather than
+ * closing on the exact second, so ROTC_AUCTION_DURATION is right for
+ * "when bidding ends" and the actual close lands at MFL's next sweep.)
  *
  * There is NO end time in the feed, but the rule is known: this league
  * runs a HARD STOP 24 hours after the opening bid -- confirmed by the
@@ -148,15 +160,17 @@ function rotc_auction_attr(array $attrs, array $names, string $default = ''): st
  *    'franchises'=>[id => ['startingFunds'=>f,'spent'=>f,'max'=>f,
  *                          'numPlayers'=>int,'openSpots'=>int,
  *                          'canNominate'=>bool]],
- *    'auctions'=>[ ['player'=>str,'bid'=>float,'bidder'=>str,
- *                   'started'=>int,'lastBid'=>int,'ends'=>int], ... ]]
+ *    'auctions'=>[ ... ],   // OPEN only
+ *    'closed'=>[ ... ]]     // same shape + 'completed'=>int
+ * Each auction: ['player'=>str,'bid'=>float,'bidder'=>str,
+ *                'started'=>int,'lastBid'=>int,'ends'=>int]
  */
 function rotc_auction_parse_live(?string $body): array {
     $out = [
         'ok' => false, 'timestamp' => 0, 'paused' => false, 'over' => false,
         'currentNominator' => '', 'nextNominator' => '',
         'currentPlayer' => '', 'lastBidTime' => 0,
-        'franchises' => [], 'auctions' => [],
+        'franchises' => [], 'auctions' => [], 'closed' => [],
     ];
     if ($body === null || $body === '') return $out;
 
@@ -193,24 +207,34 @@ function rotc_auction_parse_live(?string $body): array {
             continue;
         }
 
-        // Anything that isn't a <franchise> row is an open auction.
-        // Confirmed attribute names lead each list (see the file header);
-        // the alternates behind them are insurance, not guesswork.
+        // Anything that isn't a <franchise> row is an auction -- open or
+        // long since closed. Confirmed attribute names lead each list
+        // (see the file header); the alternates are insurance.
         $playerId = rotc_auction_attr($attrs, ['player', 'playerId', 'player_id', 'id']);
         if ($playerId === '') continue;
-        $out['auctions'][] = [
+
+        $started = (int) rotc_auction_attr($attrs, ['timeStarted', 'started', 'startTime', 'start'], '0');
+        $row = [
             'player'  => $playerId,
             'bid'     => rotc_auction_money(rotc_auction_attr($attrs, ['highBid', 'formattedHighBid', 'bid', 'currentBid', 'amount'])),
             'bidder'  => rotc_auction_attr($attrs, ['highBidder', 'franchise', 'bidder', 'franchiseId']),
-            'started' => (int) rotc_auction_attr($attrs, ['timeStarted', 'started', 'startTime', 'start'], '0'),
+            'started' => $started,
             'lastBid' => (int) rotc_auction_attr($attrs, ['lastBidTime', 'lastBid', 'last_bid_time'], '0'),
+            // Derived, not read: see ROTC_AUCTION_DURATION. Only
+            // meaningful with a real start time -- a 0 start would
+            // produce a deadline in 1970 and mark everything as closing.
+            'ends'    => $started > 0 ? $started + ROTC_AUCTION_DURATION : 0,
         ];
-        // Derived, not read: see ROTC_AUCTION_DURATION. Only meaningful
-        // when we actually got a start time -- a 0 start would otherwise
-        // produce a deadline in 1970 and mark every auction as closing.
-        $last = count($out['auctions']) - 1;
-        $started = $out['auctions'][$last]['started'];
-        $out['auctions'][$last]['ends'] = $started > 0 ? $started + ROTC_AUCTION_DURATION : 0;
+
+        // THE split (see the file header): a closed auction stays in this
+        // file forever, carrying `completed`. Anything else is live.
+        $completed = (int) rotc_auction_attr($attrs, ['completed', 'completedTime', 'ended'], '0');
+        if ($completed > 0) {
+            $row['completed'] = $completed;
+            $out['closed'][] = $row;
+        } else {
+            $out['auctions'][] = $row;
+        }
     }
     return $out;
 }
@@ -257,6 +281,12 @@ function rotc_auction_completed(): array {
  *                (exact, per player); falls back to the live file's
  *                per-franchise 'spent' totals if the export hasn't caught
  *                up yet, since that's the same figure MFL shows owners.
+ *
+ * 'completed' comes from the export rather than the live file's closed
+ * rows, but the live file backstops it: the export is the documented
+ * source and carries the winning bid per player, while the live file is
+ * what updates first. Whichever knows about more closed auctions wins,
+ * so the count can never go backwards between the two.
  */
 function rotc_auction_summary(): array {
     $live = rotc_auction_live(60);
@@ -282,7 +312,7 @@ function rotc_auction_summary(): array {
     return [
         'active'     => count($live['auctions']),
         'bidTotal'   => $bidTotal,
-        'completed'  => count($completed),
+        'completed'  => max(count($completed), count($live['closed'])),
         'spent'      => $spent,
         'live'       => $live['ok'],
         'paused'     => $live['paused'],
