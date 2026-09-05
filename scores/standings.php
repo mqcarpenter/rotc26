@@ -69,8 +69,8 @@ if (!$fetchError) {
     }
     unset($conf);
 
-    $nflPool      = mfl_cached_get('pool', 3600, ['POOLTYPE' => 'NFL']);
-    $fantasyPool  = mfl_cached_get('pool', 3600, ['POOLTYPE' => 'Fantasy']);
+    $nflPool      = rotc_fetch_pool('NFL', 3600);
+    $fantasyPool  = rotc_fetch_pool('Fantasy', 3600);
     $survivor     = mfl_cached_get('survivorPool', 3600);
     $poolWeeks    = range((int) ($nflPool['poolPicks']['startWeek'] ?? 1), (int) ($nflPool['poolPicks']['endWeek'] ?? 17));
     $survivorWeeks = range((int) ($survivor['survivorPool']['startWeek'] ?? 1), (int) ($survivor['survivorPool']['endWeek'] ?? 17));

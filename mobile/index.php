@@ -365,10 +365,22 @@ if ($hasConfig) {
     // Pre-check: a just-submitted lineup (this POST) wins; otherwise read
     // the currently-submitted starters back from MFL so the form opens
     // showing your existing lineup instead of everything on the bench.
-    $lnChecked = array_filter((array) ($_POST['starters'] ?? []));
+    //
+    // Kept as a SET ([id => true]) and tested with isset(), never as a
+    // list tested with in_array(..., true). Player ids are pure digits,
+    // so PHP canonicalises them to INTEGER array keys; array_keys() hands
+    // back ints while the roster's ids are strings, and a strict
+    // in_array() then never matches. That is exactly why a submitted
+    // lineup rendered as if nothing were set while the "showing your
+    // submitted lineup" note above it said otherwise. isset() coerces
+    // both sides the same way, so it is immune.
+    $lnChecked = [];
     $lnFromMfl = false;
+    foreach (array_filter((array) ($_POST['starters'] ?? [])) as $pid) {
+        $lnChecked[(string) $pid] = true;
+    }
     if (!$lnChecked) {
-        $lnChecked = array_keys(rotc_current_starter_ids($ownerFranchiseId, $week));
+        $lnChecked = rotc_current_starter_ids($ownerFranchiseId, $week);
         $lnFromMfl = (bool) $lnChecked;
     }
 
@@ -387,7 +399,7 @@ if ($hasConfig) {
             'team'     => $team,
             'opp'      => $opp ? (($opp['home'] ? 'vs ' : '@ ') . $opp['opp']) : '--',
             'proj'     => $lnProj[$p['id']] ?? null,
-            'starting' => in_array($p['id'], $lnChecked, true),
+            'starting' => isset($lnChecked[$p['id']]),
         ];
     }
     $lineup = array_filter($lnGrouped, fn($v) => !empty($v));
@@ -695,6 +707,26 @@ if ($hasConfig) {
     }
     [$rotcPicked, $rotcPickedFromMfl] = rotc_m_pool_selection('rotcpick', $ownerFranchiseId, 'Fantasy', $rotcWeek);
 
+    if (($_GET['debug'] ?? '') === 'picks') {
+        // One place to see why a selection isn't rendering: what MFL
+        // returned, what got parsed out of it, and what the panel is
+        // actually comparing against.
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "franchise = $ownerFranchiseId\n";
+        echo "lineup week = $week | nfl week = $nflWeek | rotc week = $rotcWeek\n\n";
+        echo "=== LINEUP: parsed starters (set) ===\n";
+        print_r(rotc_current_starter_ids($ownerFranchiseId, $week));
+        echo "\n=== NFL picks (set) ===\n";
+        print_r(rotc_current_pool_pick_ids($ownerFranchiseId, 'NFL', $nflWeek));
+        echo "\n=== FANTASY picks (set) ===\n";
+        print_r(rotc_current_pool_pick_ids($ownerFranchiseId, 'Fantasy', $rotcWeek));
+        echo "\n=== ROTC matchups the panel renders (compared against the set above) ===\n";
+        print_r($rotcMatchups);
+        echo "\n=== RAW pool Fantasy ===\n";
+        print_r(rotc_fetch_pool('Fantasy', 0));
+        exit;
+    }
+
     if (($_GET['debug'] ?? '') === 'rotcsched') {
         header('Content-Type: text/plain');
         echo "fantasyPoolStartWeek=$rotcStartWeek endWeek=$rotcEndWeek week=$rotcWeek\n\nRAW schedule:\n";
@@ -713,9 +745,9 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
     echo "franchise=$ownerFranchiseId  lineupWeek=$week  nflWeek=$nflWeek  rotcWeek=$rotcWeek\n\n";
     echo "=== weeklyResults (W=$week) RAW ===\n";  print_r(mfl_cached_get('weeklyResults', 0, ['W' => $week]));
     echo "\n=== parsed current starters ===\n";     print_r(rotc_current_starter_ids($ownerFranchiseId, $week));
-    echo "\n=== pool NFL RAW ===\n";                print_r(mfl_cached_get('pool', 0, ['POOLTYPE' => 'NFL']));
+    echo "\n=== pool NFL RAW ===\n";                print_r(rotc_fetch_pool('NFL', 0));
     echo "\n=== parsed NFL picks (W=$nflWeek) ===\n"; print_r(rotc_current_pool_pick_ids($ownerFranchiseId, 'NFL', $nflWeek));
-    echo "\n=== pool Fantasy RAW ===\n";            print_r(mfl_cached_get('pool', 0, ['POOLTYPE' => 'Fantasy']));
+    echo "\n=== pool Fantasy RAW ===\n";            print_r(rotc_fetch_pool('Fantasy', 0));
     echo "\n=== parsed Fantasy picks (W=$rotcWeek) ===\n"; print_r(rotc_current_pool_pick_ids($ownerFranchiseId, 'Fantasy', $rotcWeek));
     exit;
 }
@@ -800,9 +832,29 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
           <div class="rotc-mapp-banner err"><?= nl2br(htmlspecialchars($result['error'])) ?></div>
         <?php endif; ?>
       <?php endif; ?>
-      <p class="rotc-mapp-blurb">Tap Start for each player you want in. MyFantasyLeague enforces the position limits when you submit — if it doesn't fit, it'll say exactly why here.</p>
-      <?php if ($lnFromMfl): ?>
-        <p class="rotc-mapp-blurb" style="color:var(--accent);">✓ Showing your currently-submitted Week <?= (int) $week ?> lineup — change any toggles and re-submit to update it.</p>
+      <?php
+      // How many are actually toggled on, so the banner states a fact
+      // rather than just claiming a lineup is loaded. This is what made
+      // the old copy so confusing: it said "showing your submitted
+      // lineup" while every toggle rendered off.
+      $lnStarterCount = 0;
+      foreach ($lineup as $rows) { foreach ($rows as $r) { if ($r['starting']) $lnStarterCount++; } }
+      ?>
+      <?php if ($lnFromMfl && $lnStarterCount): ?>
+        <div class="rotc-mapp-status ok">
+          <strong>Lineup submitted</strong>
+          <span><?= (int) $lnStarterCount ?> starters set for Week <?= (int) $week ?>. Change any toggle and re-submit to update it.</span>
+        </div>
+      <?php elseif ($lnStarterCount): ?>
+        <div class="rotc-mapp-status">
+          <strong>Not submitted yet</strong>
+          <span><?= (int) $lnStarterCount ?> selected — hit Submit Lineup to send it to MyFantasyLeague.</span>
+        </div>
+      <?php else: ?>
+        <div class="rotc-mapp-status warn">
+          <strong>No lineup set for Week <?= (int) $week ?></strong>
+          <span>Tap Start for each player you want in. MyFantasyLeague enforces the position limits on submit.</span>
+        </div>
       <?php endif; ?>
       <?php if ($lnCurrentFallback): ?>
         <p class="rotc-mapp-blurb" style="color:var(--accent);">Week <?= (int) $week ?> hasn't started yet, so this is your <strong>current</strong> roster. Setting a lineup here submits it for Week <?= (int) $week ?>.</p>
@@ -816,12 +868,16 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
         <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
         <input type="hidden" name="week" value="<?= (int) $week ?>">
         <?php foreach ($lineup as $section => $rows): ?>
-          <p class="rotc-mapp-section-title"><?= htmlspecialchars($section) ?></p>
+          <?php $secStarting = count(array_filter($rows, fn($r) => $r['starting'])); ?>
+          <p class="rotc-mapp-section-title">
+            <?= htmlspecialchars($section) ?>
+            <span class="rotc-mapp-section-count<?= $secStarting ? ' on' : '' ?>"><?= $secStarting ?> starting</span>
+          </p>
           <div class="rotc-mapp-card">
             <?php foreach ($rows as $i => $p): $fid = 'start_' . $section . '_' . $i; ?>
-              <div class="rotc-mrow">
+              <div class="rotc-mrow<?= $p['starting'] ? ' rotc-mrow-on' : '' ?>">
                 <div class="rotc-mrow-body">
-                  <div class="rotc-mrow-name"><?= htmlspecialchars($p['name']) ?></div>
+                  <div class="rotc-mrow-name"><?= htmlspecialchars($p['name']) ?><?= rotc_injury_tag((string) $p['id']) ?></div>
                   <div class="rotc-mrow-meta"><?= htmlspecialchars($p['team']) ?> &middot; <?= htmlspecialchars($p['opp']) ?></div>
                 </div>
                 <div class="rotc-mrow-stat"><?= $p['proj'] !== null ? htmlspecialchars(number_format((float) $p['proj'], 1)) : '--' ?><span class="rotc-mrow-stat-label">Proj</span></div>
@@ -1213,7 +1269,19 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
           <div class="rotc-mapp-banner err"><?= nl2br(htmlspecialchars($result['error'])) ?></div>
         <?php endif; ?>
       <?php endif; ?>
-      <p class="rotc-mapp-blurb">Tap the team you think wins each game.<?= $nflPickedFromMfl ? ' <span style="color:var(--accent);">✓ Your submitted Week ' . (int) $nflWeek . ' picks are shown — change any and re-submit.</span>' : '' ?></p>
+      <p class="rotc-mapp-blurb">Tap the team you think wins each game.</p>
+      <?php $nflSet = count(array_filter($nflMatchups, fn($m) => isset($nflPicked[$m['away']]) || isset($nflPicked[$m['home']]))); ?>
+      <?php if ($nflPickedFromMfl && $nflSet): ?>
+        <div class="rotc-mapp-status ok">
+          <strong>Picks submitted</strong>
+          <span><?= (int) $nflSet ?> of <?= count($nflMatchups) ?> set for Week <?= (int) $nflWeek ?>. Change any and re-submit to update.</span>
+        </div>
+      <?php elseif (!$nflSet): ?>
+        <div class="rotc-mapp-status warn">
+          <strong>No picks for Week <?= (int) $nflWeek ?></strong>
+          <span>Tap a winner in each game, then submit.</span>
+        </div>
+      <?php endif; ?>
       <?php if (!$nflMatchups): ?>
         <div class="rotc-mapp-card"><div class="rotc-mrow"><div class="rotc-mrow-body"><div class="rotc-mrow-meta">No NFL schedule found for Week <?= (int) $nflWeek ?> yet.</div></div></div></div>
       <?php else: ?>
@@ -1258,7 +1326,19 @@ if ($hasConfig && ($_GET['debug'] ?? '') === 'picks') {
           <div class="rotc-mapp-banner err"><?= nl2br(htmlspecialchars($result['error'])) ?></div>
         <?php endif; ?>
       <?php endif; ?>
-      <p class="rotc-mapp-blurb">Franchise vs. franchise — pick who wins each fantasy matchup this week.<?= $rotcPickedFromMfl ? ' <span style="color:var(--accent);">✓ Your submitted Week ' . (int) $rotcWeek . ' picks are shown — change any and re-submit.</span>' : '' ?></p>
+      <p class="rotc-mapp-blurb">Franchise vs. franchise — pick who wins each fantasy matchup this week.</p>
+      <?php $rotcSet = count(array_filter($rotcMatchups, fn($m) => isset($rotcPicked[$m['away']]) || isset($rotcPicked[$m['home']]))); ?>
+      <?php if ($rotcPickedFromMfl && $rotcSet): ?>
+        <div class="rotc-mapp-status ok">
+          <strong>Picks submitted</strong>
+          <span><?= (int) $rotcSet ?> of <?= count($rotcMatchups) ?> set for Week <?= (int) $rotcWeek ?>. Change any and re-submit to update.</span>
+        </div>
+      <?php elseif (!$rotcSet): ?>
+        <div class="rotc-mapp-status warn">
+          <strong>No picks for Week <?= (int) $rotcWeek ?></strong>
+          <span>Pick a winner in each matchup, then submit.</span>
+        </div>
+      <?php endif; ?>
       <?php if (!$rotcMatchups): ?>
         <div class="rotc-mapp-card"><div class="rotc-mrow"><div class="rotc-mrow-body"><div class="rotc-mrow-meta">No fantasy schedule found for Week <?= (int) $rotcWeek ?> yet.</div></div></div></div>
       <?php else: ?>

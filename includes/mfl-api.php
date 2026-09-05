@@ -15,8 +15,8 @@
  * liveScoring on gameday wants a much shorter TTL.
  */
 
-function mfl_cached_get(string $type, int $ttlSeconds, array $params = [], bool $includeLeague = true): ?array {
-    return mfl_cached_get_year($type, (int) MFL_YEAR, $ttlSeconds, $params, $includeLeague);
+function mfl_cached_get(string $type, int $ttlSeconds, array $params = [], bool $includeLeague = true, ?callable $isValid = null): ?array {
+    return mfl_cached_get_year($type, (int) MFL_YEAR, $ttlSeconds, $params, $includeLeague, $isValid);
 }
 
 /**
@@ -25,7 +25,20 @@ function mfl_cached_get(string $type, int $ttlSeconds, array $params = [], bool 
  * points shown on a 2026 page. Year is part of the cache key so a
  * prior-year lookup never collides with the current season's entry.
  */
-function mfl_cached_get_year(string $type, int $year, int $ttlSeconds, array $params = [], bool $includeLeague = true): ?array {
+/**
+ * $isValid (optional) is a caller-supplied sanity check on a FRESH
+ * response, and exists because "no error key" does not mean "usable
+ * data". Confirmed live 2026-09-05: an unauthorised TYPE=pool request
+ * returns a perfectly well-formed payload -- every franchise node
+ * present, week node present -- with the `game` arrays simply missing,
+ * and no `error` key anywhere. mfl_fetch() therefore accepted it and
+ * this function cached it, silently replacing a good copy with "you
+ * have no picks" and rendering an owner's submitted pick sheet as
+ * blank. When $isValid rejects a response it is neither returned nor
+ * cached, and the stale copy is served instead -- the same fallback a
+ * transport failure already gets.
+ */
+function mfl_cached_get_year(string $type, int $year, int $ttlSeconds, array $params = [], bool $includeLeague = true, ?callable $isValid = null): ?array {
     $cacheDir = sys_get_temp_dir() . '/rotc-mfl-cache';
     if (!is_dir($cacheDir)) @mkdir($cacheDir, 0700, true);
     // Params affect the response shape (e.g. POOLTYPE, W, ALL) so they
@@ -39,6 +52,12 @@ function mfl_cached_get_year(string $type, int $year, int $ttlSeconds, array $pa
     }
 
     $data = mfl_fetch($type, $params, $includeLeague, $year);
+    if ($data !== null && $isValid !== null && !$isValid($data)) {
+        // Well-formed but not trustworthy -- see the note above. Treat it
+        // exactly like a failed fetch rather than letting it overwrite
+        // good data.
+        $data = null;
+    }
     if ($data !== null) {
         @file_put_contents($cacheFile, json_encode($data));
     } elseif (file_exists($cacheFile)) {
@@ -217,14 +236,38 @@ function rotc_current_starter_ids(string $franchiseId, $week): array {
  * scans the week row defensively for any pick-like values rather than
  * assuming one layout. Pages expose a ?debug dump to confirm it.
  */
+/**
+ * TYPE=pool for one pool type, refusing to cache the picks-stripped
+ * shape an unauthorised request returns (see mfl_cached_get_year()).
+ * Every pool read goes through here so the guard can't be forgotten at
+ * one call site.
+ */
+function rotc_fetch_pool(string $poolType, int $ttlSeconds = 120): ?array {
+    return mfl_cached_get('pool', $ttlSeconds, ['POOLTYPE' => $poolType], true, function ($data) {
+        foreach (mfl_normalize_list($data['poolPicks']['franchise'] ?? null) as $fr) {
+            foreach (mfl_normalize_list($fr['week'] ?? null) as $w) {
+                if (!empty($w['game'])) return true;   // real picks present
+            }
+        }
+        // Nobody in the league has picked yet is a legitimate empty, and
+        // indistinguishable from the unauthorised shape -- so an empty
+        // franchise list is accepted and a populated-but-gameless one is
+        // not. That's the only difference the payload actually carries.
+        return !mfl_normalize_list($data['poolPicks']['franchise'] ?? null);
+    });
+}
+
 function rotc_current_pool_pick_ids(string $franchiseId, string $poolType, $week): array {
     if ($franchiseId === '') return [];
-    $raw = mfl_cached_get('pool', 120, ['POOLTYPE' => $poolType]);
+    $raw = rotc_fetch_pool($poolType);
     $out = [];
     foreach (mfl_normalize_list($raw['poolPicks']['franchise'] ?? null) as $fr) {
         if ((string) ($fr['id'] ?? '') !== $franchiseId) continue;
         foreach (mfl_normalize_list($fr['week'] ?? null) as $wRow) {
-            if ((int) ($wRow['week'] ?? -1) !== (int) $week) continue;
+            // Only skip on a week that is present AND different. MFL has
+            // been seen omitting the attribute on the week node; treating
+            // absent as "not my week" threw away real picks.
+            if (isset($wRow['week']) && (int) $wRow['week'] !== (int) $week) continue;
             rotc_collect_pool_pick_values($wRow, $out);
         }
     }
@@ -236,7 +279,19 @@ function rotc_collect_pool_pick_values($node, array &$out): void {
     if (!is_array($node)) return;
     foreach ($node as $k => $v) {
         if ($k === 'pick' && is_scalar($v) && (string) $v !== '') {
-            $out[(string) $v] = true;
+            $val = (string) $v;
+            $out[$val] = true;
+            // An all-digits pick is a FRANCHISE id (the Fantasy pool picks
+            // franchises; the NFL pool picks team codes like "SEA", which
+            // this leaves alone). MFL is not consistent about zero-padding
+            // those to four digits between endpoints, and the caller
+            // compares against ids that ARE padded -- so "1" would never
+            // match "0001" and the pick would silently render unselected.
+            // Storing both spellings makes the lookup immune either way.
+            if (ctype_digit($val)) {
+                $out[str_pad($val, 4, '0', STR_PAD_LEFT)] = true;
+                $out[ltrim($val, '0') !== '' ? ltrim($val, '0') : '0'] = true;
+            }
         } elseif (is_array($v)) {
             rotc_collect_pool_pick_values($v, $out);
         }

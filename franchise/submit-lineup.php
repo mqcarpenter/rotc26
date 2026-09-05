@@ -93,7 +93,12 @@ if ($hasConfig) {
     // slate. A just-submitted POST above already populated $checked; only
     // fall back to the MFL read when it didn't. (weeklyResults starter
     // status -- see rotc_current_starter_ids(); ?debug=lineup dumps it.)
-    if (!$checked) $checked = array_keys(rotc_current_starter_ids($franchiseId, $week));
+    // A SET, not a list -- see the note in mobile/index.php. array_keys()
+    // on a set of numeric player ids returns INTs, and the strict
+    // in_array() this used to feed never matched the roster's string ids,
+    // so a submitted lineup rendered as entirely unset.
+    $checked = $checked ? array_fill_keys(array_map('strval', $checked), true) : [];
+    if (!$checked) $checked = rotc_current_starter_ids($franchiseId, $week);
     $lineupFromMfl = (bool) $checked && $_SERVER['REQUEST_METHOD'] !== 'POST';
 
     if (($_GET['debug'] ?? '') === 'lineup') {
@@ -110,6 +115,18 @@ if ($hasConfig) {
     // else needing a cookie per MFL's docs.
     $rosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $franchiseId, 'W' => $week]);
     $roster = mfl_normalize_list($rosterResp['rosters']['franchise']['player'] ?? null);
+    // TYPE=rosters&W=<week> is a per-week SNAPSHOT, and a week with no
+    // snapshot yet comes back empty -- which rendered this page as "No
+    // roster found for Week 1" even with a full roster and a submitted
+    // lineup (seen live 2026-09-05). You still set a lineup off your
+    // CURRENT roster, so fall back to the no-W call, exactly as the
+    // mobile dashboard already did.
+    $rosterIsCurrentFallback = false;
+    if (!$roster) {
+        $rosterResp = rotc_mfl_authed_request('export', 'rosters', ['FRANCHISE' => $franchiseId]);
+        $roster = mfl_normalize_list($rosterResp['rosters']['franchise']['player'] ?? null);
+        $rosterIsCurrentFallback = (bool) $roster;
+    }
     // Exclude IR/Taxi Squad by matching on a substring rather than an
     // exact status string -- the live 'status' value confirmed so far
     // is literally "ROSTER" for a bench player in the offseason (no
@@ -262,8 +279,20 @@ if ($hasConfig) {
               $sectioned[$bucket ?? 'Other'][] = $p;
           }
         ?>
-          <?php if (!empty($lineupFromMfl)): ?>
-            <p class="rotc-login-blurb" style="color:var(--accent);font-weight:600;">✓ Showing your currently-submitted Week <?= (int) $week ?> lineup — change any Start boxes and re-submit to update it.</p>
+          <?php
+          // State the count, not just the claim -- the old copy asserted a
+          // submitted lineup was on screen while every box rendered
+          // unchecked, which is the most confusing thing it could have done.
+          $startingCount = 0;
+          foreach ($sectioned as $secRows) { foreach ($secRows as $sp) { if (isset($checked[$sp['id']])) $startingCount++; } }
+          ?>
+          <?php if (!empty($lineupFromMfl) && $startingCount): ?>
+            <p class="rotc-login-success">✓ Lineup submitted — <?= (int) $startingCount ?> starters set for Week <?= (int) $week ?>. Change any Start boxes and re-submit to update it.</p>
+          <?php elseif (!$startingCount): ?>
+            <p class="rotc-login-blurb" style="font-weight:600;">No lineup set for Week <?= (int) $week ?> yet — tick Start for each player you want in.</p>
+          <?php endif; ?>
+          <?php if (!empty($rosterIsCurrentFallback)): ?>
+            <p class="rotc-login-blurb">Week <?= (int) $week ?> hasn't started, so this is your <strong>current</strong> roster. Submitting here sets your Week <?= (int) $week ?> lineup.</p>
           <?php endif; ?>
           <form method="post" class="rotc-lineup-form">
             <input type="hidden" name="csrf" value="<?= htmlspecialchars(rotc_csrf_token()) ?>">
@@ -285,7 +314,7 @@ if ($hasConfig) {
                   <?php foreach ($sectionRoster as $p):
                     $pd = $players[$p['id']] ?? [];
                     $team = $pd['team'] ?? '';
-                    $isChecked = in_array($p['id'], $checked, true);
+                    $isChecked = isset($checked[$p['id']]);
                     $opp = $oppByTeam[$team] ?? null;
                     $onBye = !empty($byeByTeam[$team]) && (string) $byeByTeam[$team] === (string) $week;
                     $oppDisplay = $onBye ? 'BYE' : ($opp ? ($opp['home'] ? 'vs ' : '@ ') . $opp['opp'] : '--');

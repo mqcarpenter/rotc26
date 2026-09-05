@@ -260,3 +260,44 @@
   background:var(--paper); color:var(--ink); font-size:16px; font-variant-numeric:tabular-nums;
   text-align:right;
 }
+
+
+/* ---- Panel status banner --------------------------------------
+   "Is this already submitted?" answered at the top of a panel, in
+   words and a count, before you scroll. This replaced a line of muted
+   prose that claimed a submitted lineup was on screen while every
+   toggle rendered off -- the copy was right and the toggles were
+   wrong, which is the worst combination. Three states: submitted
+   (green), staged-but-unsent (neutral), nothing set (amber). Amber,
+   not red: no lineup yet is a normal state early in the week, not an
+   error. */
+.rotc-mapp-status{
+  display:flex; flex-direction:column; gap:2px;
+  border:1px solid var(--line); border-left:4px solid var(--muted);
+  border-radius:10px; padding:9px 12px; margin:0 0 12px; background:var(--card);
+}
+.rotc-mapp-status strong{
+  font-family:"Roboto Condensed",sans-serif; text-transform:uppercase;
+  letter-spacing:.04em; font-size:12px;
+}
+.rotc-mapp-status span{ font-size:12px; color:var(--muted); line-height:1.4; }
+.rotc-mapp-status.ok{ border-left-color:#1b5e20; background:#e8f5e9; }
+.rotc-mapp-status.ok strong{ color:#1b5e20; }
+.rotc-mapp-status.ok span{ color:#2f5d33; }
+.rotc-mapp-status.warn{ border-left-color:#8a5a00; background:#fff3e0; }
+.rotc-mapp-status.warn strong{ color:#8a5a00; }
+.rotc-mapp-status.warn span{ color:#7a5a2a; }
+
+/* Per-position "n starting" tally, so a section reads at a glance
+   without counting toggles. */
+.rotc-mapp-section-title{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.rotc-mapp-section-count{
+  font-family:"Roboto Condensed",sans-serif; font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+}
+.rotc-mapp-section-count.on{ color:var(--accent); }
+
+/* A starting player's whole row is tinted, not just its pill -- the
+   selected set has to be readable while scrolling past, not only when
+   you look at the right-hand edge. Matches .rotc-mpick.mine. */
+.rotc-mrow-on{ background:var(--sand); box-shadow:inset 3px 0 0 var(--accent); }

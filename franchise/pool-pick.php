@@ -109,7 +109,7 @@ if ($hasConfig) {
     if (($_GET['debug'] ?? '') === 'pool') {
         header('Content-Type: text/plain');
         echo "franchise=$franchiseId week=$week\n\nRAW pool (NFL):\n";
-        print_r(mfl_cached_get('pool', 0, ['POOLTYPE' => 'NFL']));
+        print_r(rotc_fetch_pool('NFL', 0));
         echo "\nPARSED picks:\n"; print_r(rotc_current_pool_pick_ids($franchiseId, 'NFL', $week));
         exit;
     }
