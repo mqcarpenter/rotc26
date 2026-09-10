@@ -62,7 +62,20 @@ function rotc_lw_espn_get(string $url, int $ttl): ?array {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 6,     // a garnish must never stall the page
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_USERAGENT      => defined('MFL_USER_AGENT') ? MFL_USER_AGENT : 'ROTC26-Site',
+            // site.api.espn.com is the endpoint espn.com's own front-end
+            // calls from the browser, not a documented public API -- it
+            // 403s a request identifying itself as a script (confirmed in
+            // production: MFL's own UA, sent here previously, was
+            // rejected every time). Presenting as an ordinary browser hit
+            // is what the endpoint actually expects.
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                . '(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+            CURLOPT_HTTPHEADER     => [
+                'Accept: application/json, text/plain, */*',
+                'Accept-Language: en-US,en;q=0.9',
+                'Referer: https://www.espn.com/',
+                'Origin: https://www.espn.com',
+            ],
         ]);
         $body = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -77,8 +90,14 @@ function rotc_lw_espn_get(string $url, int $ttl): ?array {
         // This degrade is otherwise completely silent -- a stat breakdown
         // just quietly never appears -- so log every failed attempt instead
         // of leaving "why is nothing showing" undiagnosable from outside.
-        error_log(sprintf('live-wire espn: GET %s failed on attempt %d (http %d%s)',
-            $url, $attempt, $code, $err !== '' ? ", curl: $err" : ''));
+        // A non-200 body is usually a WAF/block page that names the actual
+        // reason (rate limit, IP block, bad UA, ...) -- worth a snippet
+        // rather than just the status code if this ever needs debugging
+        // again.
+        $snippet = $body !== false ? substr(preg_replace('/\s+/', ' ', (string) $body), 0, 200) : '';
+        error_log(sprintf('live-wire espn: GET %s failed on attempt %d (http %d%s)%s',
+            $url, $attempt, $code, $err !== '' ? ", curl: $err" : '',
+            $snippet !== '' ? ", body: $snippet" : ''));
     }
     // Serve a stale copy rather than nothing.
     if (is_readable($file)) {
