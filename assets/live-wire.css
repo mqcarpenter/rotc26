@@ -139,9 +139,11 @@
 .lw-of-lbl{font-family:var(--lw-disp); font-size:9.5px; text-transform:uppercase;
   letter-spacing:.1em; color:var(--lw-muted); padding-bottom:4px;}
 .lw-of-col.a .lw-of-lbl{color:var(--lw-accent);}
-.lw-pl{display:flex; align-items:center; gap:7px; padding:4px 0;
-  border-top:1px solid var(--lw-line);}
-.lw-of-col > .lw-pl:first-of-type{border-top:none;}
+.lw-pl{display:flex; align-items:center; gap:7px; padding:3px 0;}
+/* A soft break between position GROUPS (QB/RB/WR/... per
+   ROTC_LW_POSITION_ORDER), not a line under every single player --
+   that would just be visual noise once a column is a dozen rows deep. */
+.lw-pl.lw-pos-start{margin-top:7px; padding-top:8px; border-top:1px solid var(--lw-line);}
 .lw-pl.yet{opacity:.5;}
 .lw-pl img,.lw-pl .lw-av{width:22px; height:22px; border-radius:50%;
   object-fit:cover; object-position:top center; flex:none;}
@@ -253,9 +255,12 @@
   letter-spacing:.11em; color:var(--lw-muted); margin:12px 0 5px; font-weight:700;}
 .lw-plist{display:flex; flex-direction:column;}
 .lw-plist.muted{opacity:.62;}   /* the bench scores nothing */
-.lw-prow{padding:7px 0; border-top:1px solid rgba(58,42,34,.55);}
+.lw-prow{padding:6px 0;}
 .lw-prow-top{display:flex; align-items:center; gap:9px;}
-.lw-prow:first-child{border-top:none;}
+/* A soft break between position GROUPS (QB/RB/WR/... per
+   ROTC_LW_POSITION_ORDER) rather than a line under every player -- the
+   groups are what someone scanning the roster actually wants marked. */
+.lw-prow.lw-pos-start{margin-top:8px; padding-top:12px; border-top:1px solid rgba(58,42,34,.55);}
 .lw-prow img,.lw-prow .lw-av{width:32px; height:24px; border-radius:4px;
   object-fit:cover; object-position:top center; flex:none;}
 .lw-prow-main{flex:1; min-width:0;}

@@ -181,9 +181,16 @@ function rotc_lw_render_cards(array $state, ?string $highlightId = null, string 
                                           ?: $y['score'] <=> $x['score']); ?>
                 <div class="lw-of-col <?= $si ? 'b' : 'a' ?>">
                   <span class="lw-of-lbl"><?= htmlspecialchars(rotc_lw_tag($s['name'])) ?></span>
-                  <?php foreach ($roster as $p):
-                    $pstate = $p['yet'] ? 'yet' : ($p['live'] ? 'live' : 'done'); ?>
-                    <span class="lw-pl <?= $si ? 'b' : 'a' ?> <?= $pstate ?>">
+                  <?php $lastRank = null;
+                  foreach ($roster as $p):
+                    $pstate = $p['yet'] ? 'yet' : ($p['live'] ? 'live' : 'done');
+                    $rank = rotc_lw_pos_rank($p['pos']);
+                    // A divider between position GROUPS, not between every
+                    // player -- the whole point is to separate roles, not
+                    // to redraw the row border that's already there.
+                    $newGroup = $lastRank !== null && $rank !== $lastRank;
+                    $lastRank = $rank; ?>
+                    <span class="lw-pl <?= $si ? 'b' : 'a' ?> <?= $pstate ?><?= $newGroup ? ' lw-pos-start' : '' ?>">
                       <?= rotc_lw_avatar($p) ?>
                       <span class="lw-pl-n"><?= htmlspecialchars($p['name']) ?><?= rotc_lw_inj($p['inj'] ?? null) ?>
                         <span class="lw-pl-pos"><?= htmlspecialchars(trim($p['pos'] . ' ' . $p['team'])) ?></span>
@@ -279,9 +286,13 @@ function rotc_lw_render_script(string $base): void {
             var roster = (s.players || []).slice().sort(function(x, y){
               return posRank(x.pos) - posRank(y.pos) || y.score - x.score;
             });
+            var lastRank = null;
             var chips = roster.map(function(p){
               var state = p.yet ? 'yet' : (p.live ? 'live' : 'done');
-              return '<span class="lw-pl ' + (si ? 'b' : 'a') + ' ' + state + '">' + avatar(p)
+              var rank = posRank(p.pos);
+              var newGroup = lastRank !== null && rank !== lastRank;
+              lastRank = rank;
+              return '<span class="lw-pl ' + (si ? 'b' : 'a') + ' ' + state + (newGroup ? ' lw-pos-start' : '') + '">' + avatar(p)
                 + '<span class="lw-pl-n">' + esc(p.name) + injTag(p)
                 + '<span class="lw-pl-pos">' + esc((p.pos + ' ' + p.team).trim()) + '</span></span>'
                 + '<span class="lw-pl-s">' + Number(p.score).toFixed(1) + '</span></span>';
@@ -401,13 +412,17 @@ function rotc_lw_render_roster(array $players, array $events, string $heading, b
     ?>
     <h3 class="lw-roster-sub"><?= htmlspecialchars($heading) ?></h3>
     <div class="lw-plist<?= $muted ? ' muted' : '' ?>">
-      <?php foreach ($players as $p):
+      <?php $lastRank = null;
+      foreach ($players as $p):
         // Three states worth distinguishing at a glance: still to start,
         // on the field now, done for the week.
         $state = $p['yet'] ? 'yet' : ($p['live'] ? 'live' : 'done');
         $ev = ($p['espn'] !== '' && isset($events[$p['espn']])) ? $events[$p['espn']] : [];
-        $bd = $ev ? rotc_lw_breakdown($p['pos'], $ev, (float) $p['score']) : null; ?>
-        <div class="lw-prow <?= $state ?>">
+        $bd = $ev ? rotc_lw_breakdown($p['pos'], $ev, (float) $p['score']) : null;
+        $rank = rotc_lw_pos_rank($p['pos']);
+        $newGroup = $lastRank !== null && $rank !== $lastRank;
+        $lastRank = $rank; ?>
+        <div class="lw-prow <?= $state ?><?= $newGroup ? ' lw-pos-start' : '' ?>">
           <div class="lw-prow-top">
             <?= rotc_lw_avatar($p) ?>
             <span class="lw-prow-main">
