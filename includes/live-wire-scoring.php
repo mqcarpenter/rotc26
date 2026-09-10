@@ -141,17 +141,23 @@ const ROTC_LW_EVENT_LABEL = [
  */
 function rotc_lw_espn_events(array $mflTeams, ?string $date = null): array {
     $games = rotc_lw_espn_games($date);
+    // gid => final, deduped -- two teams in the same game must agree, and
+    // the ESPN scoreboard gives an identical answer for both.
     $ids = [];
     foreach ($mflTeams as $t) {
         $ab = rotc_lw_espn_team((string) $t);
-        if (isset($games[$ab])) $ids[$games[$ab]] = true;
+        if (isset($games[$ab])) $ids[$games[$ab]['id']] = $games[$ab]['final'];
     }
 
     $out = [];
-    foreach (array_keys($ids) as $gid) {
+    foreach ($ids as $gid => $final) {
+        // A final game's box score is done changing, so a successful fetch
+        // is cached for the rest of the week (see ROTC_LW_ESPN_FINAL_TTL) --
+        // one hiccup reaching ESPN shouldn't leave the stat breakdown
+        // missing for a game that's already over.
         $sum = rotc_lw_espn_get(
             'https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event='
-            . urlencode((string) $gid), 60);
+            . urlencode((string) $gid), $final ? ROTC_LW_ESPN_FINAL_TTL : 60);
         if (!$sum) continue;
 
         foreach ((array) ($sum['boxscore']['players'] ?? []) as $teamBlock) {

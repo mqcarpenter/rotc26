@@ -5,17 +5,15 @@
    dark surface on the site, and keeping a self-contained dark palette
    out of the global sheet stops it bleeding into every other page.
 
-   The field IS the matchup (see includes/live-wire.php): ball = margin,
-   marker = projected final, lit end zone = leader. Turf greens and the
-   amber are the only colours here that don't descend from the site
-   palette — they have to read as a football field, and amber is
-   reserved exclusively for the ball and big plays.
+   The lean bar IS the matchup (see includes/live-wire.php): the fill
+   grows from center toward whichever side leads, sized by the margin;
+   the thin tick is the projected-final lean. Amber is reserved
+   exclusively for that fill and for big plays.
    ============================================================ */
 .lw-page{
   --lw-bg:#15100D; --lw-surface:#221813; --lw-surface-2:#2C201A; --lw-line:#3A2A22;
   --lw-text:#F6F1EA; --lw-muted:#A08D7E;
   --lw-accent:#E0531B; --lw-big:#F2A93B;
-  --lw-turf:#1E4630; --lw-turf-2:#24523A;
   --lw-mono:"Roboto Mono",ui-monospace,Menlo,monospace;
   --lw-disp:"Roboto Condensed",Arial,sans-serif;
   background:var(--lw-bg); color:var(--lw-text);
@@ -93,21 +91,21 @@
 .lw-helm img.flip{transform:scaleX(-1);}
 .lw-tm.trail .lw-helm img{filter:grayscale(.6) brightness(.72);}
 
-/* ---- the field ---------------------------------------------------- */
-.lw-field{position:relative; height:32px; margin:0 14px; border-radius:4px; overflow:hidden;
-  background:repeating-linear-gradient(90deg,var(--lw-turf) 0 10%,var(--lw-turf-2) 10% 20%);}
-.lw-game.redzone .lw-field{box-shadow:inset 0 0 22px rgba(224,83,27,.5);}
-.lw-ez{position:absolute; top:0; bottom:0; width:9%; display:flex; align-items:center;
-  justify-content:center; font-family:var(--lw-disp); font-size:10px; font-weight:700;
-  color:#fff; letter-spacing:.04em; background:#3A2A22;}
-.lw-ez.l{left:0;} .lw-ez.r{right:0;}
-.lw-ez.hi{background:var(--lw-accent); color:#1a0f08;}
-.lw-yl{position:absolute; top:0; bottom:0; width:1px; background:rgba(255,255,255,.32);}
-.lw-yl.mid{width:2px; background:rgba(255,255,255,.6);}
-.lw-proj{position:absolute; top:0; bottom:0; width:2px; background:#F5E96B; opacity:.85;
+/* ---- the lean bar --------------------------------------------------
+   A margin meter, not a football field: a slim track with a center tie
+   mark, and a fill that grows from center toward whichever side leads.
+   Position alone says who's ahead; distance from center says by how
+   much. No yard lines or end zones to decode. */
+.lw-field{position:relative; height:6px; margin:16px 14px 6px; border-radius:999px;
+  background:var(--lw-surface-2);}
+.lw-mid{position:absolute; top:-4px; bottom:-4px; left:50%; width:2px; margin-left:-1px;
+  background:var(--lw-line); border-radius:1px;}
+.lw-lean{position:absolute; top:0; bottom:0; border-radius:999px; background:var(--lw-big);
+  transition:left .7s cubic-bezier(.3,.8,.4,1), width .7s cubic-bezier(.3,.8,.4,1);}
+.lw-game.redzone .lw-lean{box-shadow:0 0 10px rgba(242,169,59,.85);}
+.lw-proj{position:absolute; top:-5px; bottom:-5px; width:2px; margin-left:-1px;
+  background:#F5E96B; opacity:.85; border-radius:1px;
   transition:left .7s cubic-bezier(.3,.8,.4,1);}
-.lw-ball{position:absolute; top:0; bottom:0; width:3px; background:var(--lw-big);
-  box-shadow:0 0 9px rgba(242,169,59,.95); transition:left .7s cubic-bezier(.3,.8,.4,1);}
 
 /* ---- on the field ------------------------------------------------- */
 .lw-onfield{display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:7px 14px 11px;}
@@ -141,8 +139,7 @@
   /* Helmets off: two 46px slots cost more width than the names can spare,
      and the name is what identifies a matchup on a phone. */
   .lw-helm{display:none;}
-  .lw-field{height:34px; margin:2px 12px 0;}
-  .lw-ez{width:14%;}
+  .lw-field{height:8px; margin:10px 12px 4px;}
   /* Two columns still, one per team -- with headshots off the chips are
      just a name and a number, which fits at 375px and keeps ownership
      obvious. Capped at three a side so card height stays predictable and

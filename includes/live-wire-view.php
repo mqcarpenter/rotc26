@@ -35,6 +35,24 @@ function rotc_lw_helmet(string $fid, string $side): string {
     return '<span class="lw-helm"><img src="' . htmlspecialchars($src) . '" alt=""' . $flip . '></span>';
 }
 
+/**
+ * The lean bar: a fill growing from center toward whichever side leads,
+ * plus a thin tick for the projected-final lean. $m['ball']/['projBall']
+ * are already 0-100 with 50 = tie (see rotc_lw_field_pos()), so the fill
+ * just spans the shorter distance between center and that position.
+ */
+function rotc_lw_render_field(array $m): void {
+    $left = min(50, $m['ball']);
+    $width = abs($m['ball'] - 50);
+    ?>
+    <div class="lw-field">
+      <span class="lw-mid"></span>
+      <span class="lw-lean" style="left:<?= $left ?>%; width:<?= $width ?>%"></span>
+      <span class="lw-proj" style="left:<?= $m['projBall'] ?>%"></span>
+    </div>
+    <?php
+}
+
 /** Headshot, or initials when a player has no espn_id (7 of 256 in a sample week). */
 function rotc_lw_avatar(array $p): string {
     if (!empty($p['espn'])) {
@@ -85,14 +103,7 @@ function rotc_lw_render_wire(array $state): void {
 
 /** One card per matchup. $highlightId pins the viewer's own franchise first. */
 function rotc_lw_render_cards(array $state, ?string $highlightId = null, string $base = ''): void {
-    $matchups = $state['matchups'];
-    if ($highlightId !== null) {
-        usort($matchups, function ($x, $y) use ($highlightId) {
-            $mine = fn($m) => (int) ($m['sides'][0]['id'] === $highlightId
-                                  || $m['sides'][1]['id'] === $highlightId);
-            return $mine($y) <=> $mine($x);
-        });
-    }
+    $matchups = rotc_lw_sort_matchups($state['matchups'], $highlightId);
     foreach ($matchups as $i => $m):
         [$a, $b] = $m['sides'];
         $isMine = $highlightId !== null && ($a['id'] === $highlightId || $b['id'] === $highlightId);
@@ -116,15 +127,7 @@ function rotc_lw_render_cards(array $state, ?string $highlightId = null, string 
             </span>
           </div>
 
-          <div class="lw-field">
-            <?php for ($y = 10; $y < 100; $y += 10): $x = 9 + ($y / 100) * 82; ?>
-              <span class="lw-yl<?= $y === 50 ? ' mid' : '' ?>" style="left:<?= $x ?>%"></span>
-            <?php endfor; ?>
-            <span class="lw-ez l<?= $m['margin'] > 0 ? ' hi' : '' ?>"><?= htmlspecialchars(rotc_lw_tag($a['name'])) ?></span>
-            <span class="lw-ez r<?= $m['margin'] < 0 ? ' hi' : '' ?>"><?= htmlspecialchars(rotc_lw_tag($b['name'])) ?></span>
-            <span class="lw-proj" style="left:<?= $m['projBall'] ?>%"></span>
-            <span class="lw-ball" style="left:<?= $m['ball'] ?>%"></span>
-          </div>
+          <?php rotc_lw_render_field($m); ?>
 
           <?php
           // Split by side rather than one mixed row: a border colour alone
@@ -211,14 +214,16 @@ function rotc_lw_render_script(string $base): void {
           });
           card.querySelector('.lw-q').textContent = m.quarter;
           card.querySelector('.lw-dd').textContent = Math.abs(m.margin).toFixed(1) + ' margin';
-          card.querySelector('.lw-ball').style.left = m.ball + '%';
+          // Fill spans the shorter distance between center (50%) and the
+          // lean position -- same geometry as rotc_lw_render_field() in PHP.
+          var lean = card.querySelector('.lw-lean');
+          lean.style.left = Math.min(50, m.ball) + '%';
+          lean.style.width = Math.abs(m.ball - 50) + '%';
           card.querySelector('.lw-proj').style.left = m.projBall + '%';
           card.classList.toggle('redzone', !!m.redzone);
           var tms = card.querySelectorAll('.lw-tm');
           tms[0].classList.toggle('trail', m.margin < 0);
           tms[1].classList.toggle('trail', m.margin > 0);
-          card.querySelector('.lw-ez.l').classList.toggle('hi', m.margin > 0);
-          card.querySelector('.lw-ez.r').classList.toggle('hi', m.margin < 0);
 
           card.querySelector('.lw-onfield').innerHTML = m.sides.map(function(s, si){
             var live = (s.players || []).filter(function(p){ return p.live; }).slice(0,4);
@@ -308,15 +313,7 @@ function rotc_lw_render_matchup(array $m, array $events, string $base, bool $dem
           <?= rotc_lw_helmet($b['id'], 'right') ?>
         </span>
       </div>
-      <div class="lw-field">
-        <?php for ($y = 10; $y < 100; $y += 10): $x = 9 + ($y / 100) * 82; ?>
-          <span class="lw-yl<?= $y === 50 ? ' mid' : '' ?>" style="left:<?= $x ?>%"></span>
-        <?php endfor; ?>
-        <span class="lw-ez l<?= $m['margin'] > 0 ? ' hi' : '' ?>"><?= htmlspecialchars($a['tag']) ?></span>
-        <span class="lw-ez r<?= $m['margin'] < 0 ? ' hi' : '' ?>"><?= htmlspecialchars($b['tag']) ?></span>
-        <span class="lw-proj" style="left:<?= $m['projBall'] ?>%"></span>
-        <span class="lw-ball" style="left:<?= $m['ball'] ?>%"></span>
-      </div>
+      <?php rotc_lw_render_field($m); ?>
       <div class="lw-proj-line">
         Projected <strong><?= number_format($m['proj'][0], 1) ?></strong> &ndash;
         <strong><?= number_format($m['proj'][1], 1) ?></strong>
@@ -340,7 +337,13 @@ function rotc_lw_render_matchup(array $m, array $events, string $base, bool $dem
 
 /** One roster block. $muted dims the bench, which scores nothing. */
 function rotc_lw_render_roster(array $players, array $events, string $heading, bool $muted = false): void {
-    usort($players, fn($x, $y) => $y['score'] <=> $x['score']);
+    // Always grouped QB, RB, WR, TE, DL, LB, CB, S -- score only breaks
+    // ties within the same position, so the list doesn't reshuffle groups
+    // as the game plays out.
+    usort($players, function ($x, $y) {
+        return rotc_lw_pos_rank($x['pos']) <=> rotc_lw_pos_rank($y['pos'])
+            ?: $y['score'] <=> $x['score'];
+    });
     ?>
     <h3 class="lw-roster-sub"><?= htmlspecialchars($heading) ?></h3>
     <div class="lw-plist<?= $muted ? ' muted' : '' ?>">

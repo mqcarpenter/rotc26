@@ -21,6 +21,11 @@
  * garnish.
  */
 
+// A completed game's box score never changes, so once fetched it's cached
+// for the rest of the week rather than the 60s used while a game is live.
+// One successful fetch after the final whistle should be enough forever.
+if (!defined('ROTC_LW_ESPN_FINAL_TTL')) define('ROTC_LW_ESPN_FINAL_TTL', 604800);
+
 /** MFL team codes differ from ESPN's for eight teams; the rest match. */
 const ROTC_LW_MFL_TO_ESPN = [
     'GBP' => 'GB', 'JAC' => 'JAX', 'KCC' => 'KC', 'LVR' => 'LV',
@@ -32,7 +37,15 @@ function rotc_lw_espn_team(string $mflTeam): string {
     return ROTC_LW_MFL_TO_ESPN[$t] ?? $t;
 }
 
-/** Small cached GET. Returns decoded JSON or null; never throws. */
+/**
+ * Small cached GET. Returns decoded JSON or null; never throws.
+ *
+ * Retries once on a transport failure or bad status before falling back
+ * to a stale copy -- a completed game's box score is worth a second
+ * attempt rather than quietly going missing over one flaky connection,
+ * since (unlike the scoreboard) it will otherwise never be asked for
+ * again once $ttl has it marked fresh.
+ */
 function rotc_lw_espn_get(string $url, int $ttl): ?array {
     $dir = sys_get_temp_dir() . '/rotc-mfl-cache';
     if (!is_dir($dir)) @mkdir($dir, 0700, true);
@@ -43,31 +56,45 @@ function rotc_lw_espn_get(string $url, int $ttl): ?array {
         if (is_array($hit)) return $hit;
     }
 
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 6,     // a garnish must never stall the page
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_USERAGENT      => defined('MFL_USER_AGENT') ? MFL_USER_AGENT : 'ROTC26-Site',
-    ]);
-    $body = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    if ($body === false || $code !== 200) {
-        // Serve a stale copy rather than nothing.
-        if (is_readable($file)) {
-            $stale = json_decode((string) file_get_contents($file), true);
-            if (is_array($stale)) return $stale;
+    for ($attempt = 1; $attempt <= 2; $attempt++) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 6,     // a garnish must never stall the page
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_USERAGENT      => defined('MFL_USER_AGENT') ? MFL_USER_AGENT : 'ROTC26-Site',
+        ]);
+        $body = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch);
+        curl_close($ch);
+        if ($body !== false && $code === 200) {
+            $data = json_decode((string) $body, true);
+            if (!is_array($data)) return null;
+            @file_put_contents($file, json_encode($data), LOCK_EX);
+            return $data;
         }
-        return null;
+        // This degrade is otherwise completely silent -- a stat breakdown
+        // just quietly never appears -- so log every failed attempt instead
+        // of leaving "why is nothing showing" undiagnosable from outside.
+        error_log(sprintf('live-wire espn: GET %s failed on attempt %d (http %d%s)',
+            $url, $attempt, $code, $err !== '' ? ", curl: $err" : ''));
     }
-    $data = json_decode((string) $body, true);
-    if (!is_array($data)) return null;
-    @file_put_contents($file, json_encode($data), LOCK_EX);
-    return $data;
+    // Serve a stale copy rather than nothing.
+    if (is_readable($file)) {
+        $stale = json_decode((string) file_get_contents($file), true);
+        if (is_array($stale)) return $stale;
+    }
+    return null;
 }
 
-/** NFL team abbreviation -> ESPN game id, for one day's slate. */
+/**
+ * NFL team abbreviation -> ['id' => ESPN game id, 'final' => bool], for
+ * one day's slate. 'final' lets callers cache a completed game's box
+ * score far longer than an in-progress one -- it will never change again,
+ * so one successful fetch should "lock in" the stat breakdown rather than
+ * depend on every future page load re-fetching it successfully.
+ */
 function rotc_lw_espn_games(?string $date = null): array {
     $q = $date ? ('?dates=' . preg_replace('/\D/', '', $date)) : '';
     // 90s: the slate itself barely changes; only scores do, and those come
@@ -77,9 +104,11 @@ function rotc_lw_espn_games(?string $date = null): array {
     $map = [];
     foreach ((array) ($d['events'] ?? []) as $ev) {
         $id = (string) ($ev['id'] ?? '');
+        if ($id === '') continue;
+        $final = (bool) ($ev['status']['type']['completed'] ?? false);
         foreach ((array) ($ev['competitions'][0]['competitors'] ?? []) as $c) {
             $ab = strtoupper((string) ($c['team']['abbreviation'] ?? ''));
-            if ($ab !== '' && $id !== '') $map[$ab] = $id;
+            if ($ab !== '') $map[$ab] = ['id' => $id, 'final' => $final];
         }
     }
     return $map;
@@ -100,11 +129,12 @@ function rotc_lw_espn_explain(string $mflTeam, string $playerName, ?string $date
     if ($team === '') return null;
 
     $games = rotc_lw_espn_games($date);
-    $gid = $games[$team] ?? null;
-    if (!$gid) return null;
+    $g = $games[$team] ?? null;
+    if (!$g) return null;
 
     $sum = rotc_lw_espn_get(
-        'https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=' . urlencode($gid), 60);
+        'https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=' . urlencode($g['id']),
+        $g['final'] ? ROTC_LW_ESPN_FINAL_TTL : 60);
     if (!$sum) return null;
 
     $parts = preg_split('/\s+/', trim($playerName)) ?: [];

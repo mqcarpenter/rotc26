@@ -4,13 +4,12 @@
  * State builder for the Live Wire (scores/live-scoring.php + the /mobile
  * module + api/live-wire.php).
  *
- * Every matchup is presented as a football field where the FIELD IS THE
- * MATCHUP, not an NFL game:
+ * Every matchup is presented as a lean bar, not an NFL game:
  *
- *   ball spot   = the current margin. Midfield is a tie; the leader
- *                 "drives" toward the trailing franchise's end zone.
+ *   lean        = the current margin. Center is a tie; the bar fills
+ *                 from center TOWARD whichever franchise is ahead, the
+ *                 further the bigger the lead.
  *   marker      = projected final margin, from MFL's own projectedScores.
- *   momentum    = which way the last poll moved the margin.
  *   quarter     = real roster game-time left, derived from MFL's
  *                 gameSecondsRemaining, NOT the NFL clock.
  *
@@ -123,6 +122,40 @@ function rotc_lw_detect_big_plays(array $players, int $week): array {
     ]), LOCK_EX);
 
     return $feed;
+}
+
+/**
+ * Pin the viewer's own matchup first, stable otherwise. Shared by the
+ * server-rendered board (scores/live-scoring.php) and the JSON it polls
+ * (api/live-wire.php) -- those two MUST agree on order, because the poll
+ * repaints card N in place by array index. If only one side pinned the
+ * viewer's matchup, card N would silently start showing a different
+ * matchup's teams and players after the first poll.
+ */
+function rotc_lw_sort_matchups(array $matchups, ?string $highlightId): array {
+    if ($highlightId !== null) {
+        usort($matchups, function ($x, $y) use ($highlightId) {
+            $mine = fn($m) => (int) ($m['sides'][0]['id'] === $highlightId
+                                  || $m['sides'][1]['id'] === $highlightId);
+            return $mine($y) <=> $mine($x);
+        });
+    }
+    return $matchups;
+}
+
+/**
+ * Roster display order: QB, RB, WR, TE, DL (DE/DT), LB, CB, S, then
+ * anything else (K, coach slots, etc.) after. Unmapped positions sort
+ * last rather than colliding with a real group.
+ */
+const ROTC_LW_POSITION_ORDER = [
+    'QB' => 0, 'RB' => 1, 'WR' => 2, 'TE' => 3,
+    'DL' => 4, 'DE' => 4, 'DT' => 4,
+    'LB' => 5, 'CB' => 6, 'S' => 7,
+];
+
+function rotc_lw_pos_rank(string $pos): int {
+    return ROTC_LW_POSITION_ORDER[strtoupper(trim($pos))] ?? 99;
 }
 
 /**
@@ -380,9 +413,15 @@ function rotc_lw_demo_big_plays(array $players): array {
     return $out;
 }
 
-/** Margin -> 0-100 field position. 50 is a tie; clamped inside the end zones. */
+/**
+ * Margin -> 0-100 lean position. 50 is a tie; a positive margin (side a,
+ * rendered on the left) leans the position below 50, a negative margin
+ * (side b) leans it above -- i.e. the position moves toward whichever
+ * side is actually ahead, not away from it. Clamped so it never quite
+ * reaches the edge.
+ */
 function rotc_lw_field_pos(float $margin): float {
-    $pos = 50 + ($margin / ROTC_LW_FIELD_SCALE) * 47;
+    $pos = 50 - ($margin / ROTC_LW_FIELD_SCALE) * 47;
     return round(max(3, min(97, $pos)), 2);
 }
 

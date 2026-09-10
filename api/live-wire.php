@@ -27,6 +27,7 @@ if (!file_exists($configPath)) {
 }
 require_once $configPath;
 require_once __DIR__ . '/../includes/mfl-api.php';
+require_once __DIR__ . '/../includes/mfl-auth.php';
 require_once __DIR__ . '/../includes/live-wire.php';
 require_once __DIR__ . '/../includes/live-wire-espn.php';
 
@@ -42,6 +43,14 @@ try {
         echo json_encode(['live' => false, 'matchups' => [], 'bigPlays' => []]);
         exit;
     }
+    // The board pins the viewer's own matchup first on initial render (see
+    // rotc_lw_render_cards); this poll must pin it the same way, since the
+    // client repaints card N in place by array index (see paint() in
+    // includes/live-wire-view.php). Skipping this step would leave a
+    // logged-in viewer's card index pointing at a different matchup than
+    // what the page first rendered there.
+    $myFranchiseId = function_exists('rotc_mfl_franchise_id') ? (rotc_mfl_franchise_id() ?: null) : null;
+    $state['matchups'] = rotc_lw_sort_matchups($state['matchups'], $myFranchiseId);
     echo json_encode(['live' => true] + $state);
 } catch (Throwable $e) {
     http_response_code(500);
