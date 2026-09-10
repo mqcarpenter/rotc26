@@ -4,11 +4,11 @@
  *
  * Replaces the old starter-by-starter table, which duplicated
  * scores/weekly-results.php once a week had finished. This page is for
- * WATCHING a week happen: every matchup is a football field where the
- * field IS the matchup -- ball = margin, marker = projected final, lit
- * end zone = leader, and the clock is roster game-time left rather than
- * the NFL's. See includes/live-wire.php for the mapping and for what
- * MFL can and cannot tell us.
+ * WATCHING a week happen: every matchup gets a lean bar -- it fills from
+ * center toward whoever's ahead, the further the bigger the lead -- and
+ * the clock is roster game-time left rather than the NFL's. See
+ * includes/live-wire.php for the mapping and for what MFL can and
+ * cannot tell us.
  *
  * Rendered server-side on first paint (so it is useful with JS off and
  * never flashes empty), then repainted from api/live-wire.php every 30s.
@@ -139,11 +139,7 @@ if (!$fetchError) {
         <?php rotc_lw_render_cards($state, $myFranchiseId, $base); ?>
       </div>
     <?php endif; ?>
-    <p class="lw-note">
-      The field is the matchup, not an NFL game. Midfield is a tie; the leader
-      drives toward the trailing team's end zone. The yellow marker is the
-      projected final, and the clock is how much roster game-time is left.
-    </p>
+    <?php if (!$detail) rotc_lw_render_legend(); ?>
     <?php // A demo is a still: polling would overwrite it with live (empty) data.
           if (empty($state['demo']) && !$detail) rotc_lw_render_script($base); ?>
   <?php endif; ?>

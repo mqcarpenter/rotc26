@@ -53,6 +53,31 @@ function rotc_lw_render_field(array $m): void {
     <?php
 }
 
+/**
+ * One-time legend for the lean bar, meant to sit once at the bottom of
+ * the board -- not per card, which would just be noise repeated eight
+ * times. Each swatch is built from the exact same classes as the real
+ * bar so it never drifts from what it's explaining.
+ */
+function rotc_lw_render_legend(): void {
+    ?>
+    <div class="lw-legend">
+      <span class="lw-legend-item">
+        <span class="lw-legend-swatch"><span class="lw-mid"></span></span>
+        Tied game
+      </span>
+      <span class="lw-legend-item">
+        <span class="lw-legend-swatch"><span class="lw-lean" style="left:50%; width:32%"></span></span>
+        Leans toward whoever's ahead — farther from center is a bigger lead
+      </span>
+      <span class="lw-legend-item">
+        <span class="lw-legend-swatch"><span class="lw-proj" style="left:74%"></span></span>
+        Projected final margin
+      </span>
+    </div>
+    <?php
+}
+
 /** Headshot, or initials when a player has no espn_id (7 of 256 in a sample week). */
 function rotc_lw_avatar(array $p): string {
     if (!empty($p['espn'])) {
@@ -135,28 +160,44 @@ function rotc_lw_render_cards(array $state, ?string $highlightId = null, string 
           // thing anyone wants to know. Each column sits under the team it
           // belongs to, matching the scoreboard directly above it.
           ?>
-          <?php // Whole card is the target: on a phone a small "details"
-                // link would be a poor tap target next to a 34px field. ?>
+          <?php
+          // Collapsed by default: a <details> element rather than a JS
+          // toggle, so tapping works even before the poll script attaches
+          // and there's no open/closed state to lose on repaint (paint()
+          // below only replaces .lw-onfield's contents, never this wrapper).
+          // Every starter is shown here, not just whoever's currently live
+          // -- previously the card had nothing to show at all outside game
+          // time, which read as "no player data" rather than "no games yet".
+          ?>
+          <details class="lw-roster-drop">
+            <summary class="lw-roster-drop-sum">
+              <span>Rosters</span>
+              <span class="lw-chev" aria-hidden="true"></span>
+            </summary>
+            <div class="lw-onfield">
+              <?php foreach ($m['sides'] as $si => $s):
+                $roster = $s['players'];
+                usort($roster, fn($x, $y) => rotc_lw_pos_rank($x['pos']) <=> rotc_lw_pos_rank($y['pos'])
+                                          ?: $y['score'] <=> $x['score']); ?>
+                <div class="lw-of-col <?= $si ? 'b' : 'a' ?>">
+                  <span class="lw-of-lbl"><?= htmlspecialchars(rotc_lw_tag($s['name'])) ?></span>
+                  <?php foreach ($roster as $p):
+                    $pstate = $p['yet'] ? 'yet' : ($p['live'] ? 'live' : 'done'); ?>
+                    <span class="lw-pl <?= $si ? 'b' : 'a' ?> <?= $pstate ?>">
+                      <?= rotc_lw_avatar($p) ?>
+                      <span class="lw-pl-n"><?= htmlspecialchars($p['name']) ?><?= rotc_lw_inj($p['inj'] ?? null) ?>
+                        <span class="lw-pl-pos"><?= htmlspecialchars(trim($p['pos'] . ' ' . $p['team'])) ?></span>
+                      </span>
+                      <span class="lw-pl-s"><?= number_format($p['score'], 1) ?></span>
+                    </span>
+                  <?php endforeach; ?>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </details>
           <a class="lw-open" href="<?= $base ?>/scores/live-scoring?m=<?= urlencode($a['id'] . '-' . $b['id']) ?><?= !empty($state['demo']) ? '&amp;demo=1' : '' ?>">
-            <span class="lw-open-lbl">Full box score &rarr;</span>
+            <span class="lw-open-lbl">Full box score &amp; stats &rarr;</span>
           </a>
-          <div class="lw-onfield">
-            <?php foreach ($m['sides'] as $si => $s):
-              $live = array_slice(array_values(array_filter($s['players'], fn($p) => $p['live'])), 0, 4); ?>
-              <div class="lw-of-col <?= $si ? 'b' : 'a' ?>">
-                <span class="lw-of-lbl"><?= htmlspecialchars(rotc_lw_tag($s['name'])) ?></span>
-                <?php if ($live): foreach ($live as $p): ?>
-                  <span class="lw-pl <?= $si ? 'b' : 'a' ?>">
-                    <?= rotc_lw_avatar($p) ?>
-                    <span class="lw-pl-n"><?= htmlspecialchars($p['name']) ?><?= rotc_lw_inj($p['inj'] ?? null) ?></span>
-                    <span class="lw-pl-s"><?= number_format($p['score'], 1) ?></span>
-                  </span>
-                <?php endforeach; else: ?>
-                  <span class="lw-none">none playing</span>
-                <?php endif; ?>
-              </div>
-            <?php endforeach; ?>
-          </div>
         </article>
     <?php endforeach;
 }
@@ -196,6 +237,12 @@ function rotc_lw_render_script(string $base): void {
         return '<span class="lw-av">' + esc(i.toUpperCase()) + '</span>';
       }
 
+      // Mirrors ROTC_LW_POSITION_ORDER / rotc_lw_pos_rank() in
+      // includes/live-wire.php -- the two must agree or the roster
+      // reorders itself the moment the first poll repaints it.
+      var POS_ORDER = {QB:0, RB:1, WR:2, TE:3, DL:4, DE:4, DT:4, LB:5, CB:6, S:7};
+      function posRank(pos){ return POS_ORDER.hasOwnProperty(pos) ? POS_ORDER[pos] : 99; }
+
       function paint(d){
         if (!d || !d.live) return;
         // Cards are matched by their rendered order, which the server keeps
@@ -226,15 +273,22 @@ function rotc_lw_render_script(string $base): void {
           tms[1].classList.toggle('trail', m.margin > 0);
 
           card.querySelector('.lw-onfield').innerHTML = m.sides.map(function(s, si){
-            var live = (s.players || []).filter(function(p){ return p.live; }).slice(0,4);
-            var chips = live.map(function(p){
-              return '<span class="lw-pl ' + (si ? 'b' : 'a') + '">' + avatar(p)
-                + '<span class="lw-pl-n">' + esc(p.name) + injTag(p) + '</span>'
+            // Every starter, not just whoever's live -- same list the
+            // server renders, so the roster panel's contents don't change
+            // shape depending on whether anyone happens to be playing.
+            var roster = (s.players || []).slice().sort(function(x, y){
+              return posRank(x.pos) - posRank(y.pos) || y.score - x.score;
+            });
+            var chips = roster.map(function(p){
+              var state = p.yet ? 'yet' : (p.live ? 'live' : 'done');
+              return '<span class="lw-pl ' + (si ? 'b' : 'a') + ' ' + state + '">' + avatar(p)
+                + '<span class="lw-pl-n">' + esc(p.name) + injTag(p)
+                + '<span class="lw-pl-pos">' + esc((p.pos + ' ' + p.team).trim()) + '</span></span>'
                 + '<span class="lw-pl-s">' + Number(p.score).toFixed(1) + '</span></span>';
             });
             return '<div class="lw-of-col ' + (si ? 'b' : 'a') + '">'
               + '<span class="lw-of-lbl">' + esc(s.tag || '') + '</span>'
-              + (chips.length ? chips.join('') : '<span class="lw-none">none playing</span>')
+              + chips.join('')
               + '</div>';
           }).join('');
         });
