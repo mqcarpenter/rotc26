@@ -113,26 +113,28 @@ const ROTC_HOME_NFL_ABBR = [
     include __DIR__ . '/templates/hero-carousel.php';
     ?>
 
+    <?php /* Fantasy Recap runs ABOVE the Hall of Fame/champion spotlight
+       on purpose -- this is the news-style "what happened this week"
+       lead story, the champion card below it is evergreen background,
+       not news. $recap auto-advances to the latest COMPLETED week every
+       Tuesday morning (rotc_current_recap_week() walks real NFL kickoff
+       timestamps and rolls over ~4 hours after each week's last game,
+       which lands in the Tuesday-morning window for a normal week
+       without hardcoding a day-of-week anywhere) -- see
+       includes/weekly-recap.php. Stays hidden only while literally
+       nothing has been played yet (true preseason). */ ?>
+    <?php if ($recap): ?>
+    <div class="card">
+      <h2 class="card-title">Fantasy Recap <span style="font-size:12px;font-weight:400;text-transform:none;color:var(--muted);">&mdash; Week <?= htmlspecialchars($recapWeek) ?>, <?= htmlspecialchars($recapYear) ?> Season</span></h2>
+      <?php include __DIR__ . '/templates/weekly-recap-hub.php'; ?>
+    </div>
+    <?php endif; ?>
+
     <?php if ($hofChampion): ?>
       <div class="card">
         <h2 class="card-title">Hall of Fame <span style="font-size:12px;font-weight:400;text-transform:none;color:var(--muted);"><a href="<?= $base ?>/history/hall-of-fame">See every champion &rarr;</a></span></h2>
         <?php $spotlight = $hofChampion; include __DIR__ . '/templates/hall-of-fame-spotlight.php'; ?>
       </div>
-    <?php endif; ?>
-
-    <?php /* Commented out for the start of the season -- nothing has been
-       played yet, so there's no real recap to show. Restore in place
-       (don't move it) once Week 1 completes; $recap already auto-detects
-       the latest finished week via rotc_current_recap_week() above. */ ?>
-    <?php if (false): ?>
-    <div class="card">
-      <h2 class="card-title">Fantasy Recap</h2>
-      <?php if ($recap): ?>
-        <?php include __DIR__ . '/templates/weekly-recap-hub.php'; ?>
-      <?php else: ?>
-        <p>No recap available yet.</p>
-      <?php endif; ?>
-    </div>
     <?php endif; ?>
 
     <div class="card">

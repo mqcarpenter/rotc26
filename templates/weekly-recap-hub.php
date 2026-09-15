@@ -1,12 +1,19 @@
 <?php
 /**
  * templates/weekly-recap-hub.php
- * Front-page recap hub, news-homepage style: one full article shown
- * as the "primary" story on the left, and a plain text list of every
- * other matchup that week on the right -- click a list item and its
- * article swaps into the primary spot, no page reload. Matches a
- * classic news-hub front page (headline + big story left, "more
- * stories" list right) rather than a grid of equal-weight cards.
+ * Front-page recap hub, news-homepage style: the week's closest/best
+ * game runs as the "primary" story on the left with the rest of that
+ * week's games as small hub-style tiles on the right (click a tile and
+ * its article swaps into the primary spot, no page reload) -- matches
+ * a classic news-hub front page (headline + big story left, "more
+ * stories" river right) rather than a grid of equal-weight cards.
+ *
+ * Below that week's hub sits a season-long "Top Games" rail (the
+ * closest/most notable results across every completed week so far,
+ * rotc_season_top_games()) and a "Recap Archive" strip linking every
+ * earlier completed week's full article -- so past weeks stay
+ * reachable from this same section instead of only living on the
+ * standalone scores/weekly-recap-article.php page.
  *
  * Every article is pre-rendered server-side (paragraphs from the
  * shared rotc_recap_paragraphs() in includes/weekly-recap.php, same
@@ -15,8 +22,13 @@
  * since the whole week's data is already on the page.
  *
  * Expects $recap = rotc_weekly_recap_article($year, $week) result,
- * non-null (index.php only includes this file when $recap is set).
+ * non-null (index.php only includes this file when $recap is set), and
+ * $recapYear/$recapWeek set to that same year/week.
  */
+
+$rotcArticleBase = $base . '/scores/weekly-recap-article';
+$rotcSeasonTopGames = rotc_season_top_games($recapYear, $recapWeek, 4);
+$rotcArchiveWeeks = $recapWeek > 1 ? rotc_recap_archive_weeks($recapYear, $recapWeek - 1) : [];
 ?>
 <div class="rotc-recap-hub-wrap">
   <div class="rotc-recap-primary" id="rotc-recap-primary">
@@ -31,6 +43,7 @@
             <?php if ($winner['helmet']): ?>
               <img src="<?= htmlspecialchars($winner['helmet']) ?>" alt="<?= htmlspecialchars($winner['name']) ?> helmet" class="rotc-recap-hero-helmet" style="<?= $winner['helmetFlip'] ? 'transform:scaleX(-1);' : '' ?>">
             <?php endif; ?>
+            <?= rotc_recap_top_performer_photo($winner['topPerformer'], 'rotc-recap-hero-photo') ?>
           </div>
           <div class="rotc-recap-hero-body">
             <div class="rotc-recap-kicker"><?= $game['isGameOfWeek'] ? 'Game of the Week' : htmlspecialchars($game['category']) ?></div>
@@ -40,7 +53,7 @@
             <p class="rotc-recap-blurb"><?= $paras['p2'] ?></p>
             <?php if ($paras['p3']): ?><p class="rotc-recap-blurb" style="color:var(--muted);font-style:italic;"><?= $paras['p3'] ?></p><?php endif; ?>
             <?php if ($paras['p4']): ?><p class="rotc-recap-blurb" style="color:var(--muted);"><?= $paras['p4'] ?></p><?php endif; ?>
-            <a href="<?= $base ?>/scores/weekly-recap-article?year=<?= $recap['year'] ?>&week=<?= $recap['week'] ?>#game-<?= htmlspecialchars($winner['id']) ?>-<?= htmlspecialchars($loser['id']) ?>" style="font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;font-size:13px;letter-spacing:.03em;">Full box score &rarr;</a>
+            <a href="<?= $rotcArticleBase ?>?year=<?= $recap['year'] ?>&week=<?= $recap['week'] ?>#game-<?= htmlspecialchars($winner['id']) ?>-<?= htmlspecialchars($loser['id']) ?>" style="font-family:'Roboto Condensed',sans-serif;text-transform:uppercase;font-size:13px;letter-spacing:.03em;">Full box score &rarr;</a>
           </div>
         </div>
       </article>
@@ -52,21 +65,65 @@
       $winner = $game['a']['score'] >= $game['b']['score'] ? $game['a'] : $game['b'];
       $loser  = $game['a']['score'] >= $game['b']['score'] ? $game['b'] : $game['a'];
     ?>
-      <button type="button" class="rotc-recap-list-item<?= $i === 0 ? ' active' : '' ?>" data-game-index="<?= $i ?>">
-        <span class="rotc-recap-list-kicker"><?= $game['isGameOfWeek'] ? 'Game of the Week' : htmlspecialchars($game['category']) ?></span>
-        <span class="rotc-recap-list-headline"><?= htmlspecialchars($winner['name']) ?> d. <?= htmlspecialchars($loser['name']) ?></span>
-        <span class="rotc-recap-list-score">Final: <?= htmlspecialchars(number_format($winner['score'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($loser['score'], 2)) ?></span>
+      <button type="button" class="rotc-recap-hub-tile<?= $i === 0 ? ' active' : '' ?>" data-game-index="<?= $i ?>">
+        <?php if ($winner['helmet']): ?>
+          <img src="<?= htmlspecialchars($winner['helmet']) ?>" alt="" class="rotc-recap-tile-helmet" style="<?= $winner['helmetFlip'] ? 'transform:scaleX(-1);' : '' ?>">
+        <?php endif; ?>
+        <span class="rotc-recap-tile-text">
+          <span class="rotc-recap-list-kicker"><?= $game['isGameOfWeek'] ? 'Game of the Week' : htmlspecialchars($game['category']) ?></span>
+          <span class="rotc-recap-list-headline"><?= htmlspecialchars($winner['name']) ?> d. <?= htmlspecialchars($loser['name']) ?></span>
+          <span class="rotc-recap-list-score">Final: <?= htmlspecialchars(number_format($winner['score'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($loser['score'], 2)) ?></span>
+        </span>
+        <?= rotc_recap_top_performer_photo($winner['topPerformer'], 'rotc-recap-tile-photo') ?>
       </button>
     <?php endforeach; ?>
   </div>
 </div>
+
+<?php if ($rotcSeasonTopGames): ?>
+<div class="rotc-recap-season-block">
+  <h3 class="rotc-recap-subhead">Top Games This Season</h3>
+  <div class="rotc-recap-season-grid">
+    <?php foreach ($rotcSeasonTopGames as $g):
+      $winner = $g['a']['score'] >= $g['b']['score'] ? $g['a'] : $g['b'];
+      $loser  = $g['a']['score'] >= $g['b']['score'] ? $g['b'] : $g['a'];
+    ?>
+      <a class="rotc-recap-season-card" href="<?= $rotcArticleBase ?>?year=<?= $recap['year'] ?>&week=<?= $g['week'] ?>#game-<?= htmlspecialchars($winner['id']) ?>-<?= htmlspecialchars($loser['id']) ?>">
+        <?php if ($winner['helmet']): ?>
+          <img src="<?= htmlspecialchars($winner['helmet']) ?>" alt="" class="rotc-recap-tile-helmet" style="<?= $winner['helmetFlip'] ? 'transform:scaleX(-1);' : '' ?>">
+        <?php endif; ?>
+        <span class="rotc-recap-tile-text">
+          <span class="rotc-recap-list-kicker">Week <?= (int) $g['week'] ?> &middot; <?= htmlspecialchars($g['category']) ?></span>
+          <span class="rotc-recap-list-headline"><?= htmlspecialchars($winner['name']) ?> d. <?= htmlspecialchars($loser['name']) ?></span>
+          <span class="rotc-recap-list-score">Final: <?= htmlspecialchars(number_format($winner['score'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($loser['score'], 2)) ?></span>
+        </span>
+        <?= rotc_recap_top_performer_photo($winner['topPerformer'], 'rotc-recap-tile-photo') ?>
+      </a>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($rotcArchiveWeeks): ?>
+<div class="rotc-recap-archive-block">
+  <h3 class="rotc-recap-subhead">Recap Archive</h3>
+  <div class="rotc-recap-archive-strip">
+    <?php foreach ($rotcArchiveWeeks as $aw): ?>
+      <a class="rotc-recap-archive-item" href="<?= $rotcArticleBase ?>?year=<?= $recap['year'] ?>&week=<?= $aw['week'] ?>">
+        <span class="rotc-recap-archive-week">Week <?= (int) $aw['week'] ?></span>
+        <span class="rotc-recap-archive-headline"><?= htmlspecialchars($aw['winner']['name']) ?> d. <?= htmlspecialchars($aw['loser']['name']) ?></span>
+      </a>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <script>
 (function () {
   var primary = document.getElementById('rotc-recap-primary');
   if (!primary) return;
   var articles = primary.querySelectorAll('.rotc-recap-primary-article');
-  var items = document.querySelectorAll('.rotc-recap-list-item');
+  var items = document.querySelectorAll('.rotc-recap-hub-tile');
   items.forEach(function (btn) {
     btn.addEventListener('click', function () {
       var idx = btn.dataset.gameIndex;

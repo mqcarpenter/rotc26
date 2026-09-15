@@ -99,13 +99,21 @@ function rotc_article_box_score(array $side): void {
           $paras = rotc_recap_paragraphs($winner, $loser, $game, $week);
         ?>
           <div class="card" id="game-<?= htmlspecialchars($winner['id']) ?>-<?= htmlspecialchars($loser['id']) ?>">
-            <?php if ($game['isGameOfWeek']): ?>
-              <div class="rotc-recap-kicker">Game of the Week</div>
-            <?php else: ?>
-              <div class="rotc-recap-card-kicker"><?= htmlspecialchars($game['category']) ?></div>
-            <?php endif; ?>
-            <h2 class="card-title" style="margin-top:2px;"><?= htmlspecialchars($winner['name']) ?> Defeats <?= htmlspecialchars($loser['name']) ?></h2>
-            <p style="color:var(--muted);font-size:13px;margin-top:-8px;">Final: <?= htmlspecialchars(number_format($winner['score'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($loser['score'], 2)) ?> &middot; <?= htmlspecialchars($winner['name']) ?> (<?= htmlspecialchars($winner['record']) ?>) &middot; <?= htmlspecialchars($loser['name']) ?> (<?= htmlspecialchars($loser['record']) ?>)</p>
+            <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+              <?php if ($winner['helmet']): ?>
+                <img src="<?= htmlspecialchars($winner['helmet']) ?>" alt="<?= htmlspecialchars($winner['name']) ?> helmet" style="width:64px;height:64px;object-fit:contain;flex:none;<?= $winner['helmetFlip'] ? 'transform:scaleX(-1);' : '' ?>">
+              <?php endif; ?>
+              <?= rotc_recap_top_performer_photo($winner['topPerformer'], 'rotc-recap-hero-photo') ?>
+              <div style="min-width:0;">
+                <?php if ($game['isGameOfWeek']): ?>
+                  <div class="rotc-recap-kicker">Game of the Week</div>
+                <?php else: ?>
+                  <div class="rotc-recap-card-kicker"><?= htmlspecialchars($game['category']) ?></div>
+                <?php endif; ?>
+                <h2 class="card-title" style="margin-top:2px;"><?= htmlspecialchars($winner['name']) ?> Defeats <?= htmlspecialchars($loser['name']) ?></h2>
+                <p style="color:var(--muted);font-size:13px;margin-top:-8px;">Final: <?= htmlspecialchars(number_format($winner['score'], 2)) ?>&ndash;<?= htmlspecialchars(number_format($loser['score'], 2)) ?> &middot; <?= htmlspecialchars($winner['name']) ?> (<?= htmlspecialchars($winner['record']) ?>) &middot; <?= htmlspecialchars($loser['name']) ?> (<?= htmlspecialchars($loser['record']) ?>)</p>
+              </div>
+            </div>
 
             <p><?= $paras['p1'] ?></p>
             <p><?= $paras['p2'] ?></p>

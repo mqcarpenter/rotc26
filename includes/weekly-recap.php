@@ -132,6 +132,20 @@ function rotc_positional_week_rank(string $playerId, string $position, array $we
 }
 
 /**
+ * Small inline headshot for a game's top performer -- used in recap
+ * cards/tiles so the article shows the star's face up front instead of
+ * only on hover (rotc_player_hover_span() still wraps their name in the
+ * body text for the bio-card hover). Returns '' if there's no
+ * top performer or no ESPN photo for them (no broken-image box).
+ */
+function rotc_recap_top_performer_photo(?array $topPerformer, string $class = 'rotc-recap-tp-photo'): string {
+    if (!$topPerformer) return '';
+    $photo = rotc_espn_photo($topPerformer['pd'] ?? null);
+    if (!$photo) return '';
+    return '<img src="' . htmlspecialchars($photo) . '" alt="' . htmlspecialchars($topPerformer['name']) . '" class="' . htmlspecialchars($class) . '" loading="lazy" onerror="this.remove()">';
+}
+
+/**
  * One flowing sentence covering the result + a side's top performer
  * (+ that side's bench-miss callout, if any), meant to be used as one
  * half of a two-paragraph article body (winner paragraph / loser
@@ -437,4 +451,67 @@ function rotc_weekly_recap_article(int $year, int $week): ?array {
     unset($g);
 
     return ['year' => $year, 'week' => $week, 'games' => $games];
+}
+
+/**
+ * Pulls every game from weeks 1..$throughWeek of $year (each week's
+ * article reused from rotc_weekly_recap_article(), which is itself
+ * cached a day at a time via mfl_cached_get_year -- so scanning a whole
+ * season here costs nothing beyond what the front page + archive pages
+ * already fetch) and returns the $limit most notable ones league-wide,
+ * for a season-long "Top Games" rail. "Most notable" = closest margin
+ * first (matches the same Game-of-the-Week definition used per-week),
+ * ties broken by highest combined score (a shootout beats a defensive
+ * squeaker at the same margin).
+ *
+ * Each returned game gets a 'week' key added so callers can link back
+ * to that week's specific article anchor.
+ *
+ * @return array of game (same shape as rotc_weekly_recap_article()'s
+ *   games, plus 'week') ordered most- to least-notable.
+ */
+function rotc_season_top_games(int $year, int $throughWeek, int $limit = 4): array {
+    $all = [];
+    for ($w = 1; $w <= $throughWeek; $w++) {
+        $wk = rotc_weekly_recap_article($year, $w);
+        if (!$wk) continue;
+        foreach ($wk['games'] as $g) {
+            $g['week'] = $w;
+            $all[] = $g;
+        }
+    }
+    usort($all, function ($x, $y) {
+        if ($x['margin'] !== $y['margin']) return $x['margin'] <=> $y['margin'];
+        $xTotal = $x['a']['score'] + $x['b']['score'];
+        $yTotal = $y['a']['score'] + $y['b']['score'];
+        return $yTotal <=> $xTotal;
+    });
+    return array_slice($all, 0, $limit);
+}
+
+/**
+ * Lists every week from 1..$throughWeek (most recent first) with just
+ * enough summary to render a compact "Recap Archive" strip -- the
+ * Game-of-the-Week headline for that week, no full paragraph text.
+ * $throughWeek is normally the CURRENT recap week minus one (the
+ * current week is already shown as the live recap, not the archive),
+ * but callers may pass the current week itself if they want it
+ * included too.
+ *
+ * @return array of ['week'=>int,'winner'=>fullSide,'loser'=>fullSide,
+ *   'margin'=>float] ordered newest week first. Skips any week with no
+ *   completed games (bye-heavy edge case, or a week that hasn't
+ *   happened at all).
+ */
+function rotc_recap_archive_weeks(int $year, int $throughWeek): array {
+    $out = [];
+    for ($w = $throughWeek; $w >= 1; $w--) {
+        $wk = rotc_weekly_recap_article($year, $w);
+        if (!$wk || !$wk['games']) continue;
+        $g = $wk['games'][0]; // Game of the Week for that week.
+        $winner = $g['a']['score'] >= $g['b']['score'] ? $g['a'] : $g['b'];
+        $loser  = $g['a']['score'] >= $g['b']['score'] ? $g['b'] : $g['a'];
+        $out[] = ['week' => $w, 'winner' => $winner, 'loser' => $loser, 'margin' => $g['margin'], 'gameCount' => count($wk['games'])];
+    }
+    return $out;
 }

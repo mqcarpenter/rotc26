@@ -453,21 +453,50 @@ a:hover{ color:var(--accent); }
 .rotc-recap-card-kicker{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.06em; font-size:11px; color:var(--accent); font-weight:700; margin-bottom:4px; }
 .rotc-recap-blurb .rotc-player-hover{ border-bottom:1px dotted var(--muted); }
 
-/* Interactive hub: primary article left, plain text "more stories"
-   list right -- clicking a list item swaps which article is shown in
-   the primary spot (JS in templates/weekly-recap-hub.php), same shape
-   as a classic news-hub front page. Every article is pre-rendered and
-   just hidden/shown, so switching stories is instant, no reload. */
+/* Key-performer headshot, shown inline (not just on hover) so the
+   article/tile leads with the star's face -- hero size next to the
+   150px helmet, a small round chip everywhere else (hub tiles, season
+   rail cards, archive-adjacent cards). rotc_recap_top_performer_photo()
+   in includes/weekly-recap.php removes itself onerror, so a player
+   with no ESPN headshot on file just leaves the helmet/text alone. */
+.rotc-recap-hero-photo{ width:72px; height:72px; object-fit:cover; object-position:top center; border-radius:50%; border:3px solid var(--card); box-shadow:0 0 0 1px var(--line); margin-left:-16px; flex:none; }
+.rotc-recap-tile-photo{ width:34px; height:34px; object-fit:cover; object-position:top center; border-radius:50%; flex:none; margin-left:auto; }
+
+/* Interactive hub: primary article left, hub-style tiles (helmet +
+   headline + key-performer photo, not a plain text list) right --
+   clicking a tile swaps which article is shown in the primary spot
+   (JS in templates/weekly-recap-hub.php), same shape as a classic
+   news-hub front page. Every article is pre-rendered and just
+   hidden/shown, so switching stories is instant, no reload. The same
+   tile markup/classes are reused (as plain <a> links instead of
+   buttons) for the season-long "Top Games" rail below. */
 .rotc-recap-hub-wrap{ display:grid; grid-template-columns:2fr 1fr; column-gap:32px; align-items:start; margin-top:6px; }
-.rotc-recap-list{ display:flex; flex-direction:column; border-top:1px solid var(--line); }
-.rotc-recap-list-item{ display:flex; flex-direction:column; gap:2px; text-align:left; background:none; border:none; border-bottom:1px solid var(--line); padding:12px 4px; cursor:pointer; font-family:inherit; }
-.rotc-recap-list-item:hover{ background:var(--sand); }
-.rotc-recap-list-item.active{ background:var(--sand); box-shadow:inset 3px 0 0 var(--accent); }
+.rotc-recap-list{ display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--line); padding-top:8px; }
+.rotc-recap-hub-tile{ display:flex; align-items:center; gap:10px; text-align:left; background:none; border:1px solid var(--line); border-radius:var(--radius); padding:8px 10px; cursor:pointer; font-family:inherit; text-decoration:none; color:inherit; }
+.rotc-recap-hub-tile:hover{ background:var(--sand); }
+.rotc-recap-hub-tile.active{ background:var(--sand); box-shadow:inset 3px 0 0 var(--accent); }
+.rotc-recap-tile-helmet{ width:36px; height:36px; object-fit:contain; flex:none; }
+.rotc-recap-tile-text{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 auto; }
 .rotc-recap-list-kicker{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.06em; font-size:10px; color:var(--accent); font-weight:700; }
 .rotc-recap-list-headline{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; font-size:14px; line-height:1.25; color:var(--ink); }
 .rotc-recap-list-score{ font-size:12px; color:var(--muted); }
 @media (max-width:900px){ .rotc-recap-hub-wrap{ grid-template-columns:1fr; } }
-@media (max-width:600px){ .rotc-recap-hero{ flex-direction:column; align-items:flex-start; } .rotc-recap-hero-helmet{ width:110px; height:110px; } .rotc-recap-headline{ font-size:22px; } }
+@media (max-width:600px){ .rotc-recap-hero{ flex-direction:column; align-items:flex-start; } .rotc-recap-hero-helmet{ width:110px; height:110px; } .rotc-recap-headline{ font-size:22px; } .rotc-recap-hero-photo{ margin-left:0; } }
+
+/* Season-long "Top Games" rail and the "Recap Archive" strip, both
+   below the current week's hub (see rotc_season_top_games() and
+   rotc_recap_archive_weeks() in includes/weekly-recap.php) -- past
+   weeks stay reachable from this same front-page section instead of
+   only living on the standalone recap article page. */
+.rotc-recap-subhead{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.05em; font-size:15px; color:var(--ink); margin:20px 0 10px; padding-top:14px; border-top:1px solid var(--line); }
+.rotc-recap-season-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:10px; }
+.rotc-recap-season-card{ display:flex; align-items:center; gap:10px; border:1px solid var(--line); border-radius:var(--radius); padding:8px 10px; text-decoration:none; color:inherit; }
+.rotc-recap-season-card:hover{ background:var(--sand); }
+.rotc-recap-archive-strip{ display:flex; flex-wrap:wrap; gap:8px; }
+.rotc-recap-archive-item{ display:flex; flex-direction:column; gap:2px; border:1px solid var(--line); border-radius:var(--radius); padding:6px 10px; text-decoration:none; color:inherit; font-size:12px; }
+.rotc-recap-archive-item:hover{ background:var(--sand); }
+.rotc-recap-archive-week{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.05em; font-size:10px; color:var(--accent); font-weight:700; }
+.rotc-recap-archive-headline{ color:var(--ink); }
 
 /* Sidebar "Top Adds/Drops" tab (templates/sidefeed.php, replacing the
    dead Videos tab) -- compact trending-player rows: logo, hoverable
