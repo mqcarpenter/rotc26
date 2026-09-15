@@ -2,18 +2,32 @@
 /**
  * includes/recap-phrases.php
  * Matteo's curated flavor-line bank for weekly recap articles (see
- * includes/weekly-recap.php). ~400 broadcast-style color-commentary
- * lines, organized into the same categories he grouped them in.
+ * includes/weekly-recap.php). 550+ color-commentary lines across two
+ * registers: the original ~400 broadcast-style lines (crowd/stadium/
+ * play-by-play, as if this were a live NFL broadcast) plus a newer
+ * ~150-line internet/fantasy-manager register (group chat trash talk,
+ * waiver-wire panic, hot-take reactions) added because the original
+ * pool alone was starting to feel repetitive once a season ran a full
+ * slate of matchups every week -- a second, distinct voice cuts the
+ * odds of the same handful of lines resurfacing across nearby games
+ * far more than just padding the existing categories would have.
+ * 'blowoutRoast' and 'nailBiterNerves' are margin-specific (only mixed
+ * in when that week's game is an actual Blowout/Nail-Biter -- see the
+ * category-pool logic in rotc_recap_paragraphs()); every other
+ * category, old or new, is generic enough to fit any result.
  *
  * These are pure flavor, not factual claims -- no line here names a
  * real person tied to a real quote, and none of the play-by-play /
- * crowd / stadium lines are presented as reporting on a specific real
- * event (this league doesn't have a physical stadium or play-by-play
- * data to report on in the first place). rotc_recap_paragraphs() in
- * includes/weekly-recap.php weaves a handful of these in around the
- * real, factual content (actual score, actual top performer, actual
- * bench-miss, actual next opponent) as connective color, the same way
- * a sports-radio broadcast uses hype lines between real play calls.
+ * crowd / stadium / group-chat / waiver-wire lines are presented as
+ * reporting on a specific real event (this league doesn't have a
+ * physical stadium or play-by-play data to report on in the first
+ * place, and no real league member's actual chat message or waiver
+ * claim is quoted -- these are generic, could-be-anyone lines).
+ * rotc_recap_paragraphs() in includes/weekly-recap.php weaves a
+ * handful of these in around the real, factual content (actual score,
+ * actual top performer, actual bench-miss, actual next opponent) as
+ * connective color, the same way a sports-radio broadcast uses hype
+ * lines between real play calls.
  *
  * Picks are deterministic (seeded by game+week+slot), so a given
  * matchup shows the same lines on every reload rather than a
@@ -465,6 +479,184 @@ const ROTC_RECAP_PHRASE_BANK = [
         'They came, they played, they conquered, and one team walks away with the ultimate prize tonight!',
         'Fans are heading to the turnpike, singing the victory song after a game that had absolutely everything!',
         'The final whistle blows on a masterpiece of gridiron theatre, and we will see you next week, football fans!',
+    ],
+
+    // Fantasy Manager Reactions -- general internet/fantasy-degenerate
+    // voice, fits any result (25 lines).
+    'fantasyManagerReactions' => [
+        'Somewhere in this league, a manager is already drafting the trash talk for next week.',
+        "That kind of week makes every manager reconsider their whole draft strategy by Wednesday.",
+        'This is the kind of result that gets brought up unprompted for the rest of the season.',
+        "Somebody's about to change their team name out of pure embarrassment after this one.",
+        "That's the kind of performance that earns a permanent nickname in the league group chat.",
+        'This result is why half the league still checks their lineup at 11:59 on Sunday morning.',
+        "Somebody's fantasy confidence just took a hit it won't recover from this week.",
+        "That's the kind of week that turns a casual manager into a waiver-wire insomniac.",
+        'This result belongs on a highlight reel that nobody actually asked to see twice.',
+        "Somebody in this league just became insufferable for the next seven days, easily.",
+        "That's a stat line that gets forwarded around before the late games are even over.",
+        "This week reminded everyone why fantasy football ruins otherwise normal Sundays.",
+        "That's the kind of result that makes a manager question every trade they didn't make.",
+        "Somebody just locked in bragging rights for the rest of the regular season.",
+        "This result is the exact reason nobody ever lets a rival forget a bad week one.",
+        "That's a performance that turns a bench spot into a permanent regret.",
+        "This week's box score is getting quoted in an argument by Wednesday, guaranteed.",
+        "That's the kind of result that starts a rivalry over one meaningless flex spot.",
+        "Somebody's going to overreact to this one result way harder than they should.",
+        "This week is proof that a good matchup can make or break an entire fantasy mood.",
+        "That's a stat line that turns a Sunday nap into a Monday-morning victory lap.",
+        "This result is the exact reason nobody trusts their gut on start-sit calls anymore.",
+        "That's the kind of week where the waiver wire suddenly looks a lot more interesting.",
+        "Somebody's going to bring this result up at the trophy presentation, mark it down.",
+        "This is the kind of week that turns a casual league into a full-time hobby again.",
+    ],
+
+    // League Chat Banter -- group-chat trash talk, generic and
+    // could-be-anyone (no real member's actual message quoted) (25 lines).
+    'leagueChatBanter' => [
+        'The league group chat is going to need a moderator after this final score drops.',
+        "Somebody just muted the group chat rather than deal with the fallout from this one.",
+        "This result is getting brought back up in the group chat until the trade deadline.",
+        'The trash talk in this league just found its opening line for the week.',
+        "Somebody's already typing up the group chat message and deleting it three times.",
+        "This one's getting brought up at every league gathering until the trophy gets handed out.",
+        'The group chat reactions to this score alone deserve their own recap article.',
+        "Somebody just sent a single emoji to the group chat and everyone knew exactly what it meant.",
+        "This result is the reason the league group chat never actually sleeps during the season.",
+        "Somebody's league rival is drafting their trash talk as we speak.",
+        'The group chat just turned into a courtroom over this final score.',
+        "This is the kind of result that gets its own inside joke by next week's matchup.",
+        "Somebody's about to get roasted in the group chat before the late window even starts.",
+        "The league's resident trash talker just got handed a whole week of material.",
+        "This score is the reason somebody's league nickname is about to change permanently.",
+        "The group chat is currently mostly reaction images because of this result.",
+        "Somebody just left the group chat on read after seeing this final score.",
+        "This result already has a meme attached to it, and it's not a flattering one.",
+        "The league's trophy talk just got a lot more interesting after this week.",
+        "Somebody's going to bring up this score at the draft party next year, guaranteed.",
+        'The group chat consensus is already in, and it is not kind.',
+        'This is the kind of week where the standings page gets refreshed way too often.',
+        "Somebody's rival just got bragging rights and they are not going to let it go.",
+        'The group chat just declared this an instant league classic, for better or worse.',
+        'This result is officially league lore as of tonight.',
+    ],
+
+    // Waiver Wire and Roster Talk -- generic, fits any result (25 lines).
+    'waiverWireAndRosterTalk' => [
+        'Somewhere a waiver claim just got a lot more urgent because of this performance.',
+        "That stat line is about to spike a free-agent bidding war by Wednesday morning.",
+        "This is exactly the kind of week that turns a bench player into the hottest name on the wire.",
+        "Somebody's about to burn their last waiver priority chasing this exact performance.",
+        'That kind of week makes every manager double check their bench for a hidden gem.',
+        "This result is going to make somebody's inactive roster spot look like a missed opportunity.",
+        'Free-agent interest in that performance is about to spike leaguewide by morning.',
+        'This is the kind of week where the waiver wire suddenly gets a lot more crowded.',
+        "Somebody's about to drop a bye-week fill-in the second this news breaks.",
+        "That's a stat line that turns a practice-squad afterthought into a hot commodity.",
+        "This performance is going to trigger a roster shakeup nobody saw coming this week.",
+        "Somebody's bench just became a lot more valuable after this showing.",
+        "That's a breakout the waiver wire is going to be fighting over by Wednesday.",
+        "This week's stat line is enough to get somebody dropped for a hunch pickup.",
+        "Somebody's about to overpay in FAAB chasing this exact kind of performance.",
+        "That's the kind of week that makes a deep-bench name suddenly relevant.",
+        'This result is proof that the waiver wire never actually sleeps during the season.',
+        "Somebody's roster is about to look completely different by kickoff next week.",
+        "That's a stat line that turns a streaming option into a must-roster piece.",
+        "This week's box score is the reason somebody's about to make a panic trade.",
+        "Somebody's bench depth just quietly became the best story of the week.",
+        "That's the kind of performance that gets a waiver claim submitted before the final whistle.",
+        "This result is going to make next week's free-agent list a lot more competitive.",
+        "Somebody's about to regret cutting a player two weeks ago after seeing this.",
+        "That's a stat line the whole league's waiver wire chat is about to be arguing over.",
+    ],
+
+    // Statline Hot Takes -- generic reaction-to-a-box-score energy (25 lines).
+    'statlineHotTakes' => [
+        'That box score is going to start arguments nobody actually needed to have.',
+        'This stat line reads like a hot-take generator working overtime.',
+        "Somebody's about to build a whole podcast segment around that performance.",
+        "That's the kind of stat line that gets circled in red on a Tuesday morning.",
+        'This performance is going to get overanalyzed way more than it deserves.',
+        "That box score alone is worth a whole debate on which trend is real and which isn't.",
+        "Somebody's about to call this a turning point, and somebody else a fluke.",
+        "That's a stat line that splits a league right down the middle on what it means.",
+        'This performance is the exact kind of thing that gets overreacted to by Wednesday.',
+        "That box score just handed the league's hot-take crowd a week's worth of material.",
+        "Somebody's about to declare a permanent trend off a single week's stat line.",
+        "That's the kind of performance that gets its own highlight reel and its own backlash.",
+        "This stat line is going to be exhibit A in somebody's argument by kickoff next week.",
+        'That box score reads different depending on who lost because of it.',
+        "Somebody's about to fast-track that performance straight into buy-low, sell-high advice.",
+        "This is the kind of stat line that gets quoted out of context by next week.",
+        "That performance just became the league's new benchmark for a good week, fair or not.",
+        "Somebody's going to spend all week trying to explain that stat line away.",
+        'That box score alone is enough to change how the whole league sees this roster.',
+        "This performance is going straight into the small-sample-size argument, whether it deserves it or not.",
+        "That's a stat line that's going to get compared to every other week for the rest of the season.",
+        "Somebody's about to build a whole trade pitch around that single performance.",
+        "That box score just turned a bench-warmer into the league's newest talking point.",
+        'This performance is the exact reason nobody trusts a stat line until midseason.',
+        "That's the kind of week that gets a smug message sent to the whole league.",
+    ],
+
+    // Blowout Roast -- margin-specific, only mixed in for an actual
+    // Blowout result (margin > 40); see rotc_recap_paragraphs() (25 lines).
+    'blowoutRoast' => [
+        "Somebody check on that fantasy roster -- the paramedics are already on the way.",
+        'This was not a loss, it was a public execution with a scoreboard.',
+        'That final margin needs its own zip code, it left the building that far behind.',
+        "That lineup got dragged before the late games even kicked off.",
+        "Not a beatdown, a full eviction notice with thirty days waived.",
+        'The box score reads less like a game and more like a restraining order.',
+        "This is the kind of final score that gets meme'd in three different group chats by Tuesday.",
+        "Somebody screenshot that final and mail it home.",
+        "That's not a loss, that's a science experiment in how bad a Sunday can get.",
+        'The margin was so lopsided the optimal-lineup math gave up early.',
+        "This roster didn't just lose, it filed for fantasy bankruptcy.",
+        "That's the kind of final score you screenshot and never speak of again.",
+        "Somewhere a bench is getting blamed for a beating the starters caused all by themselves.",
+        "The final score belongs in a museum under a sign that says 'how not to draft.'",
+        'That result does not need a recap, it needs a eulogy.',
+        'This was not a fantasy matchup, it was a hostage situation with a kickoff time.',
+        "The loser's group chat has already gone silent, and silence says everything.",
+        "That blowout is getting framed and hung on the league's wall of shame.",
+        "Somebody's waiver wire is about to look like a five-alarm fire after this one.",
+        'The final margin looked like a typo until everyone double-checked the box score.',
+        'This is the kind of result that makes a bye week look like mercy.',
+        'That scoreline reads like a phone number, not a football score.',
+        'The optimal-lineup gods were merciless and everyone watched it happen live.',
+        "Somebody's going to need a new lineup and possibly a new outlook after that one.",
+        "That's not a rivalry game anymore, that's a cautionary tale.",
+    ],
+
+    // Nail-Biter Nerves -- margin-specific, only mixed in for an actual
+    // Nail-Biter result (margin < 3); see rotc_recap_paragraphs() (25 lines).
+    'nailBiterNerves' => [
+        "That one came down to a single decimal point and everyone's stomach felt it.",
+        'This is the kind of finish that has both rosters refreshing the scoreboard past midnight.',
+        'A margin that thin does not leave a winner, it leaves two teams with matching heart palpitations.',
+        'Every garbage-time stat line in this one mattered, and both sides know it.',
+        'That final score is close enough to require a recount and a stiff drink.',
+        "Somebody's Monday-night flex just decided the whole week, no pressure.",
+        "This game came down to the kind of margin that makes a missed extra point feel personal.",
+        'Both benches were sweating a stat correction long after the games actually ended.',
+        'A finish this tight turns a fantasy matchup into a full-blown group-chat crisis.',
+        "That's the kind of margin where a single dropped pass becomes the whole story.",
+        'Neither side is sleeping tonight after a finish that close.',
+        'This one had both rosters glued to the live scoring ticker until the very last tenth of a point.',
+        "A margin under three points is basically fantasy football's version of overtime.",
+        "That result came down to whoever remembered to check their bench for a bye week.",
+        'Both sides are going to relive this final score in their heads for a week straight.',
+        'This is the type of finish that turns a garbage-time touchdown into a season-defining moment.',
+        'The kind of margin that makes a manager question every start-sit decision from Thursday on.',
+        'That scoreboard stayed tight enough to keep both group chats up past midnight.',
+        'A finish this close does not need overtime, it just needs a distraction.',
+        'Both rosters were one flex decision away from switching outcomes entirely.',
+        "That's the razor's-edge kind of final score that makes next week's rematch a must-watch.",
+        "Somebody's waiver-wire pickup from Wednesday just decided the whole week.",
+        'This one will get replayed in the league group chat until the next kickoff.',
+        'A margin that small turns every garbage-time stat update into a full-on emergency.',
+        'That is the kind of nail-biter where checking the score becomes a personality trait for a night.',
     ],
 ];
 

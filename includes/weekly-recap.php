@@ -69,6 +69,13 @@ const ROTC_RECAP_COLOR_CATEGORIES = [
     'keyPlays', 'fanEngagement', 'genericDetails', 'additionalGameAction',
     'environmentDetails', 'deepCutPuns', 'moreGameAction',
     'fanStadiumEnergy', 'finalElements',
+    // Second, distinct voice (internet/fantasy-manager banter rather
+    // than broadcast-announcer) -- added alongside the original
+    // categories above so two nearby games are far less likely to draw
+    // from the exact same small pool. See recap-phrases.php's doc
+    // comment for why this was needed.
+    'fantasyManagerReactions', 'leagueChatBanter', 'waiverWireAndRosterTalk',
+    'statlineHotTakes',
 ];
 
 /**
@@ -202,7 +209,16 @@ function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $we
 
     $p2 = rotc_recap_side_paragraph($loser, htmlspecialchars($loser['name'] . " couldn\u{2019}t quite complete the comeback."), $week);
 
-    $colorLines = rotc_recap_pick_phrases($seed . '-color', ROTC_RECAP_COLOR_CATEGORIES, 2);
+    // Blowouts/nail-biters get their own margin-specific flavor
+    // category mixed into the general pool (rather than replacing it),
+    // so a lopsided or razor-thin result has a real chance of drawing a
+    // line that actually fits it, on top of the always-available
+    // generic categories.
+    $colorCategories = ROTC_RECAP_COLOR_CATEGORIES;
+    if ($game['category'] === 'Blowout') $colorCategories[] = 'blowoutRoast';
+    if ($game['category'] === 'Nail-Biter') $colorCategories[] = 'nailBiterNerves';
+
+    $colorLines = rotc_recap_pick_phrases($seed . '-color', $colorCategories, 2);
     $p3 = $colorLines ? implode(' ', array_map('htmlspecialchars', $colorLines)) : null;
 
     $p4parts = [];
