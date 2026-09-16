@@ -136,12 +136,34 @@ function rotc_lw_espn_games(?string $date = null): array {
 /**
  * The play behind a jump, or null.
  *
- * Matches on surname within the play text, most recent play first, and
- * prefers scoring plays -- a 5+ point jump is usually a touchdown, and
+ * Matching strategy, in order:
+ *  1. ESPN's own play-by-play text abbreviates a player to "F.Surname"
+ *     (e.g. "P.Mahomes pass complete to T.Kelce for 12 yards") --
+ *     matching on that exact abbreviated form is what actually
+ *     disambiguates two players who share a surname in the same game,
+ *     which the previous version of this function could not do (it
+ *     matched on bare surname alone and would silently pick whichever
+ *     candidate happened to appear first, no matter whose play it
+ *     actually was -- this file's own prior comment already flagged
+ *     "two Johnsons would collide" as a known risk of that approach;
+ *     this rewrite is what actually closes it, not just documents it).
+ *     NOTE: this specific fix is untested against a live ESPN payload
+ *     -- site.api.espn.com returned 403 for every request attempted
+ *     while writing this (an IP-level block on the environment this
+ *     was written from, unrelated to the request headers), so verify
+ *     against a real in-progress or completed game before trusting it
+ *     fully.
+ *  2. Only if that abbreviated form appears nowhere in the candidate
+ *     pool does this fall back to a bare-surname match, and only when
+ *     the surname is NOT ambiguous within that same pool (i.e. it
+ *     never appears paired with a different first initial elsewhere
+ *     in the candidates) -- an ambiguous bare surname now returns null
+ *     rather than guessing, same philosophy the old code already
+ *     claimed but didn't fully apply.
+ *
+ * Prefers scoring plays -- a 5+ point jump is usually a touchdown, and
  * ESPN's scoringPlays list is far smaller and cleaner than the full
- * drive log. Surname matching is imperfect (two Johnsons in one game
- * would collide), hence returning null rather than guessing when the
- * name doesn't appear at all.
+ * drive log.
  */
 function rotc_lw_espn_explain(string $mflTeam, string $playerName, ?string $date = null): ?array {
     $team = rotc_lw_espn_team($mflTeam);
@@ -157,8 +179,11 @@ function rotc_lw_espn_explain(string $mflTeam, string $playerName, ?string $date
     if (!$sum) return null;
 
     $parts = preg_split('/\s+/', trim($playerName)) ?: [];
-    $surname = $parts ? end($parts) : '';
+    if (count($parts) < 2) return null;
+    $first = $parts[0];
+    $surname = end($parts);
     if (mb_strlen($surname) < 3) return null;
+    $abbrev = mb_substr($first, 0, 1) . '.' . $surname;
 
     $candidates = [];
     foreach ((array) ($sum['scoringPlays'] ?? []) as $sp) {
@@ -182,18 +207,37 @@ function rotc_lw_espn_explain(string $mflTeam, string $playerName, ?string $date
         }
     }
 
+    // Pass 1: exact "F.Surname" match -- specific enough that a scoring
+    // hit can be trusted immediately.
     $best = null;
     foreach ($candidates as $c) {
-        if ($c['text'] === '' || stripos($c['text'], $surname) === false) continue;
-        // Scoring plays win; otherwise take the first (most recent) hit.
+        if ($c['text'] === '' || stripos($c['text'], $abbrev) === false) continue;
         if ($c['score']) { $best = $c; break; }
         if ($best === null) $best = $c;
     }
-    if ($best === null) return null;
+    if ($best !== null) {
+        return ['text' => mb_substr($best['text'], 0, 160), 'clock' => $best['clock'], 'period' => $best['period']];
+    }
 
-    return [
-        'text'   => mb_substr($best['text'], 0, 160),
-        'clock'  => $best['clock'],
-        'period' => $best['period'],
-    ];
+    // Pass 2: bare surname, but only if it is unambiguous across the
+    // WHOLE candidate pool -- i.e. it never shows up attached to a
+    // different first initial (a different player) anywhere in this
+    // game's plays. Two Smiths on opposite sides of the same game will
+    // both fail this check and correctly return null instead of one
+    // silently borrowing the other's play.
+    $otherInitialSameSurname = false;
+    $surnameHit = null;
+    foreach ($candidates as $c) {
+        if ($c['text'] === '') continue;
+        if (preg_match('/\b([A-Z])\.' . preg_quote($surname, '/') . '\b/', $c['text'], $m)) {
+            if (strcasecmp($m[1], mb_substr($first, 0, 1)) !== 0) { $otherInitialSameSurname = true; continue; }
+        } elseif (stripos($c['text'], $surname) === false) {
+            continue;
+        }
+        if ($c['score']) { $surnameHit = $c; break; }
+        if ($surnameHit === null) $surnameHit = $c;
+    }
+    if ($otherInitialSameSurname || $surnameHit === null) return null;
+
+    return ['text' => mb_substr($surnameHit['text'], 0, 160), 'clock' => $surnameHit['clock'], 'period' => $surnameHit['period']];
 }
