@@ -9,13 +9,13 @@
  * graphic), not 'logo' (the big banner) — per Matteo's call.
  *
  * Also pulls the three pool summaries that live on this tab on the
- * MFL-hosted page: NFL Pick 'Em, Fantasy Pick 'Em, Survivor Pool.
- * Per-week pick data is confirmed against the real survivorPool API
- * shape (franchise[].week[].{week,pick}). The NFL/Fantasy pool export
- * (TYPE=pool) came back with no franchise-level picks when this was
- * built, since no picks exist yet this preseason — the per-pick
- * scoring field name is a best guess (tries a few plausible keys) and
- * should get a real check once picks start coming in during the season.
+ * MFL-hosted page: NFL Pick 'Em, Fantasy Pick 'Em, Survivor Pool, and
+ * grades every pick against real results (includes/pool-accuracy.php)
+ * -- see that file's doc comment for the real TYPE=pool/survivorPool
+ * shapes this was rebuilt against once Week 1 actually had picks and
+ * results on file (the original build predated any real pool data and
+ * guessed wrong at the payload shape, which is why every week showed
+ * blank).
  *
  * NOT included: the detailed "Power Rankings / All-Play Record" table
  * (COULDA WON / WOULDA LOST / bench points columns) from the MFL-hosted
@@ -38,6 +38,8 @@ if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/helmets.php';
+    require_once __DIR__ . '/../includes/pool-accuracy.php';
+    require_once __DIR__ . '/../includes/weekly-recap.php'; // rotc_current_recap_week()
 
     $franchises = mfl_franchises();
     $divisions  = mfl_divisions_conferences();
@@ -74,13 +76,52 @@ if (!$fetchError) {
     $survivor     = mfl_cached_get('survivorPool', 3600);
     $poolWeeks    = range((int) ($nflPool['poolPicks']['startWeek'] ?? 1), (int) ($nflPool['poolPicks']['endWeek'] ?? 17));
     $survivorWeeks = range((int) ($survivor['survivorPool']['startWeek'] ?? 1), (int) ($survivor['survivorPool']['endWeek'] ?? 17));
+
+    // A fantasy matchup has no per-game "final" flag of its own the way
+    // an NFL game does (gameSecondsRemaining), so grading Fantasy Pick 'Em
+    // picks piggybacks on the same real-kickoff-timestamp completion
+    // check the recap feature already trusts.
+    $currentCompleted = rotc_current_recap_week((int) MFL_YEAR);
+    $lastFinalWeek = $currentCompleted ? $currentCompleted['week'] : 0;
+
+    // Per-week score lookups, fetched once and reused across every
+    // franchise's row for that week rather than once per franchise.
+    $nflWeekScores = [];
+    $nflWeekOpponents = [];
+    $fantasyWeekScores = [];
+    foreach (array_unique(array_merge($poolWeeks, $survivorWeeks)) as $w) {
+        $nflWeekScores[$w] = rotc_nfl_week_scores((int) MFL_YEAR, $w);
+        $nflWeekOpponents[$w] = rotc_nfl_week_opponents((int) MFL_YEAR, $w);
+        $fantasyWeekScores[$w] = rotc_fantasy_week_scores((int) MFL_YEAR, $w, $w <= $lastFinalWeek);
+    }
+
 }
 
-function rotc_pick_value(array $weekRow): string {
-    foreach (['correct', 'score', 'pts', 'result'] as $key) {
-        if (isset($weekRow[$key]) && $weekRow[$key] !== '') return (string) $weekRow[$key];
+/** One franchise's season line for a pick'em pool: per-week grade + running total. */
+function rotc_pool_franchise_line(array $franchiseNode, array $weeks, array $weekScores): array {
+    $byWeek = rotc_pool_weeks_by_number($franchiseNode);
+    $out = []; $totalCorrect = 0; $totalGraded = 0;
+    foreach ($weeks as $w) {
+        $games = $byWeek[$w] ?? [];
+        $grade = $games ? rotc_pool_grade_week_games($games, fn($id) => $weekScores[$w][$id] ?? ['score' => null, 'final' => false]) : ['correct' => 0, 'graded' => 0, 'total' => 0, 'picks' => []];
+        $totalCorrect += $grade['correct'];
+        $totalGraded += $grade['graded'];
+        $out[$w] = $grade;
     }
-    return $weekRow['pick'] ?? '';
+    return ['weeks' => $out, 'totalCorrect' => $totalCorrect, 'totalGraded' => $totalGraded];
+}
+
+/** Compact per-week cell for a pick'em pool: "3/4" graded, "-" ungraded/unpicked. */
+function rotc_pool_cell(array $grade): string {
+    if ($grade['total'] === 0) return '';
+    if ($grade['graded'] === 0 && !array_filter($grade['picks'], fn($p) => $p['status'] === 'push')) {
+        // Nothing gradable yet (all pending/unpicked) -- still show how
+        // many picks are in so an empty week doesn't look identical to
+        // a bye/no-picks week.
+        $made = count(array_filter($grade['picks'], fn($p) => $p['pick'] !== ''));
+        return $made > 0 ? $made . '/' . $grade['total'] . ' pending' : '-';
+    }
+    return $grade['correct'] . '/' . $grade['graded'];
 }
 ?>
 
@@ -129,6 +170,7 @@ function rotc_pick_value(array $weekRow): string {
 
     <div class="card">
       <h2 class="card-title" id="nfl-pool">NFL Pick 'Em Pool</h2>
+      <p style="color:var(--muted);font-size:12px;margin-top:-6px;">Each cell is correct/graded picks for that week (real NFL results). A week with no finished games yet shows "pending".</p>
       <?php if (empty(mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
@@ -136,18 +178,15 @@ function rotc_pick_value(array $weekRow): string {
         <table class="data-table">
           <thead><tr><th>Franchise</th><?php foreach ($poolWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?><th>Total</th></tr></thead>
           <tbody>
-            <?php foreach (mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; $total = 0; ?>
+            <?php foreach (mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']];
+              $line = rotc_pool_franchise_line($fr, $poolWeeks, $nflWeekScores);
+            ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= htmlspecialchars($f['name']) ?></td>
-                <?php foreach ($poolWeeks as $w):
-                  $wk = null;
-                  foreach (($fr['week'] ?? []) as $wRow) { if ((int) ($wRow['week'] ?? -1) === $w) { $wk = $wRow; break; } }
-                  $val = $wk ? rotc_pick_value($wk) : '';
-                  $total += is_numeric($val) ? (float) $val : 0;
-                ?>
-                  <td><?= htmlspecialchars($val) ?></td>
+                <?php foreach ($poolWeeks as $w): ?>
+                  <td><?= htmlspecialchars(rotc_pool_cell($line['weeks'][$w])) ?></td>
                 <?php endforeach; ?>
-                <td><?= $total ?></td>
+                <td><strong><?= $line['totalCorrect'] ?>/<?= $line['totalGraded'] ?></strong></td>
               </tr>
             <?php endforeach; ?>
           </tbody>
@@ -158,6 +197,7 @@ function rotc_pick_value(array $weekRow): string {
 
     <div class="card">
       <h2 class="card-title" id="fantasy-pool">Fantasy Pick 'Em Pool</h2>
+      <p style="color:var(--muted);font-size:12px;margin-top:-6px;">Each cell is correct/graded picks for that week (real fantasy matchup results). A week not fully complete yet shows "pending".</p>
       <?php if (empty(mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
@@ -165,18 +205,15 @@ function rotc_pick_value(array $weekRow): string {
         <table class="data-table">
           <thead><tr><th>Franchise</th><?php foreach ($poolWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?><th>Total</th></tr></thead>
           <tbody>
-            <?php foreach (mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; $total = 0; ?>
+            <?php foreach (mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']];
+              $line = rotc_pool_franchise_line($fr, $poolWeeks, $fantasyWeekScores);
+            ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
                 <td><?= htmlspecialchars($f['name']) ?></td>
-                <?php foreach ($poolWeeks as $w):
-                  $wk = null;
-                  foreach (($fr['week'] ?? []) as $wRow) { if ((int) ($wRow['week'] ?? -1) === $w) { $wk = $wRow; break; } }
-                  $val = $wk ? rotc_pick_value($wk) : '';
-                  $total += is_numeric($val) ? (float) $val : 0;
-                ?>
-                  <td><?= htmlspecialchars($val) ?></td>
+                <?php foreach ($poolWeeks as $w): ?>
+                  <td><?= htmlspecialchars(rotc_pool_cell($line['weeks'][$w])) ?></td>
                 <?php endforeach; ?>
-                <td><?= $total ?></td>
+                <td><strong><?= $line['totalCorrect'] ?>/<?= $line['totalGraded'] ?></strong></td>
               </tr>
             <?php endforeach; ?>
           </tbody>
@@ -187,6 +224,7 @@ function rotc_pick_value(array $weekRow): string {
 
     <div class="card">
       <h2 class="card-title" id="survivor-pool">Survivor Pool</h2>
+      <p style="color:var(--muted);font-size:12px;margin-top:-6px;">A pick turns red the week their team loses (eliminated from there on in a standard single-strike format); green means still alive.</p>
       <?php if (empty(mfl_normalize_list($survivor['survivorPool']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
@@ -194,14 +232,20 @@ function rotc_pick_value(array $weekRow): string {
         <table class="data-table">
           <thead><tr><th>Franchise</th><?php foreach ($survivorWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?></tr></thead>
           <tbody>
-            <?php foreach (mfl_normalize_list($survivor['survivorPool']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']]; ?>
+            <?php foreach (mfl_normalize_list($survivor['survivorPool']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']];
+              $eliminated = false;
+            ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                <td><?= htmlspecialchars($f['name']) ?></td>
+                <td><?= htmlspecialchars($f['name']) ?><?= $eliminated ? ' <span style="color:var(--muted);font-size:11px;">(eliminated)</span>' : '' ?></td>
                 <?php foreach ($survivorWeeks as $w):
                   $wk = null;
-                  foreach (($fr['week'] ?? []) as $wRow) { if ((int) ($wRow['week'] ?? -1) === $w) { $wk = $wRow; break; } }
+                  foreach (mfl_normalize_list($fr['week'] ?? null) as $wRow) { if ((int) ($wRow['week'] ?? -1) === $w) { $wk = $wRow; break; } }
+                  $pick = (string) ($wk['pick'] ?? '');
+                  $status = $eliminated ? 'past' : rotc_survivor_grade_pick($pick, $nflWeekScores[$w] ?? [], $nflWeekOpponents[$w] ?? []);
+                  if ($status === 'wrong') $eliminated = true;
+                  $color = ['correct' => 'var(--good, #2a7a3b)', 'wrong' => 'var(--bad, #b0281f)', 'push' => 'var(--muted)', 'pending' => 'inherit', 'unpicked' => 'var(--muted)', 'past' => 'var(--muted)'][$status] ?? 'inherit';
                 ?>
-                  <td><?= htmlspecialchars($wk['pick'] ?? '') ?></td>
+                  <td style="color:<?= $color ?>;<?= $status === 'wrong' ? 'font-weight:700;' : '' ?>"><?= htmlspecialchars($pick) ?: '&mdash;' ?></td>
                 <?php endforeach; ?>
               </tr>
             <?php endforeach; ?>
