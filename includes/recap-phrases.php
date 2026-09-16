@@ -46,13 +46,40 @@
  * the matching category array below.
  */
 const ROTC_RECAP_PHRASE_BANK = [
-    // Article Openers (5 lines)
+    // Article Openers (25 lines). Originally just 5 -- with a week
+    // regularly running 8 games, a 5-line pool guaranteed at least three
+    // repeats every single week (pigeonhole: 8 games, 5 openers). Grown
+    // to 25 so a full week's slate can run without a single opener
+    // repeating, with headroom to spare; see the anti-repeat assignment
+    // in rotc_weekly_recap_article() (includes/weekly-recap.php), which
+    // also guarantees it structurally rather than just hoping the pool
+    // is big enough.
     'openers' => [
         'Wham! Bam! Thank you, ma\'am! The pigskin is back in the laboratory, and tonight, the chemistry was volatile!',
         'Live from the big house, under the Friday night lights, where the big boys come to play!',
         'Buckle up, football fans, because we had a real old-fashioned, blue-plate special on the menu today!',
         'They came, they saw, they kicked the physical football machine into overdrive from the opening whistle!',
         'The weather outside was frightful, but the action on the gridiron was absolutely delightful!',
+        'Welcome in -- this is exactly the kind of week that makes fantasy football worth every bit of the stress!',
+        'Let us set the scene, because this week\'s slate did not disappoint!',
+        'If you like matchups that make zero sense until the very last stat update, this was your kind of week!',
+        'Buckle up -- this week\'s box scores read like something out of a highlight reel!',
+        'Welcome back, because this week brought exactly the kind of chaos this league lives for!',
+        'Let us get right into it -- this week had some finishes nobody saw coming!',
+        'Set the scene: a full slate of matchups, and more than a few that went down to the wire!',
+        'This week had it all -- statement wins, gut-punch losses, and everything in between!',
+        'Grab a seat, because this week\'s results are going to be the talk of the league for days!',
+        'Welcome in, because this was not a quiet week by any measure!',
+        'Let us walk through a week that had this whole league buzzing!',
+        'This week\'s slate delivered exactly the kind of drama that keeps a league chat alive!',
+        'Settle in, because this week\'s results are worth the full read!',
+        'Here we go -- another week, another set of matchups that refused to go according to plan!',
+        'This week\'s games did not just decide standings, they decided bragging rights for the next seven days!',
+        'Welcome to the recap, where this week earns every bit of the hype!',
+        'Let the record show: this was one of the more entertaining weeks this league has seen in a while!',
+        'Kick back and enjoy, because this week\'s finishes were built for exactly this kind of recap!',
+        'This week\'s action had a little bit of everything, and none of it was boring!',
+        'Strap in -- this week\'s results are going to be argued about well past kickoff next Sunday!',
     ],
     // Crowd and Atmosphere (30 lines)
     'crowdAtmosphere' => [
@@ -483,13 +510,34 @@ const ROTC_RECAP_PHRASE_BANK = [
         'The head coach\'s passion was evident on the sideline, inspiring his players to give everything they had!',
         'The players\' use of the heated benches was a smart way to stay warm and prevent injuries in the cold!',
     ],
-    // Article Closers (5 lines)
+    // Article Closers (25 lines). Same fix as 'openers' above -- a
+    // 5-line pool could not cover a full week's slate without repeats.
     'closers' => [
         'The curtain comes down, the lights are turning off, and this one is officially in the history books!',
         'He drops the mic, the clock hits all zeros, and that is a wrap from a wild night of football action!',
         'They came, they played, they conquered, and one team walks away with the ultimate prize tonight!',
         'Fans are heading to the turnpike, singing the victory song after a game that had absolutely everything!',
         'The final whistle blows on a masterpiece of gridiron theatre, and we will see you next week, football fans!',
+        'That is a wrap on a week that gave this league plenty to talk about!',
+        'And that is how the board looks heading into next week -- see you back here for more!',
+        'Another week in the books, and this league is only getting more interesting!',
+        'That is the story of the week -- now on to the next one!',
+        'File that one away, because this league will be bringing it up for a while!',
+        'That closes the book on this week, but the story is far from over!',
+        'This week is officially in the record books -- on to the next round of matchups!',
+        'That is a wrap -- same time next week, same amount of chaos expected!',
+        'The dust has settled on this week, and the standings tell the real story now!',
+        'That is all for this week\'s slate -- buckle up, because next week looks just as unpredictable!',
+        'This week\'s results are locked in, and the group chat will be feeling it for days!',
+        'That is a wrap on the week, but rest assured, this league never stays quiet for long!',
+        'The final scores are in, the standings are updated, and the league moves on to the next battle!',
+        'That is how the week wraps up -- see everyone back here after the next slate!',
+        'Another chapter in the books for this league, and it will not be the last wild one!',
+        'This week\'s story is written -- next week\'s is already shaping up to be just as unpredictable!',
+        'That is a wrap on a week this league will be replaying in the group chat for a while!',
+        'The books are closed on this week -- on to the next set of matchups!',
+        'That is the final word on this week\'s action -- see you next week for round two!',
+        'This week is officially history -- and history in this league never stays quiet for long!',
     ],
 
     // Fantasy Manager Reactions -- general internet/fantasy-degenerate

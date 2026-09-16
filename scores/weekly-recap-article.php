@@ -93,10 +93,17 @@ function rotc_article_box_score(array $side): void {
       <?php if (!$recap || !$recap['games']): ?>
         <div class="card"><p>No results for Week <?= htmlspecialchars($week) ?> yet.</p></div>
       <?php else: ?>
-        <?php foreach ($recap['games'] as $game):
+        <?php
+        // Shared across every game on this page (by reference) so no
+        // two games in the week repeat an opener/closer/color line --
+        // see the doc comment on rotc_recap_paragraphs(). Same games in
+        // the same order as the front-page hub, so this independently
+        // lands on the identical per-game assignment.
+        $rotcUsedOpeners = []; $rotcUsedClosers = []; $rotcUsedColorLines = [];
+        foreach ($recap['games'] as $game):
           $winner = $game['a']['score'] >= $game['b']['score'] ? $game['a'] : $game['b'];
           $loser  = $game['a']['score'] >= $game['b']['score'] ? $game['b'] : $game['a'];
-          $paras = rotc_recap_paragraphs($winner, $loser, $game, $week);
+          $paras = rotc_recap_paragraphs($winner, $loser, $game, $week, $rotcUsedOpeners, $rotcUsedClosers, $rotcUsedColorLines);
         ?>
           <div class="card" id="game-<?= htmlspecialchars($winner['id']) ?>-<?= htmlspecialchars($loser['id']) ?>">
             <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">

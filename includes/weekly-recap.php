@@ -90,10 +90,25 @@ const ROTC_RECAP_COLOR_CATEGORIES = [
  * returns the same lines (stable on reload, not flickering on every
  * request). Returns fewer than $count if the pool is too small/empty.
  */
-function rotc_recap_pick_phrases(string $seed, array $categories, int $count): array {
+/**
+ * $exclude (optional) removes lines already used elsewhere THIS WEEK
+ * (a different game's opener/closer/color lines -- see the $usedX
+ * reference params on rotc_recap_paragraphs()) from the candidate pool
+ * before picking, so a full week's slate of games can never repeat the
+ * same line across two different matchups. Falls back to the
+ * unfiltered pool if excluding would leave fewer candidates than
+ * $count -- with these pool sizes that should never actually happen,
+ * but it's the difference between "no repeats" and "no output" if a
+ * pool were ever small enough to run dry mid-week.
+ */
+function rotc_recap_pick_phrases(string $seed, array $categories, int $count, array $exclude = []): array {
     $pool = [];
     foreach ($categories as $cat) {
         $pool = array_merge($pool, ROTC_RECAP_PHRASE_BANK[$cat] ?? []);
+    }
+    if ($exclude) {
+        $filtered = array_values(array_diff($pool, $exclude));
+        if (count($filtered) >= $count) $pool = $filtered;
     }
     if (!$pool) return [];
     $picked = [];
@@ -108,8 +123,8 @@ function rotc_recap_pick_phrases(string $seed, array $categories, int $count): a
     return $picked;
 }
 
-function rotc_recap_pick_phrase(string $seed, array $categories): string {
-    $picked = rotc_recap_pick_phrases($seed, $categories, 1);
+function rotc_recap_pick_phrase(string $seed, array $categories, array $exclude = []): string {
+    $picked = rotc_recap_pick_phrases($seed, $categories, 1, $exclude);
     return $picked ? $picked[0] : '';
 }
 
@@ -199,9 +214,20 @@ function rotc_recap_side_paragraph(array $side, string $resultLead, int $week): 
  * broadcast using hype lines between real play calls. They're never
  * substituted for the factual sentences, only added alongside them.
  *
+ * $usedOpeners/$usedClosers/$usedColorLines are optional BY-REFERENCE
+ * accumulators: a caller looping over every game in one week (both
+ * templates/weekly-recap-hub.php and scores/weekly-recap-article.php
+ * do exactly this) should declare three empty arrays once before the
+ * loop and pass the SAME three variables into every call for that
+ * week -- each call then excludes whatever's already landed in them
+ * and adds its own picks before returning, so no two games in the same
+ * week's slate can ever open, close, or color-comment with the same
+ * line. Omit them (or pass fresh arrays) for a one-off call outside a
+ * week-wide loop; the picks still work, just without that guarantee.
+ *
  * @return array ['p1'=>html, 'p2'=>html, 'p3'=>?html, 'p4'=>?html]
  */
-function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $week): array {
+function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $week, array &$usedOpeners = [], array &$usedClosers = [], array &$usedColorLines = []): array {
     $seed = $winner['id'] . '-' . $loser['id'] . '-' . $week;
 
     $resultLead = $game['margin'] < 3
@@ -210,7 +236,8 @@ function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $we
             ? htmlspecialchars($winner['name'] . ' blew past ' . $loser['name'] . ' by ' . $game['margin'] . ' points.')
             : htmlspecialchars($winner['name'] . ' beat ' . $loser['name'] . ' ' . number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2) . '.'));
 
-    $opener = rotc_recap_pick_phrase($seed . '-opener', ['openers']);
+    $opener = rotc_recap_pick_phrase($seed . '-opener', ['openers'], $usedOpeners);
+    if ($opener !== '') $usedOpeners[] = $opener;
     $p1 = ($opener !== '' ? htmlspecialchars($opener) . ' ' : '') . rotc_recap_side_paragraph($winner, $resultLead, $week);
 
     $p2 = rotc_recap_side_paragraph($loser, htmlspecialchars($loser['name'] . " couldn\u{2019}t quite complete the comeback."), $week);
@@ -224,14 +251,15 @@ function rotc_recap_paragraphs(array $winner, array $loser, array $game, int $we
     if ($game['category'] === 'Blowout') $colorCategories[] = 'blowoutRoast';
     if ($game['category'] === 'Nail-Biter') $colorCategories[] = 'nailBiterNerves';
 
-    $colorLines = rotc_recap_pick_phrases($seed . '-color', $colorCategories, 2);
+    $colorLines = rotc_recap_pick_phrases($seed . '-color', $colorCategories, 2, $usedColorLines);
+    foreach ($colorLines as $cl) $usedColorLines[] = $cl;
     $p3 = $colorLines ? implode(' ', array_map('htmlspecialchars', $colorLines)) : null;
 
     $p4parts = [];
     if ($winner['nextOpponent']) $p4parts[] = htmlspecialchars('Up next, ' . $winner['name'] . ' face the (' . $winner['nextOpponent']['record'] . ') ' . $winner['nextOpponent']['name'] . '.');
     if ($loser['nextOpponent']) $p4parts[] = htmlspecialchars($loser['name'] . ' look to bounce back against the (' . $loser['nextOpponent']['record'] . ') ' . $loser['nextOpponent']['name'] . '.');
-    $closer = rotc_recap_pick_phrase($seed . '-closer', ['closers']);
-    if ($closer !== '') $p4parts[] = htmlspecialchars($closer);
+    $closer = rotc_recap_pick_phrase($seed . '-closer', ['closers'], $usedClosers);
+    if ($closer !== '') { $usedClosers[] = $closer; $p4parts[] = htmlspecialchars($closer); }
     $p4 = $p4parts ? implode(' ', $p4parts) : null;
 
     return ['p1' => $p1, 'p2' => $p2, 'p3' => $p3, 'p4' => $p4];

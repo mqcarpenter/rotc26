@@ -32,10 +32,16 @@ $rotcArchiveWeeks = $recapWeek > 1 ? rotc_recap_archive_weeks($recapYear, $recap
 ?>
 <div class="rotc-recap-hub-wrap">
   <div class="rotc-recap-primary" id="rotc-recap-primary">
-    <?php foreach ($recap['games'] as $i => $game):
+    <?php
+    // Shared across every game below (by reference, not reset per
+    // iteration) so no two games in this week's slate can land on the
+    // same opener, closer, or color line -- see the doc comment on
+    // rotc_recap_paragraphs() in includes/weekly-recap.php.
+    $rotcUsedOpeners = []; $rotcUsedClosers = []; $rotcUsedColorLines = [];
+    foreach ($recap['games'] as $i => $game):
       $winner = $game['a']['score'] >= $game['b']['score'] ? $game['a'] : $game['b'];
       $loser  = $game['a']['score'] >= $game['b']['score'] ? $game['b'] : $game['a'];
-      $paras = rotc_recap_paragraphs($winner, $loser, $game, $recap['week']);
+      $paras = rotc_recap_paragraphs($winner, $loser, $game, $recap['week'], $rotcUsedOpeners, $rotcUsedClosers, $rotcUsedColorLines);
     ?>
       <article class="rotc-recap-primary-article" data-game-index="<?= $i ?>"<?= $i === 0 ? '' : ' hidden' ?>>
         <div class="rotc-recap-hero">
