@@ -3,9 +3,7 @@
  * top-performers.php
  * Weekly/YTD actual fantasy points. Matches Players -> Top Performers
  * / Player Stats. TYPE=playerScores returns {playerScore:[{id,score}]}
- * for a given week or W=YTD, joined against TYPE=players. No games
- * have been played yet this preseason, so this will show "no data"
- * until Week 1 actually happens — that's expected, not a bug.
+ * for a given week or W=YTD, joined against TYPE=players.
  *
  * Year selector: mfl_cached_get_year() (not mfl_cached_get(), which is
  * always MFL_YEAR) against the current season and the two before it --
@@ -14,6 +12,21 @@
  * position/current NFL team) is NOT re-fetched per year -- TYPE=players
  * is a current directory, not a historical roster, same assumption
  * rosters.php's prior-year points column makes.
+ *
+ * Fantasy Team column: TYPE=rosters (current league, current season
+ * only -- same "current directory, not historical" caveat as the
+ * player bio lookup above) reverse-mapped player id -> franchise id.
+ * A player nobody in THIS league has rostered shows as "Free Agent".
+ *
+ * Stat Line column: only for a specific week (not the season total,
+ * which would mean summing a full stat line across every prior game --
+ * out of scope here), built the same way the Live Wire board explains
+ * a score (includes/live-wire-scoring.php's rotc_lw_breakdown(), keyed
+ * off ESPN's box score via exact athlete id, not name matching) so
+ * this page and Live Wire never disagree about what a stat line says.
+ * Requires the real calendar date(s) NFL games were actually played
+ * that week (from TYPE=nflSchedule's kickoff timestamps, since a week
+ * spans Thursday through Monday) -- ESPN's scoreboard is scoped by day.
  */
 
 $page_title = 'Top Performers — Return of the Champions';
@@ -34,9 +47,20 @@ if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
     require_once __DIR__ . '/../includes/player-hover.php';
+    require_once __DIR__ . '/../includes/live-wire-espn.php';
+    require_once __DIR__ . '/../includes/live-wire-scoring.php';
 
     $yearParam = (int) ($_GET['year'] ?? MFL_YEAR);
     if ($yearParam < (int) MFL_YEAR - 2 || $yearParam > (int) MFL_YEAR) $yearParam = (int) MFL_YEAR;
+
+    $franchises = mfl_franchises();
+    $ownerByPlayerId = [];
+    $rostersRaw = mfl_cached_get('rosters', 1800, []);
+    foreach (mfl_normalize_list($rostersRaw['rosters']['franchise'] ?? null) as $fr) {
+        foreach (mfl_normalize_list($fr['player'] ?? null) as $p) {
+            if (!empty($p['id'])) $ownerByPlayerId[$p['id']] = $fr['id'];
+        }
+    }
 
     // Scan the whole scoring pool when filtering to free agents (most top
     // scorers are rostered, so a top-200 slice would show almost none).
@@ -50,7 +74,10 @@ if (!$fetchError) {
     $players = [];
     if ($ids) {
         foreach (array_chunk($ids, 250) as $chunk) {
-            $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk)], false);
+            // DETAILS=1 is what surfaces espn_id, needed for the Stat
+            // Line column below (exact-id match against ESPN's box
+            // score, same as the Live Wire board).
+            $resp = mfl_cached_get('players', 3600, ['PLAYERS' => implode(',', $chunk), 'DETAILS' => 1], false);
             foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
                 $players[$p['id']] = $p;
             }
@@ -61,13 +88,38 @@ if (!$fetchError) {
         if (!$p) continue;
         if ($faOnly && !isset($faIds[$row['id']])) continue;
         if ($posFilter && ($p['position'] ?? '') !== $posFilter) continue;
+        $ownerId = $ownerByPlayerId[$row['id']] ?? null;
         $rows[] = [
             'pd' => $p,
             'name' => $p['name'] ?? ('Player #' . $row['id']),
             'position' => $p['position'] ?? '',
             'team' => $p['team'] ?? '',
+            'owner' => $ownerId ? ($franchises[$ownerId]['name'] ?? $ownerId) : null,
             'score' => $row['score'] ?? '',
         ];
+    }
+
+    // Stat Line column: only meaningful for one specific week (a season
+    // total would need to sum a stat line across every prior game --
+    // out of scope here). Needs the real date(s) that week's NFL games
+    // were actually played, since ESPN's scoreboard is scoped by day
+    // and a fantasy week spans Thursday through Monday.
+    $statsByEspnId = [];
+    if ($weekParam !== 'YTD' && $rows) {
+        $schedRaw = mfl_cached_get_year('nflSchedule', $yearParam, 21600, ['W' => (int) $weekParam], false);
+        $dates = [];
+        foreach (mfl_normalize_list($schedRaw['nflSchedule']['matchup'] ?? null) as $g) {
+            $ko = (int) ($g['kickoff'] ?? 0);
+            if ($ko <= 0) continue;
+            // NFL games are scheduled in US time zones; anchoring the
+            // calendar date to America/New_York keeps a late-night kickoff
+            // from rolling into the wrong day the way a bare UTC date would.
+            $dates[(new DateTime('@' . $ko))->setTimezone(new DateTimeZone('America/New_York'))->format('Ymd')] = true;
+        }
+        $teams = array_values(array_unique(array_column($rows, 'team')));
+        foreach (array_keys($dates) as $date) {
+            $statsByEspnId += rotc_lw_espn_events($teams, $date);
+        }
     }
 }
 
@@ -112,9 +164,10 @@ function rotc_qs3(array $overrides): string {
           <?php if ($faOnly): ?><span style="color:var(--muted);font-size:12px;margin-left:8px;">Showing only players available in your league.</span><?php endif; ?>
         </div>
 
+        <?php $showStats = $weekParam !== 'YTD'; ?>
         <div style="overflow-x:auto;">
         <table class="data-table">
-          <thead><tr><th>#</th><th></th><th>Player</th><th>Pos</th><th>NFL Team</th><th>Pts</th></tr></thead>
+          <thead><tr><th>#</th><th></th><th>Player</th><th>Pos</th><th>NFL Team</th><th>Fantasy Team</th><th>Pts</th><?php if ($showStats): ?><th>Stat Line</th><?php endif; ?></tr></thead>
           <tbody>
             <?php $periodLabel = $yearParam . ' ' . ($weekParam === 'YTD' ? 'Season' : 'Week ' . $weekParam); ?>
             <?php foreach ($rows as $i => $r): ?>
@@ -124,15 +177,31 @@ function rotc_qs3(array $overrides): string {
                 <td><?= rotc_player_hover_span($r['name'], $r['pd'], [$periodLabel => $r['score'] !== '' ? $r['score'] . ' pts' : '']) ?></td>
                 <td><?= htmlspecialchars($r['position']) ?></td>
                 <td><?= htmlspecialchars($r['team']) ?></td>
+                <td><?= $r['owner'] ? htmlspecialchars($r['owner']) : '<span style="color:var(--muted);">Free Agent</span>' ?></td>
                 <td><?= htmlspecialchars($r['score']) ?></td>
+                <?php if ($showStats):
+                  $espnId = $r['pd']['espn_id'] ?? '';
+                  $events = $espnId !== '' ? ($statsByEspnId[$espnId] ?? null) : null;
+                ?>
+                  <td style="font-size:12.5px;color:var(--muted);max-width:320px;">
+                    <?php if ($events):
+                      $bd = rotc_lw_breakdown($r['position'], $events, is_numeric($r['score']) ? (float) $r['score'] : 0.0);
+                      $parts = array_map(fn($row) => $row['stat'] . ' ' . $row['label'], $bd['rows']);
+                      echo $parts ? htmlspecialchars(implode(', ', $parts)) : '&mdash;';
+                    else: ?>
+                      &mdash;
+                    <?php endif; ?>
+                  </td>
+                <?php endif; ?>
               </tr>
             <?php endforeach; ?>
             <?php if (!$rows): ?>
-              <tr><td colspan="6">No games played yet — check back once the season kicks off.</td></tr>
+              <tr><td colspan="<?= $showStats ? 8 : 7 ?>">No games played yet — check back once the season kicks off.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
         </div>
+        <?php if ($showStats): ?><p style="color:var(--muted);font-size:12px;margin-top:8px;">Stat lines come from ESPN's public box score, matched to MFL's own scoring rules for this league; a dash means ESPN doesn't have a box score for that player's game (or the game hasn't finished).</p><?php endif; ?>
       </div>
     <?php endif; ?>
   </main>
