@@ -2,15 +2,26 @@
 /**
  * includes/recap-phrases.php
  * Matteo's curated flavor-line bank for weekly recap articles (see
- * includes/weekly-recap.php). 550+ color-commentary lines across two
+ * includes/weekly-recap.php). 650+ color-commentary lines across three
  * registers: the original ~400 broadcast-style lines (crowd/stadium/
- * play-by-play, as if this were a live NFL broadcast) plus a newer
- * ~150-line internet/fantasy-manager register (group chat trash talk,
- * waiver-wire panic, hot-take reactions) added because the original
- * pool alone was starting to feel repetitive once a season ran a full
- * slate of matchups every week -- a second, distinct voice cuts the
- * odds of the same handful of lines resurfacing across nearby games
- * far more than just padding the existing categories would have.
+ * play-by-play, as if this were a live NFL broadcast); a ~150-line
+ * internet/fantasy-manager register (group chat trash talk, waiver-wire
+ * panic, hot-take reactions); and a newer ~100-line broadcast-personality
+ * register (debate-show heat, X's-and-O's breakdown, exuberant
+ * play-by-play calls, news-style wrap-ups) -- each addition exists
+ * because the pool before it was starting to feel repetitive once a
+ * season ran a full slate of matchups every week. A second or third
+ * distinct voice cuts the odds of the same handful of lines resurfacing
+ * across nearby games far more than just padding existing categories
+ * would have. The broadcast-personality register was drafted from a
+ * sample of multi-persona commentary supplied directly (commentators.rtf
+ * at the project root) -- anonymized (every vocative name addressing a
+ * co-host was stripped from that source file) and then rewritten here
+ * as brand-new, generic one-liners rather than lifted verbatim, since
+ * the sample's own invented score/clock/down-and-distance specifics
+ * ("31 to 30", "third and 16", "eight seconds left") were themselves
+ * fictional and would clash with this game's real numbers appearing
+ * elsewhere in the same article.
  * 'blowoutRoast' and 'nailBiterNerves' are margin-specific (only mixed
  * in when that week's game is an actual Blowout/Nail-Biter -- see the
  * category-pool logic in rotc_recap_paragraphs()); every other
@@ -657,6 +668,127 @@ const ROTC_RECAP_PHRASE_BANK = [
         'This one will get replayed in the league group chat until the next kickoff.',
         'A margin that small turns every garbage-time stat update into a full-on emergency.',
         'That is the kind of nail-biter where checking the score becomes a personality trait for a night.',
+    ],
+
+    // Debate-Show Heat -- fiery, hot-take-rant energy, generic and
+    // fits any result (25 lines). See the file-level doc comment above
+    // for where this register came from.
+    'debateShowHeat' => [
+        'I am disgusted. I am utterly, thoroughly, unequivocally appalled by what I just witnessed with my own two eyes!',
+        'Do not sit here and try to tell me that was some legendary, heroic performance!',
+        'I am not impressed. Not one bit. Do not try to convince me otherwise!',
+        'That was the single most undisciplined performance I have seen in a long time, and I am not exaggerating!',
+        'Let me be abundantly clear: that was not greatness, that was pure, unadulterated luck!',
+        'I do not care about the replay review. You never should have let it get that close in the first place!',
+        'Look, are we really going to pretend that was some masterclass? Because I am not buying the narrative!',
+        'That team should be required to walk home tonight, and I mean that!',
+        'I have said it before and I will say it again right now for everyone listening!',
+        'You cannot blow a lead like that late in the game. You just cannot do it!',
+        'That is not a rivalry anymore, that is a full-blown crisis, and everybody in this league knows it!',
+        'Spare me the excuses. That was a mental error, plain and simple!',
+        'I watched that with the notebook out, and I still cannot explain what I just saw!',
+        'Somebody needs to answer for that finish, and I do not mean the players!',
+        'That is the kind of performance that gets a segment named after it by Wednesday!',
+        'I am telling you right now, that goes straight into the pantheon of all-time letdowns!',
+        'You had one job in that situation, and you did not do it. Simple as that!',
+        'Do not call that a comeback. Call it what it actually was: a total collapse!',
+        'I do not want to hear about the conditions, the bounces, or the bad luck. Own it!',
+        'That was a backyard heave, not a masterclass, and I will die on that hill!',
+        'Everybody wants to talk about the highlight. Nobody wants to talk about how it got to that point!',
+        'That was blasphemous. That was an absolute abomination of situational football!',
+        'You want to tell me that was clutch? I want to tell you that was chaos, and chaos got lucky!',
+        'I am watching the same game as everyone else, and I am still the only one saying it plainly!',
+        'That performance will get replayed on every highlight show, and it should be replayed as a warning!',
+    ],
+
+    // Analyst Breakdown -- measured X's-and-O's / coach's-eye tone,
+    // generic and fits any result (25 lines).
+    'analystBreakdown' => [
+        'When you study the tape on that sequence, you see exactly what separates a good performance from a great one under pressure!',
+        'That is gut-check football right there -- you find out who has the discipline to close it out!',
+        'This comes down to one word: finish. You either have the will to execute in the biggest moment, or you do not!',
+        'You have to look at what happened up front on both sides of the ball. That is where this one was actually decided!',
+        'That was textbook situational football -- manage the clock and do not give anything away for free!',
+        'The technique, the read, and the finish all lined up on that one -- that is how you execute at the highest level!',
+        'That is not brilliant improvisation, that is a fundamental breakdown, and the tape will show it clearly!',
+        'When you have the game in hand, your only job is discipline. That is exactly where it slipped away!',
+        'Great individual effort in isolation, but the details around it are what actually cost the game!',
+        'That was a processing-speed problem more than a talent problem -- the read was late and it showed!',
+        'You live and die by discipline in that situation, and today it did not hold!',
+        'This is where veteran composure shows up -- staying balanced instead of drifting away from pressure!',
+        'The margin for error in that situation was basically zero, and it played out exactly like that!',
+        'That is a details issue more than anything else -- the fundamentals just were not there!',
+        'You want to talk about clutch? Clutch is doing the boring, disciplined thing when everyone is watching!',
+        'That sequence is going to get shown in film sessions for the wrong reasons all week!',
+        'The situation dictated one approach, and the execution said something completely different!',
+        'That is the difference between a good process and a good result -- they do not always line up!',
+        'When the game slows down for a player like that, you see it in how in-control the finish looks!',
+        'That was a rep that will get taught as a case study for a long time!',
+        'The little things -- a missed assignment, an extra half-second -- those are what actually decided this one!',
+        'You cannot simulate that kind of composure in practice. That only shows up when it is real!',
+        'That is what happens when the details get sloppy with the game right there for the taking!',
+        'Championship-level execution in that exact spot is genuinely rare, and it showed up when it mattered!',
+        'The tape does not lie -- that was a discipline breakdown, not a talent problem!',
+    ],
+
+    // Play-by-Play Calls -- exuberant, live-call energy, generic and
+    // fits any result (25 lines).
+    'playByPlayCalls' => [
+        'Ooooh! I do not know! Look at this right now!',
+        'Go up and get it! Oh, what a grab! Absolutely unbelievable!',
+        'You cannot ask for better theater than this -- just unbelievable football!',
+        'Did he get the feet down? Did he get the feet in? Let us look at that one more time!',
+        'Oh my! Nobody in this league saw that coming!',
+        'That is a call that gets replayed for a week, easily!',
+        'Unbelievable! Just when you thought you had seen it all!',
+        'Hang on to your seat, because this one is not over yet!',
+        'Well, put that one in the record books -- what a finish!',
+        'This league is going bananas right now, and rightfully so!',
+        'That is about as good as it gets on a football Sunday, folks!',
+        'Somebody pinch me, because I do not believe what I just watched!',
+        'That is a signature moment right there -- remember exactly where you were for that one!',
+        'Absolute mayhem on one sideline right now, and pure heartbreak on the other!',
+        'What. A. Play. There is simply no other way to describe it!',
+        'The whole league just came unglued, and honestly, so did I!',
+        'That is the kind of moment that gets a highlight package all its own!',
+        'You talk about a signature win -- that is exactly what we just witnessed!',
+        'That is a play that gets talked about for years, mark it down right now!',
+        'Chaos! Pure, beautiful chaos, and I would not have it any other way!',
+        'I have called a lot of these, and that one just moved right to the top of the list!',
+        'The scoreboard operator might need a minute after that sequence!',
+        'That is appointment viewing if I have ever seen it!',
+        'There is no explaining that one away -- you just have to sit back and enjoy it!',
+        'That is the kind of finish that makes you glad you stuck around until the very end!',
+    ],
+
+    // Game-Recap Wrap -- measured, news-anchor closing-segment tone,
+    // generic and fits any result (25 lines).
+    'gameRecapWrap' => [
+        'A wild finish ends with heartbreak on one sideline and pure pandemonium on the other!',
+        'Let us walk through exactly how that final sequence unfolded!',
+        'A tense review, a confirmed call, and a sideline erupts in celebration!',
+        'That is a tough, bitter pill to swallow after controlling the game for so long!',
+        'Great grit in the finish, but a costly stretch is what actually decided this one!',
+        'A physical, hard-fought battle that came down to the final possession!',
+        'In the end, discipline in the fourth quarter made all the difference!',
+        'That is a result that will get replayed on highlight shows well into the week!',
+        'A finish that will be remembered long after the final whistle blew!',
+        'The kind of game that reminds you why nobody changes the channel late!',
+        'A statement performance in the moments that mattered most!',
+        'That is exactly the kind of finish this league will be talking about all week!',
+        'A hard-earned result forged in the final, tension-filled minutes!',
+        'The story of this one is really the story of the final two minutes!',
+        'A game that had everything -- momentum swings, big plays, and a finish for the ages!',
+        'In the end, one side made the play that had to be made, and the other did not!',
+        "A finish that will show up in this league's highlight reel for years to come!",
+        'That one is going straight into the conversation for game of the season!',
+        'A back-and-forth battle that earned every bit of its dramatic ending!',
+        'The final sequence alone was worth the price of admission!',
+        'A result that will linger with one side long after tonight!',
+        'That is the kind of finish that turns a regular week into a story people still tell!',
+        'In the end, the team that finished stronger walked away with it!',
+        'A tightly contested battle that delivered exactly the finish it promised!',
+        'That is a wrap on one of the more memorable finishes of the year!',
     ],
 ];
 

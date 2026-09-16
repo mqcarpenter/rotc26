@@ -76,6 +76,12 @@ const ROTC_RECAP_COLOR_CATEGORIES = [
     // comment for why this was needed.
     'fantasyManagerReactions', 'leagueChatBanter', 'waiverWireAndRosterTalk',
     'statlineHotTakes',
+    // Third voice: broadcast-personality register (debate-show heat,
+    // X's-and-O's breakdown, exuberant play-by-play calls, news-style
+    // wrap-ups) -- bulks up the original announcer register itself
+    // rather than adding another internet-culture angle. See
+    // recap-phrases.php's doc comment for provenance.
+    'debateShowHeat', 'analystBreakdown', 'playByPlayCalls', 'gameRecapWrap',
 ];
 
 /**
