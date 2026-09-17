@@ -170,19 +170,25 @@ function rotc_pool_cell(array $grade): string {
 
     <div class="card">
       <h2 class="card-title" id="nfl-pool">NFL Pick 'Em Pool</h2>
-      <p style="color:var(--muted);font-size:12px;margin-top:-6px;">Each cell is correct/graded picks for that week (real NFL results). A week with no finished games yet shows "pending".</p>
+      <p style="color:var(--muted);font-size:12px;margin-top:-6px;">Ranked by total correct picks across the season (each week's correct count adds to a running total). Each week cell is correct/graded for that week (real NFL results); a week with no finished games yet shows "pending".</p>
       <?php if (empty(mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
+        <?php
+        $nflRows = [];
+        foreach (mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null) as $fr) {
+            $nflRows[] = ['name' => $franchises[$fr['id']]['name'] ?? $fr['id'], 'line' => rotc_pool_franchise_line($fr, $poolWeeks, $nflWeekScores)];
+        }
+        usort($nflRows, fn($a, $b) => $b['line']['totalCorrect'] <=> $a['line']['totalCorrect']);
+        ?>
         <div style="overflow-x:auto;">
         <table class="data-table">
-          <thead><tr><th>Franchise</th><?php foreach ($poolWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?><th>Total</th></tr></thead>
+          <thead><tr><th>#</th><th>Franchise</th><?php foreach ($poolWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?><th>Total</th></tr></thead>
           <tbody>
-            <?php foreach (mfl_normalize_list($nflPool['poolPicks']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']];
-              $line = rotc_pool_franchise_line($fr, $poolWeeks, $nflWeekScores);
-            ?>
+            <?php foreach ($nflRows as $i => $row): $line = $row['line']; ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                <td><?= htmlspecialchars($f['name']) ?></td>
+                <td><?= $i + 1 ?></td>
+                <td><?= htmlspecialchars($row['name']) ?></td>
                 <?php foreach ($poolWeeks as $w): ?>
                   <td><?= htmlspecialchars(rotc_pool_cell($line['weeks'][$w])) ?></td>
                 <?php endforeach; ?>
@@ -197,19 +203,25 @@ function rotc_pool_cell(array $grade): string {
 
     <div class="card">
       <h2 class="card-title" id="fantasy-pool">Fantasy Pick 'Em Pool</h2>
-      <p style="color:var(--muted);font-size:12px;margin-top:-6px;">Each cell is correct/graded picks for that week (real fantasy matchup results). A week not fully complete yet shows "pending".</p>
+      <p style="color:var(--muted);font-size:12px;margin-top:-6px;">Ranked by total correct picks across the season (each week's correct count adds to a running total). Each week cell is correct/graded for that week (real fantasy matchup results); a week not fully complete yet shows "pending".</p>
       <?php if (empty(mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null))): ?>
         <p>No picks submitted yet.</p>
       <?php else: ?>
+        <?php
+        $fantasyRows = [];
+        foreach (mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null) as $fr) {
+            $fantasyRows[] = ['name' => $franchises[$fr['id']]['name'] ?? $fr['id'], 'line' => rotc_pool_franchise_line($fr, $poolWeeks, $fantasyWeekScores)];
+        }
+        usort($fantasyRows, fn($a, $b) => $b['line']['totalCorrect'] <=> $a['line']['totalCorrect']);
+        ?>
         <div style="overflow-x:auto;">
         <table class="data-table">
-          <thead><tr><th>Franchise</th><?php foreach ($poolWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?><th>Total</th></tr></thead>
+          <thead><tr><th>#</th><th>Franchise</th><?php foreach ($poolWeeks as $w): ?><th><?= $w ?></th><?php endforeach; ?><th>Total</th></tr></thead>
           <tbody>
-            <?php foreach (mfl_normalize_list($fantasyPool['poolPicks']['franchise'] ?? null) as $i => $fr): $f = $franchises[$fr['id']] ?? ['name' => $fr['id']];
-              $line = rotc_pool_franchise_line($fr, $poolWeeks, $fantasyWeekScores);
-            ?>
+            <?php foreach ($fantasyRows as $i => $row): $line = $row['line']; ?>
               <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                <td><?= htmlspecialchars($f['name']) ?></td>
+                <td><?= $i + 1 ?></td>
+                <td><?= htmlspecialchars($row['name']) ?></td>
                 <?php foreach ($poolWeeks as $w): ?>
                   <td><?= htmlspecialchars(rotc_pool_cell($line['weeks'][$w])) ?></td>
                 <?php endforeach; ?>
