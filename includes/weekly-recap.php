@@ -431,7 +431,18 @@ function rotc_weekly_recap_article(int $year, int $week): ?array {
     $playerData = [];
     foreach (array_chunk(array_unique($needIds), 150) as $chunk) {
         $resp = mfl_cached_get_year('players', $year, 86400, ['PLAYERS' => implode(',', $chunk), 'DETAILS' => 1], false);
-        foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) { $playerData[$p['id']] = $p; }
+        foreach (mfl_normalize_list($resp['players']['player'] ?? null) as $p) {
+            // MFL's name field is "Last, First" -- flip it to "First Last"
+            // for display, same convention includes/live-wire.php already
+            // uses for the Live Wire board, so a player reads the same way
+            // in a recap article as everywhere else on the site.
+            $name = (string) ($p['name'] ?? '');
+            if (strpos($name, ',') !== false) {
+                [$last, $first] = array_map('trim', explode(',', $name, 2));
+                $p['name'] = "$first $last";
+            }
+            $playerData[$p['id']] = $p;
+        }
     }
 
     $games = [];
