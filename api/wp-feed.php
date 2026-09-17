@@ -3,13 +3,13 @@
  * api/wp-feed.php
  * Same-origin JSON bridge FROM this app TO the WordPress theme
  * (wp-content/themes/rotc-theme), so the WP-hosted news site can show
- * real league data (this week's headline result, standings, this
- * week's top performer) on its own homepage without embedding this
- * app's pages directly. The WP theme fetches this server-side
- * (wp_remote_get in inc/league-data.php) and renders it with its own
- * markup -- same reasoning as api/live-wire.php: keep the two apps
- * loosely coupled through one small JSON contract rather than one
- * reaching into the other's HTML/PHP.
+ * real league data (this week's results, standings, top performer) on
+ * its own pages without embedding this app's pages directly. The WP
+ * theme fetches this server-side (wp_remote_get in inc/league-data.php)
+ * and renders it with its own markup -- same reasoning as
+ * api/live-wire.php: keep the two apps loosely coupled through one
+ * small JSON contract rather than one reaching into the other's
+ * HTML/PHP.
  *
  * Deliberately NOT "live" -- this reuses the same recap/standings data
  * the /manage/ pages themselves show, cached the same way (86400s for
@@ -20,15 +20,17 @@
  *
  * Output shape:
  * {
- *   "year": int, "week": int,
- *   "recap": { "headline", "winner", "loser", "score", "excerpt",
- *              "url", "helmet", "helmetFlip", "isGameOfWeek" } | null,
- *   "standings": [ { "rank", "name", "record", "helmet", "helmetFlip" }, ... ],
- *   "topPerformer": { "name", "team", "score", "franchise", "photo" } | null
+ *   "year": int, "week": int|null,
+ *   "games": [ { "headline", "winner", "loser", "score", "excerpt",
+ *                "url", "helmet", "helmetFlip", "isGameOfWeek",
+ *                "topPerformer": {"name","team","score","franchise","photo"}|null
+ *              }, ... ],   // EVERY game this week, Game of the Week first
+ *   "standings": [ { "rank", "name", "record", "helmet", "helmetFlip" }, ... ],  // top 5
+ *   "franchises": [ { "id", "name", "record", "helmet", "helmetFlip" }, ... ]    // every franchise, for a Teams page
  * }
  * Any section that has nothing to report is null/empty rather than the
  * whole response failing -- a missing standings block shouldn't take
- * down a homepage that only wanted the recap headline.
+ * down a homepage that only wanted the week's games.
  */
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
@@ -46,7 +48,40 @@ require_once __DIR__ . '/../includes/helmets.php';
 require_once __DIR__ . '/../includes/player-hover.php';
 require_once __DIR__ . '/../includes/weekly-recap.php';
 
-$out = ['year' => (int) MFL_YEAR, 'week' => null, 'recap' => null, 'standings' => [], 'topPerformer' => null];
+$out = ['year' => (int) MFL_YEAR, 'week' => null, 'games' => [], 'standings' => [], 'franchises' => []];
+
+/** Builds one game's JSON entry, including its own top performer. */
+function rotc_wp_feed_game(array $game, int $year, int $week): array {
+    $winner = $game['a']['score'] >= $game['b']['score'] ? $game['a'] : $game['b'];
+    $loser  = $game['a']['score'] >= $game['b']['score'] ? $game['b'] : $game['a'];
+    $paras = rotc_recap_paragraphs($winner, $loser, $game, $week);
+    $excerpt = mb_substr(strip_tags($paras['p1']), 0, 220);
+
+    $tp = null;
+    foreach ([$winner, $loser] as $side) {
+        $cand = $side['topPerformer'] ?? null;
+        if ($cand && (!$tp || $cand['score'] > $tp['score'])) $tp = $cand + ['franchise' => $side['name']];
+    }
+
+    return [
+        'headline'     => $winner['name'] . ' Tops ' . $loser['name'],
+        'winner'       => $winner['name'],
+        'loser'        => $loser['name'],
+        'score'        => number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2),
+        'excerpt'      => $excerpt,
+        'url'          => 'https://www.returnofthechampions.com/manage/scores/weekly-recap-article?year=' . $year . '&week=' . $week . '#game-' . $winner['id'] . '-' . $loser['id'],
+        'helmet'       => $winner['helmet'],
+        'helmetFlip'   => $winner['helmetFlip'],
+        'isGameOfWeek' => $game['isGameOfWeek'],
+        'topPerformer' => $tp ? [
+            'name'      => $tp['name'],
+            'team'      => $tp['pd']['team'] ?? '',
+            'score'     => $tp['score'],
+            'franchise' => $tp['franchise'],
+            'photo'     => rotc_espn_photo($tp['pd'] ?? null),
+        ] : null,
+    ];
+}
 
 try {
     $current = rotc_current_recap_week((int) MFL_YEAR);
@@ -56,44 +91,8 @@ try {
 
         $recap = rotc_weekly_recap_article($year, $week);
         if ($recap && $recap['games']) {
-            $game = $recap['games'][0]; // Game of the Week (closest margin).
-            $winner = $game['a']['score'] >= $game['b']['score'] ? $game['a'] : $game['b'];
-            $loser  = $game['a']['score'] >= $game['b']['score'] ? $game['b'] : $game['a'];
-            $paras = rotc_recap_paragraphs($winner, $loser, $game, $week);
-            $excerpt = strip_tags($paras['p1']);
-
-            $out['recap'] = [
-                'headline'     => $winner['name'] . ' Tops ' . $loser['name'],
-                'winner'       => $winner['name'],
-                'loser'        => $loser['name'],
-                'score'        => number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2),
-                'excerpt'      => mb_substr($excerpt, 0, 220),
-                'url'          => 'https://www.returnofthechampions.com/manage/scores/weekly-recap-article?year=' . $year . '&week=' . $week . '#game-' . $winner['id'] . '-' . $loser['id'],
-                'helmet'       => $winner['helmet'],
-                'helmetFlip'   => $winner['helmetFlip'],
-                'isGameOfWeek' => $game['isGameOfWeek'],
-            ];
-
-            // Top performer across every side in the week's games, not
-            // just the headline game -- a bench-warmer's monster week on
-            // an otherwise blown-out team still deserves the spotlight.
-            $best = null;
-            foreach ($recap['games'] as $g) {
-                foreach ([$g['a'], $g['b']] as $side) {
-                    $tp = $side['topPerformer'] ?? null;
-                    if ($tp && (!$best || $tp['score'] > $best['score'])) {
-                        $best = $tp + ['franchise' => $side['name']];
-                    }
-                }
-            }
-            if ($best) {
-                $out['topPerformer'] = [
-                    'name'      => $best['name'],
-                    'team'      => $best['pd']['team'] ?? '',
-                    'score'     => $best['score'],
-                    'franchise' => $best['franchise'],
-                    'photo'     => rotc_espn_photo($best['pd'] ?? null),
-                ];
+            foreach ($recap['games'] as $game) {
+                $out['games'][] = rotc_wp_feed_game($game, $year, $week);
             }
         }
     }
@@ -107,14 +106,16 @@ try {
         if ($aw !== $bw) return $bw - $aw;
         return (float) ($b['pwr'] ?? 0) - (float) ($a['pwr'] ?? 0);
     });
-    foreach (array_slice($rows, 0, 5) as $i => $row) {
-        $out['standings'][] = [
-            'rank'       => $i + 1,
+    foreach ($rows as $i => $row) {
+        $entry = [
+            'id'         => $row['id'],
             'name'       => $franchises[$row['id']]['name'] ?? $row['id'],
             'record'     => $row['h2hwlt'] ?? '',
             'helmet'     => rotc_helmet_src($row['id']),
             'helmetFlip' => rotc_helmet_flip($row['id']),
         ];
+        if ($i < 5) $out['standings'][] = ['rank' => $i + 1] + $entry;
+        $out['franchises'][] = $entry;
     }
 } catch (Throwable $e) {
     // Same philosophy as the rest of this app: a feed hiccup degrades to
