@@ -373,6 +373,21 @@ a:hover{ color:var(--accent); }
 #rotc-postcarousel .rotc-pc-dot{ width:7px; height:7px; border-radius:50%; display:inline-block; margin:0 4px 0 0; background:rgba(255,255,255,.5); cursor:pointer; }
 #rotc-postcarousel .rotc-pc-dot.active{ background:#fff; }
 
+/* ---- 9b. NEWS GRID (past articles, below the carousel) --------
+   Real-news-site pattern: the carousel is the "above the fold"
+   hero, this is the river of everything older -- see
+   templates/news-grid.php + includes/wp-hero-feed.php. */
+.rotc-news-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:16px; }
+.rotc-news-card{ display:flex; flex-direction:column; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+.rotc-news-card-media{ aspect-ratio:16/9; background:var(--sand); display:block; overflow:hidden; }
+.rotc-news-card-media img{ width:100%; height:100%; object-fit:cover; display:block; }
+.rotc-news-card-body{ padding:12px 14px 14px; flex:1; display:flex; flex-direction:column; }
+.rotc-news-card-date{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.05em; font-size:11px; color:var(--muted); margin-bottom:4px; }
+.rotc-news-card-title{ font-size:16px; margin:0 0 6px; line-height:1.3; }
+.rotc-news-card-title a{ color:var(--ink); }
+.rotc-news-card-title a:hover{ color:var(--accent); }
+.rotc-news-card-excerpt{ font-size:13px; color:var(--muted); margin:0; flex:1; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
 /* ---- 10. SIDEBAR TABS (rotc-sidefeed) ----------------------- */
 .rotc-sidefeed{
   background:var(--card); border:1px solid var(--line); border-radius:var(--radius);

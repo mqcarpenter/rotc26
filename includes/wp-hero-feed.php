@@ -44,9 +44,15 @@ function rotc_wp_cached_get(string $url, int $ttlSeconds): ?string {
     return file_exists($cacheFile) ? file_get_contents($cacheFile) : null;
 }
 
-function rotc_fetch_hero_slides(int $count = 5, string $fallbackImage = ''): array {
+/**
+ * $offset skips the N most recent posts -- used to pull the "past
+ * articles" grid below the carousel without repeating whatever the
+ * carousel itself is already showing (offset=5 when the carousel is
+ * showing the newest 5, for instance).
+ */
+function rotc_fetch_hero_slides(int $count = 5, string $fallbackImage = '', int $offset = 0): array {
     $wpBase = getenv('ROTC_WP_BASE') ?: 'https://returnofthechampions.com';
-    $url = rtrim($wpBase, '/') . '/wp-json/wp/v2/posts?per_page=' . $count . '&_embed=1';
+    $url = rtrim($wpBase, '/') . '/wp-json/wp/v2/posts?per_page=' . $count . '&offset=' . $offset . '&_embed=1';
 
     $body = rotc_wp_cached_get($url, 300);
     if ($body === null) return [];

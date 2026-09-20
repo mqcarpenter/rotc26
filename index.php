@@ -111,7 +111,19 @@ const ROTC_HOME_NFL_ABBR = [
     $fetchedSlides = rotc_fetch_hero_slides(5, $base . '/assets/hero/placeholder-1.jpg');
     if ($fetchedSlides) { $slides = $fetchedSlides; }
     include __DIR__ . '/templates/hero-carousel.php';
+
+    // "Past articles" river below the carousel, real-news-site style --
+    // offset=5 so this never repeats whatever the carousel above is
+    // already showing (same data source, same shape, see
+    // templates/news-grid.php's doc comment).
+    $newsArticles = rotc_fetch_hero_slides(8, $base . '/assets/hero/placeholder-1.jpg', 5);
+    if ($newsArticles):
     ?>
+    <div class="card">
+      <h2 class="card-title">More News <a href="https://www.returnofthechampions.com/news/" style="font-size:12px;font-weight:400;text-transform:none;">See all &rarr;</a></h2>
+      <?php include __DIR__ . '/templates/news-grid.php'; ?>
+    </div>
+    <?php endif; ?>
 
     <?php /* Fantasy Recap runs ABOVE the Hall of Fame/champion spotlight
        on purpose -- this is the news-style "what happened this week"
