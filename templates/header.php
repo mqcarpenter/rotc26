@@ -100,6 +100,13 @@ $mfl = 'https://www42.myfantasyleague.com/2026';
 // site's own page, draft-auction/auction-bid.php, which reproduces
 // MFL's O=43 flow (find a free agent, put them up for auction) against
 // the owner's own MFL session.
+
+// Small inline WhatsApp glyph for the Community dropdown's "WhatsApp
+// Group" row -- same path data as the standalone icon this replaces,
+// just sized for sitting next to text (16px) rather than standing
+// alone in the bar (22px).
+const ROTC_NAV_WHATSAPP_ICON = '<svg viewBox="0 0 32 32" width="16" height="16" fill="currentColor" aria-hidden="true" style="margin-right:6px;vertical-align:-3px;"><path d="M16.004 3C9.376 3 4 8.373 4 15c0 2.315.646 4.478 1.768 6.32L4 29l7.86-1.717A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3zm6.99 16.845c-.297.836-1.47 1.53-2.412 1.73-.642.135-1.48.243-4.302-.924-3.61-1.494-5.933-5.156-6.115-5.394-.176-.238-1.464-1.95-1.464-3.72s.914-2.64 1.24-3.003c.297-.33.652-.412.87-.412.218 0 .436.002.626.011.2.01.47-.076.735.561.297.703.965 2.34 1.05 2.51.088.17.147.37.03.6-.117.23-.176.373-.35.574-.176.202-.37.45-.53.605-.176.17-.36.354-.155.694.206.34.916 1.51 1.966 2.446 1.35 1.204 2.49 1.577 2.83 1.755.34.176.54.147.74-.089.2-.235.85-.99 1.078-1.33.23-.34.46-.283.77-.17.31.117 1.98.933 2.32 1.102.34.17.564.253.647.394.083.14.083.813-.214 1.65z"/></svg>';
+
 $nav_items = [
   'Scores' => ['wide' => true, 'sub' => [
     ['Live Scoring', "$base/scores/live-scoring"],
@@ -195,11 +202,23 @@ $nav_items = [
     ['Trades', "$base/transactions/trades"],
     ['Transactions Report', "$base/transactions/transactions"],
   ]],
+  // Community: consolidates the WhatsApp group (previously a standalone
+  // icon-only nav item, see the removed .rotc-whatsapp <li> below),
+  // Smack Board (wpforo), and FAQ (Echo Knowledge Base) into one
+  // uniform dropdown -- both wpforo and Echo KB live on the WordPress
+  // side of the domain (root-relative paths, not $base-prefixed, since
+  // $base points at /manage specifically). Per Matteo's call: a single
+  // WhatsApp-icon-as-menu-trigger would be confusing (FAQ/Smack Board
+  // have nothing to do with WhatsApp specifically), so this uses a
+  // plain text trigger label -- same convention every other dropdown
+  // here already uses -- with WhatsApp's own icon kept alongside its
+  // label inside the dropdown for recognizability.
+  'Community' => ['wide' => false, 'sub' => [
+    ['WhatsApp Group', 'https://chat.whatsapp.com/HaQkAJiqi90IEmhnoqhlBr', false, ROTC_NAV_WHATSAPP_ICON],
+    ['Smack Board', '/community/'],
+    ['FAQ', '/faq/'],
+  ]],
 ];
-// "Email to Entire League" was a Social submenu item -- Social was removed
-// per Matteo's request (moving league comms to the WhatsApp group instead,
-// see the WhatsApp icon in the nav bar). Kept out of $nav_items now that
-// there's no Social tree to attach it to.
 
 // Label + href per tab -- href defaults to "$base/$slug" (unchanged
 // behavior for main/auction/gameday, neither of which have a real page
@@ -208,7 +227,7 @@ $nav_items = [
 // 'season-deets' and 'auction' removed per Matteo's request -- unneeded,
 // neither ever had a real page behind it (no auction.php exists).
 /**
- * One rendered submenu row. $row is [label, href, inactiveFlag?].
+ * One rendered submenu row. $row is [label, href, inactiveFlag?, iconSvgHtml?].
  *
  * An inactive row is a <span>, not an <a> -- greying out a live link
  * still leaves it clickable (and still lets a screen reader announce it
@@ -217,23 +236,36 @@ $nav_items = [
  * MFL's pick page for a draft that is over. aria-disabled says the same
  * thing to assistive tech that the muted styling says visually.
  *
- * Absolute http(s) targets are MFL's own pages -- things MFL has to own
- * because it holds the clock. Those open in a popup window so the owner
- * keeps this site behind them.
+ * MFL's own domain specifically opens in a popup window so the owner
+ * keeps this site behind them -- that's about MFL holding the clock,
+ * not "any absolute URL". Confirmed this was over-broad the moment
+ * WhatsApp/FAQ/Smack Board (the Community dropdown) needed a plain
+ * external/same-site link instead: the old `preg_match('~^https?://~')`
+ * check would have popup-windowed those too.
+ *
+ * $iconSvgHtml (optional) is raw, trusted markup (never user input --
+ * only ever a hardcoded SVG literal from $nav_items below), prepended
+ * inside the link/span for rows like WhatsApp that want a recognizable
+ * icon next to their label.
  */
 function rotc_nav_sub_item(array $row): string {
     $label = htmlspecialchars((string) $row[0]);
+    $icon = $row[3] ?? '';
     if (!empty($row[2])) {
-        return '<span class="rotc-nav-inactive" aria-disabled="true">' . $label . '</span>';
+        return '<span class="rotc-nav-inactive" aria-disabled="true">' . $icon . $label . '</span>';
     }
     $href = htmlspecialchars((string) $row[1]);
     $attrs = '';
-    if (preg_match('~^https?://~i', (string) $row[1])) {
+    if (preg_match('~^https?://([^/]*\.)?myfantasyleague\.com~i', (string) $row[1])) {
         $attrs = ' target="_blank" rel="noopener"'
                . ' onclick="window.open(this.href,\'rotc_mfl\','
                . '\'width=1200,height=900,resizable=yes,scrollbars=yes\'); return false;"';
+    } elseif (preg_match('~^https?://~i', (string) $row[1])) {
+        // A genuine external link that isn't MFL (WhatsApp) -- a normal
+        // new tab, not a popup.
+        $attrs = ' target="_blank" rel="noopener"';
     }
-    return '<a href="' . $href . '"' . $attrs . '>' . $label . '</a>';
+    return '<a href="' . $href . '"' . $attrs . ' class="rotc-nav-sub-link">' . $icon . $label . '</a>';
 }
 
 $tabs = [
@@ -294,16 +326,14 @@ $tabs = [
         </li>
       <?php endforeach; ?>
       <!-- Manage: icon entry point to /mobile, the owner task hub
-           (lineup, drops, trades, pick 'ems). Icon-only, sat next to the
-           WhatsApp icon at the right of the bar. -->
+           (lineup, drops, trades, pick 'ems). Icon-only, at the right
+           of the bar. WhatsApp's own former standalone icon is gone
+           from here -- it's the first row in the new "Community"
+           dropdown above instead (see $nav_items), alongside Smack
+           Board and FAQ. -->
       <li class="rotc-item rotc-manage">
         <a class="rotc-top rotc-manage-link" href="<?= $base ?>/mobile" title="Manage: lineup, drops, trades, pick 'em" aria-label="Manage your team on mobile">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
-        </a>
-      </li>
-      <li class="rotc-item rotc-whatsapp">
-        <a class="rotc-top rotc-whatsapp-link" href="https://chat.whatsapp.com/HaQkAJiqi90IEmhnoqhlBr" target="_blank" rel="noopener" title="Join the league WhatsApp group" aria-label="Join the league WhatsApp group">
-          <svg viewBox="0 0 32 32" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M16.004 3C9.376 3 4 8.373 4 15c0 2.315.646 4.478 1.768 6.32L4 29l7.86-1.717A11.94 11.94 0 0 0 16.004 27C22.63 27 28 21.627 28 15S22.63 3 16.004 3zm6.99 16.845c-.297.836-1.47 1.53-2.412 1.73-.642.135-1.48.243-4.302-.924-3.61-1.494-5.933-5.156-6.115-5.394-.176-.238-1.464-1.95-1.464-3.72s.914-2.64 1.24-3.003c.297-.33.652-.412.87-.412.218 0 .436.002.626.011.2.01.47-.076.735.561.297.703.965 2.34 1.05 2.51.088.17.147.37.03.6-.117.23-.176.373-.35.574-.176.202-.37.45-.53.605-.176.17-.36.354-.155.694.206.34.916 1.51 1.966 2.446 1.35 1.204 2.49 1.577 2.83 1.755.34.176.54.147.74-.089.2-.235.85-.99 1.078-1.33.23-.34.46-.283.77-.17.31.117 1.98.933 2.32 1.102.34.17.564.253.647.394.083.14.083.813-.214 1.65z"/></svg>
         </a>
       </li>
       <li class="rotc-item rotc-login">
