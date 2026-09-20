@@ -374,19 +374,38 @@ a:hover{ color:var(--accent); }
 #rotc-postcarousel .rotc-pc-dot.active{ background:#fff; }
 
 /* ---- 9b. NEWS GRID (past articles, below the carousel) --------
-   Real-news-site pattern: the carousel is the "above the fold"
-   hero, this is the river of everything older -- see
+   CBSSports-style "More Headlines" pattern (Matteo referenced this
+   directly): a couple of "large" stories (bigger image + excerpt)
+   beside a grid of "small" stories (thumb + headline only, no
+   excerpt), then a small/discreet link to older articles -- see
    templates/news-grid.php + includes/wp-hero-feed.php. */
-.rotc-news-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:16px; }
-.rotc-news-card{ display:flex; flex-direction:column; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
-.rotc-news-card-media{ aspect-ratio:16/9; background:var(--sand); display:block; overflow:hidden; }
-.rotc-news-card-media img{ width:100%; height:100%; object-fit:cover; display:block; }
-.rotc-news-card-body{ padding:12px 14px 14px; flex:1; display:flex; flex-direction:column; }
-.rotc-news-card-date{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.05em; font-size:11px; color:var(--muted); margin-bottom:4px; }
-.rotc-news-card-title{ font-size:16px; margin:0 0 6px; line-height:1.3; }
-.rotc-news-card-title a{ color:var(--ink); }
-.rotc-news-card-title a:hover{ color:var(--accent); }
-.rotc-news-card-excerpt{ font-size:13px; color:var(--muted); margin:0; flex:1; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.rotc-news-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:24px; align-items:start; }
+@media (max-width:820px){ .rotc-news-grid{ grid-template-columns:1fr; } }
+
+.rotc-news-large-col{ display:flex; flex-direction:column; gap:20px; }
+.rotc-news-large{ display:flex; gap:14px; }
+.rotc-news-large-media{ flex:0 0 42%; aspect-ratio:4/3; border-radius:8px; overflow:hidden; display:block; background:var(--sand); }
+.rotc-news-large-media img{ width:100%; height:100%; object-fit:cover; display:block; }
+.rotc-news-large-body{ flex:1; min-width:0; }
+.rotc-news-large-title{ font-size:17px; line-height:1.3; margin:0 0 6px; font-weight:700; }
+.rotc-news-large-title a{ color:var(--ink); }
+.rotc-news-large-title a:hover{ color:var(--accent); }
+.rotc-news-large-excerpt{ font-size:13px; color:var(--muted); margin:0 0 6px; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+
+.rotc-news-small-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px 16px; }
+.rotc-news-small{ display:flex; gap:10px; }
+.rotc-news-small-media{ flex:0 0 56px; width:56px; height:56px; border-radius:6px; overflow:hidden; display:block; background:var(--sand); }
+.rotc-news-small-media img{ width:100%; height:100%; object-fit:cover; display:block; }
+.rotc-news-small-body{ flex:1; min-width:0; }
+.rotc-news-small-title{ font-size:13px; line-height:1.3; margin:0 0 4px; font-weight:700; }
+.rotc-news-small-title a{ color:var(--ink); }
+.rotc-news-small-title a:hover{ color:var(--accent); }
+
+.rotc-news-byline{ font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.04em; font-size:11px; color:var(--muted); }
+
+.rotc-news-older{ margin-top:16px; padding-top:12px; border-top:1px solid var(--line); text-align:right; }
+.rotc-news-older a{ font-size:12px; color:var(--muted); }
+.rotc-news-older a:hover{ color:var(--accent); }
 
 /* ---- 10. SIDEBAR TABS (rotc-sidefeed) ----------------------- */
 .rotc-sidefeed{

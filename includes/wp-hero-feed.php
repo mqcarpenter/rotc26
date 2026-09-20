@@ -64,11 +64,18 @@ function rotc_fetch_hero_slides(int $count = 5, string $fallbackImage = '', int 
     foreach ($posts as $post) {
         $media = $post['_embedded']['wp:featuredmedia'][0] ?? null;
         $image = $fallbackImage;
+        $thumb = $fallbackImage;
         if ($media) {
             $image = $media['media_details']['sizes']['large']['source_url']
                 ?? $media['media_details']['sizes']['medium_large']['source_url']
                 ?? $media['source_url']
                 ?? $fallbackImage;
+            // Small grid tiles don't need a full "large" image -- a real
+            // small size keeps the page lighter than serving the same
+            // big file everywhere and letting CSS scale it down.
+            $thumb = $media['media_details']['sizes']['medium']['source_url']
+                ?? $media['media_details']['sizes']['thumbnail']['source_url']
+                ?? $image;
         }
 
         $slides[] = [
@@ -76,6 +83,8 @@ function rotc_fetch_hero_slides(int $count = 5, string $fallbackImage = '', int 
             'headline' => html_entity_decode(strip_tags($post['title']['rendered'] ?? ''), ENT_QUOTES),
             'excerpt'  => trim(html_entity_decode(strip_tags($post['excerpt']['rendered'] ?? ''), ENT_QUOTES)),
             'image'    => $image,
+            'thumb'    => $thumb,
+            'author'   => html_entity_decode(strip_tags($post['_embedded']['author'][0]['name'] ?? ''), ENT_QUOTES),
             'url'      => $post['link'] ?? '#',
         ];
     }

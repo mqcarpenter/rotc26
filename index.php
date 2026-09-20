@@ -66,7 +66,7 @@ if ($hasConfig) {
     $hofChampions = rotc_hall_of_fame_champions(2017, (int) MFL_YEAR);
     if ($hofChampions) $hofChampion = $hofChampions[0];
 
-    $latest_txns = rotc_fetch_latest_transactions(15);
+    $latest_txns = rotc_fetch_latest_transactions(10);
 }
 
 const ROTC_HOME_NFL_ABBR = [
@@ -183,17 +183,21 @@ const ROTC_HOME_NFL_ABBR = [
 
   <aside class="home-sidebar">
     <?php
+    // Player stats (Top Free Agents / Draft Trends) now runs ABOVE Smack
+    // Feed per Matteo's call -- was the reverse order before.
+    if ($hasConfig) {
+        require_once __DIR__ . '/includes/free-agent-pulse.php';
+        $top_free_agents = rotc_fetch_top_free_agents(20);
+        $adp_trends = rotc_fetch_adp_trends(20);
+        include __DIR__ . '/templates/free-agent-pulse.php';
+    }
+
     require_once __DIR__ . '/includes/smack-feed.php';
     $fetchedSmack = rotc_fetch_smack_items(6);
     if ($fetchedSmack) { $smack_items = $fetchedSmack; }
     include __DIR__ . '/templates/sidefeed.php';
 
     if ($hasConfig) {
-        require_once __DIR__ . '/includes/free-agent-pulse.php';
-        $top_free_agents = rotc_fetch_top_free_agents(20);
-        $adp_trends = rotc_fetch_adp_trends(20);
-        include __DIR__ . '/templates/free-agent-pulse.php';
-
         include __DIR__ . '/templates/latest-transactions.php';
     }
     ?>
