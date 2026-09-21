@@ -89,11 +89,11 @@ function rotc_value_group(string $heading, array $steals, array $busts, callable
 ?>
 <div class="rotc-sidefeed">
   <div class="rotc-sidefeed-tabs">
-    <button class="rotc-sidefeed-tab active" data-tab="topfa">Top Free Agents</button>
-    <button class="rotc-sidefeed-tab" data-tab="draftvalue">Draft Value</button>
+    <button class="rotc-sidefeed-tab" data-tab="topfa">Top Free Agents</button>
+    <button class="rotc-sidefeed-tab active" data-tab="draftvalue">Was He Worth It?</button>
   </div>
 
-  <div class="rotc-sidefeed-panel active" data-panel="topfa">
+  <div class="rotc-sidefeed-panel" data-panel="topfa">
     <div class="rotc-trending-group">
       <div class="rotc-trending-heading">Top 20 Available &mdash; Week 1 Projection</div>
       <?php if (!$top_free_agents): ?>
@@ -102,7 +102,7 @@ function rotc_value_group(string $heading, array $steals, array $busts, callable
     </div>
   </div>
 
-  <div class="rotc-sidefeed-panel" data-panel="draftvalue">
+  <div class="rotc-sidefeed-panel active" data-panel="draftvalue">
     <?php
       $costLabelDraft = fn(array $r) => 'Rd ' . $r['round'] . ', Pick ' . $r['pick'] . ($r['franchise'] !== '' ? ' — ' . $r['franchise'] : '');
       $costLabelAuction = fn(array $r) => '$' . number_format($r['price'], 0) . ($r['franchise'] !== '' ? ' — ' . $r['franchise'] : '');
