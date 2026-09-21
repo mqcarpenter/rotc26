@@ -547,6 +547,22 @@ a:hover{ color:var(--accent); }
 .rotc-trend-down{ color:#b3261e; }
 .rotc-trend-flat{ color:var(--muted); }
 
+/* Draft Value tab (templates/free-agent-pulse.php's rotc_value_row()) --
+   steal/bust bar rows. Reuses the same green/red pair as the trend
+   arrows above rather than inventing new brand colors. */
+.rotc-value-row{ padding:6px 0; border-bottom:1px dashed var(--line); font-size:12px; }
+.rotc-value-row:last-child{ border-bottom:0; }
+.rotc-value-head{ display:flex; align-items:center; gap:6px; }
+.rotc-value-name{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.rotc-value-bartrack{ background:var(--sand); border-radius:3px; height:6px; overflow:hidden; margin:4px 0 3px; }
+.rotc-value-barfill{ height:100%; border-radius:3px; }
+.rotc-value-barfill.steal{ background:#1e7d32; }
+.rotc-value-barfill.bust{ background:#b3261e; }
+.rotc-value-meta{ display:flex; align-items:center; justify-content:space-between; gap:8px; color:var(--muted); font-size:11px; }
+.rotc-value-delta{ font-weight:700; flex:0 0 auto; }
+.rotc-value-delta.steal{ color:#1e7d32; }
+.rotc-value-delta.bust{ color:#b3261e; }
+
 /* Owner login (login.php) + Franchise action pages (franchise/submit-
    lineup.php, drop-player.php, offer-trade.php, survivor-pick.php,
    pool-pick.php, trade-bait.php's submit form) -- shared form chrome
