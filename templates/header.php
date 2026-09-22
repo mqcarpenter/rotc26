@@ -14,6 +14,23 @@
  * $current_tab (string) - which second-row tab is active, e.g. 'main'
  * $is_logged_in (bool)  - controls LOGIN vs LOGOUT label
  */
+
+// The host's LiteSpeed full-page cache (confirmed live via
+// `x-litespeed-cache: hit` on every response) has NO app-supplied TTL,
+// so a page it caches can sit indefinitely -- confirmed live 2026-09-22:
+// the front page was still serving "Week 1" hours after Week 2's
+// weeklyResults had posted and rotc_current_recap_week() (in
+// includes/weekly-recap.php) was already correctly resolving to Week 2
+// when run fresh. This header is LiteSpeed's own documented app-level
+// cache-control mechanism (works standalone, no WordPress/plugin
+// needed) -- capping every page at 15 minutes means the once-a-week
+// recap/standings rollover is never stuck stale for more than 15
+// minutes, while still avoiding a full PHP+MFL-API re-render on every
+// single request. Doesn't fix an ALREADY-cached stale page -- that
+// still needs one manual purge (cPanel > LiteSpeed Web Cache Manager >
+// Purge All) to clear whatever's cached from before this shipped.
+header('X-LiteSpeed-Cache-Control: max-age=900');
+
 require_once __DIR__ . '/nav-data.php';
 ?>
 <!DOCTYPE html>
