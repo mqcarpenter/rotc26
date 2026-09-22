@@ -30,6 +30,10 @@
  *   ingested game history, for the head-to-head blurb. Best-effort --
  *   returns null (never fatals) if that DB isn't reachable, same
  *   fallback every other rotchist_db() caller already uses.
+ * - includes/live-wire.php's ROTC_LW_POSITION_ORDER / rotc_lw_pos_rank()
+ *   -- starters and bench are grouped QB/RB/WR/TE/DL/LB/CB/S, the same
+ *   order and rank function the gameday Live Wire roster view already
+ *   uses, rather than a second copy of that ordering living here.
  */
 
 /**
@@ -150,8 +154,12 @@ function rotc_wr_build_side(array $f, array $franchises, array $playerMeta, arra
         if ($isStarter) $starters[] = $row; else $bench[] = $row;
     }
 
-    usort($starters, fn($a, $b) => $b['points'] <=> $a['points']);
-    usort($bench, fn($a, $b) => $b['points'] <=> $a['points']);
+    // Grouped QB/RB/WR/TE/DL/LB/CB/S -- same order + tiebreak (score,
+    // within a group) as live-wire-view.php's roster list, so a soft
+    // separator between rank changes reads the same everywhere.
+    $posSort = fn($a, $b) => rotc_lw_pos_rank($a['pos']) <=> rotc_lw_pos_rank($b['pos']) ?: $b['points'] <=> $a['points'];
+    usort($starters, $posSort);
+    usort($bench, $posSort);
 
     $score = (float) ($f['score'] ?? 0);
     $optPts = (float) ($f['opt_pts'] ?? 0);

@@ -1317,3 +1317,7 @@ a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; background:none !importan
 .rotc-mm-pos{ flex:0 0 auto; color:var(--muted); font-size:12px; }
 .rotc-mm-pts{ flex:0 0 auto; font-weight:700; min-width:44px; text-align:right; }
 .rotc-mm-statline{ margin:2px 0 0 20px; font-size:11.5px; color:var(--muted); }
+/* Soft position-group separator inside a starters/bench list -- reuses
+   the existing .rotc-position-sep hr styling (franchise/offer-trade.php),
+   just in a div instead of a table row. */
+.rotc-mm-panel .rotc-position-sep{ margin:2px 0; }

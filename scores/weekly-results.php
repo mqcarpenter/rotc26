@@ -32,6 +32,7 @@ if (!$fetchError) {
     require_once __DIR__ . '/../includes/free-agent-pulse.php'; // rotc_fetch_players_by_id()
     require_once __DIR__ . '/../includes/live-wire-espn.php';
     require_once __DIR__ . '/../includes/live-wire-scoring.php';
+    require_once __DIR__ . '/../includes/live-wire.php'; // rotc_lw_pos_rank()
     require_once __DIR__ . '/../includes/helmets.php';
     require_once __DIR__ . '/../includes/player-hover.php';
     require_once __DIR__ . '/../includes/rotchist-db.php';
@@ -73,6 +74,24 @@ function rotc_wr_player_row(array $p, bool $muted): void {
     <?php
 }
 
+/**
+ * A starters or bench list, already sorted QB/RB/WR/TE/DL/LB/CB/S (see
+ * includes/weekly-results-detail.php) -- this just adds the soft
+ * separator between position groups, same convention as the Live Wire
+ * roster view and franchise/offer-trade.php's position-grouped lists.
+ */
+function rotc_wr_player_group(array $players, bool $muted): void {
+    $lastRank = null;
+    foreach ($players as $p) {
+        $rank = rotc_lw_pos_rank($p['pos']);
+        if ($lastRank !== null && $rank !== $lastRank) {
+            echo '<div class="rotc-position-sep"><hr></div>';
+        }
+        $lastRank = $rank;
+        rotc_wr_player_row($p, $muted);
+    }
+}
+
 function rotc_wr_team_panel(array $side): void {
     ?>
     <section class="rotc-mm-panel">
@@ -87,10 +106,10 @@ function rotc_wr_team_panel(array $side): void {
         </span>
       </h3>
       <div class="rotc-mm-group-h">Starters</div>
-      <?php foreach ($side['starters'] as $p) rotc_wr_player_row($p, false); ?>
+      <?php rotc_wr_player_group($side['starters'], false); ?>
       <?php if ($side['bench']): ?>
         <div class="rotc-mm-group-h muted">Bench</div>
-        <?php foreach ($side['bench'] as $p) rotc_wr_player_row($p, true); ?>
+        <?php rotc_wr_player_group($side['bench'], true); ?>
       <?php endif; ?>
     </section>
     <?php
