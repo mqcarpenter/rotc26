@@ -1271,3 +1271,49 @@ a.rotc-nav-inactive:hover{ color:#8a7a6c99 !important; background:none !importan
 .rotc-inj-out{  color:#b3261e; }
 .rotc-inj-warn{ color:#8a5a00; }
 .rotc-inj-gone{ color:#8A7A6C; }
+
+/* Weekly Results matchup accordion (scores/weekly-results.php). Each
+   game is a <details class="rotc-matchup-card rotc-division-group">
+   -- the rotc-division-group half of that class list is what gives it
+   the existing arrow-rotation behavior above for free. */
+.rotc-matchup-card{ border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.rotc-matchup-summary{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:12px 14px; cursor:pointer; background:var(--sand);
+}
+.rotc-mm-teams{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:14px; }
+.rotc-mm-team{ display:flex; align-items:center; gap:6px; }
+.rotc-mm-team img{ border-radius:4px; }
+.rotc-mm-team.winner{ font-weight:700; color:var(--ink); }
+.rotc-mm-team.winner strong{ color:var(--accent); }
+.rotc-mm-vs{ font-size:11px; letter-spacing:.05em; color:var(--muted); text-transform:uppercase; flex:0 0 auto; }
+.rotc-mm-body{ padding:14px; border-top:1px solid var(--line); }
+.rotc-mm-h2h{ font-size:12.5px; color:var(--muted); margin:0 0 14px; padding:8px 10px; background:var(--sand); border-radius:6px; }
+.rotc-mm-panels{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:700px){ .rotc-mm-panels{ grid-template-columns:1fr; } }
+.rotc-mm-panel-h{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  font-size:15px; margin:0 0 8px; padding-bottom:8px; border-bottom:1px solid var(--line);
+}
+.rotc-mm-panel-h img{ border-radius:4px; }
+.rotc-mm-panel-name{ flex:1 1 auto; }
+.rotc-mm-panel-totals{ font-size:13px; color:var(--muted); white-space:nowrap; }
+.rotc-mm-panel-totals strong{ color:var(--ink); font-size:15px; }
+.rotc-mm-opt{ display:block; font-size:11px; color:var(--muted); }
+.rotc-mm-group-h{
+  font-family:"Roboto Condensed", sans-serif; text-transform:uppercase; letter-spacing:.05em;
+  font-size:11px; color:var(--muted); margin:10px 0 4px;
+}
+.rotc-mm-group-h.muted{ opacity:.75; }
+.rotc-mm-prow{ padding:4px 0; border-bottom:1px dashed var(--line); font-size:13px; }
+.rotc-mm-prow:last-child{ border-bottom:0; }
+.rotc-mm-prow.muted{ opacity:.7; }
+.rotc-mm-prow-top{ display:flex; align-items:center; gap:6px; }
+.rotc-mm-flag{ flex:0 0 auto; font-size:11px; width:14px; text-align:center; cursor:help; }
+.rotc-mm-flag.bench{ color:#b3261e; }
+.rotc-mm-flag.start{ color:#1e7d32; }
+.rotc-mm-flag-spacer{ flex:0 0 auto; width:14px; }
+.rotc-mm-pname{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.rotc-mm-pos{ flex:0 0 auto; color:var(--muted); font-size:12px; }
+.rotc-mm-pts{ flex:0 0 auto; font-weight:700; min-width:44px; text-align:right; }
+.rotc-mm-statline{ margin:2px 0 0 20px; font-size:11.5px; color:var(--muted); }

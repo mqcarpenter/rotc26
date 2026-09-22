@@ -1,12 +1,18 @@
 <?php
 /**
  * weekly-results.php
- * Matches Scores -> Weekly Results. TYPE=weeklyResults(W=week) gives
- * head-to-head matchup pairing per franchise (result T/W/L, spread) --
- * confirmed live it does NOT include a numeric score field until a
- * week has actually been played (preseason test came back with only
- * result:"T" placeholders for every matchup, no score/starter data).
- * Franchise names come from the shared mfl_franchises() lookup.
+ * Matches Scores -> Weekly Results. Used to be a bare team/score/result
+ * table with no way to tell what actually happened in a game -- see
+ * includes/weekly-results-detail.php for the real data assembly this
+ * now runs on: TYPE=weeklyResults (score/opt_pts/result AND a full
+ * per-player list with MFL's own should-have-started verdict, per
+ * side), real stat lines (yards/TDs) via the same ESPN box-score
+ * lookup players/top-performers.php uses, and a head-to-head blurb
+ * from the rotchist_ history DB.
+ *
+ * Each matchup is a native <details>/<summary> accordion (same pattern
+ * transactions/rosters.php uses for division groups) so "open it and
+ * see the data" needs no JS at all.
  */
 
 $page_title = 'Weekly Results — Return of the Champions';
@@ -19,20 +25,75 @@ $fetchError = !file_exists($configPath);
 
 $week = max(1, (int) ($_GET['week'] ?? 1));
 $matchups = [];
-$franchises = [];
 
 if (!$fetchError) {
     require_once $configPath;
     require_once __DIR__ . '/../includes/mfl-api.php';
+    require_once __DIR__ . '/../includes/free-agent-pulse.php'; // rotc_fetch_players_by_id()
+    require_once __DIR__ . '/../includes/live-wire-espn.php';
+    require_once __DIR__ . '/../includes/live-wire-scoring.php';
+    require_once __DIR__ . '/../includes/helmets.php';
+    require_once __DIR__ . '/../includes/player-hover.php';
+    require_once __DIR__ . '/../includes/rotchist-db.php';
+    require_once __DIR__ . '/../includes/weekly-results-detail.php';
 
-    $franchises = mfl_franchises();
-    $raw = mfl_cached_get('weeklyResults', 900, ['W' => $week]);
-    $matchups = mfl_normalize_list($raw['weeklyResults']['matchup'] ?? null);
+    $result = rotc_wr_fetch_week((int) MFL_YEAR, $week);
+    $matchups = $result['matchups'];
+    if ($result['error']) $fetchError = true;
 }
 
 function rotc_wr_qs(array $overrides): string {
     $params = array_merge($_GET, $overrides);
     return htmlspecialchars('?' . http_build_query($params));
+}
+
+/** One player row: flag icon (or a same-width spacer), hoverable name, position, points, real stat line underneath. */
+function rotc_wr_player_row(array $p, bool $muted): void {
+    $flagIcon = '';
+    $flagTitle = '';
+    $flagClass = '';
+    if ($p['flag'] === 'shouldbench') { $flagIcon = '&#9660;'; $flagTitle = 'Started, but not in the optimal lineup this week'; $flagClass = 'bench'; }
+    elseif ($p['flag'] === 'shouldstart') { $flagIcon = '&#9650;'; $flagTitle = 'Benched, but would have been in the optimal lineup this week'; $flagClass = 'start'; }
+    ?>
+    <div class="rotc-mm-prow<?= $muted ? ' muted' : '' ?>">
+      <div class="rotc-mm-prow-top">
+        <?php if ($flagIcon !== ''): ?>
+          <span class="rotc-mm-flag <?= $flagClass ?>" title="<?= htmlspecialchars($flagTitle) ?>"><?= $flagIcon ?></span>
+        <?php else: ?>
+          <span class="rotc-mm-flag-spacer"></span>
+        <?php endif; ?>
+        <span class="rotc-mm-pname"><?= rotc_player_hover_span($p['name'], $p['pd'], ['This Week' => number_format($p['points'], 2) . ' pts']) ?></span>
+        <span class="rotc-mm-pos"><?= htmlspecialchars($p['pos']) ?></span>
+        <span class="rotc-mm-pts"><?= number_format($p['points'], 2) ?></span>
+      </div>
+      <?php if ($p['statLine'] !== ''): ?>
+        <div class="rotc-mm-statline"><?= $p['statLine'] ?></div>
+      <?php endif; ?>
+    </div>
+    <?php
+}
+
+function rotc_wr_team_panel(array $side): void {
+    ?>
+    <section class="rotc-mm-panel">
+      <h3 class="rotc-mm-panel-h">
+        <?php if ($side['helmet']): ?><img src="<?= htmlspecialchars($side['helmet']) ?>" alt="" width="28" height="28"><?php endif; ?>
+        <span class="rotc-mm-panel-name"><?= htmlspecialchars($side['name']) ?></span>
+        <span class="rotc-mm-panel-totals">
+          <strong><?= number_format($side['score'], 2) ?></strong> pts
+          <?php if ($side['efficiency'] !== null): ?>
+            <span class="rotc-mm-opt">(<?= number_format($side['optPts'], 2) ?> possible &middot; <?= number_format($side['efficiency'], 1) ?>% efficiency)</span>
+          <?php endif; ?>
+        </span>
+      </h3>
+      <div class="rotc-mm-group-h">Starters</div>
+      <?php foreach ($side['starters'] as $p) rotc_wr_player_row($p, false); ?>
+      <?php if ($side['bench']): ?>
+        <div class="rotc-mm-group-h muted">Bench</div>
+        <?php foreach ($side['bench'] as $p) rotc_wr_player_row($p, true); ?>
+      <?php endif; ?>
+    </section>
+    <?php
 }
 ?>
 
@@ -53,30 +114,42 @@ function rotc_wr_qs(array $overrides): string {
         <?php if (!$matchups): ?>
           <p>No matchups found for this week.</p>
         <?php else: ?>
-          <div style="overflow-x:auto;">
-          <table class="data-table">
-            <thead><tr><th>Away</th><th>Result</th><th>Home</th></tr></thead>
-            <tbody>
-              <?php foreach ($matchups as $i => $m):
-                $teams = mfl_normalize_list($m['franchise'] ?? null);
-                $away = null; $home = null;
-                foreach ($teams as $t) { if (($t['isHome'] ?? '0') === '1') $home = $t; else $away = $t; }
-                $awayName = $franchises[$away['id'] ?? '']['name'] ?? ($away['id'] ?? '?');
-                $homeName = $franchises[$home['id'] ?? '']['name'] ?? ($home['id'] ?? '?');
-              ?>
-                <tr class="<?= $i % 2 === 0 ? 'odd' : 'even' ?>">
-                  <td><?= htmlspecialchars($awayName) ?><?= isset($away['score']) ? ' — ' . htmlspecialchars($away['score']) : '' ?></td>
-                  <td style="text-align:center;color:var(--muted);"><?= (($home['result'] ?? '') === 'T' && !isset($home['score'])) ? 'not yet played' : htmlspecialchars($home['result'] ?? '') ?></td>
-                  <td><?= htmlspecialchars($homeName) ?><?= isset($home['score']) ? ' — ' . htmlspecialchars($home['score']) : '' ?></td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-          </div>
+          <?php foreach ($matchups as $m):
+            $away = $m['away']; $home = $m['home'];
+            $h2h = rotc_wr_h2h_blurb((int) MFL_YEAR, $week, $away['fid'], $away['name'], $away['score'], $home['fid'], $home['name'], $home['score']);
+          ?>
+            <details class="rotc-matchup-card rotc-division-group" style="margin:0 0 14px;">
+              <summary class="rotc-matchup-summary">
+                <span class="rotc-mm-teams">
+                  <span class="rotc-mm-team<?= $m['winner'] === 'away' ? ' winner' : '' ?>">
+                    <?php if ($away['helmet']): ?><img src="<?= htmlspecialchars($away['helmet']) ?>" alt="" width="24" height="24"><?php endif; ?>
+                    <?= htmlspecialchars($away['name']) ?>
+                    <strong><?= number_format($away['score'], 2) ?></strong>
+                  </span>
+                  <span class="rotc-mm-vs"><?= $m['winner'] ? 'FINAL' : 'TIE' ?></span>
+                  <span class="rotc-mm-team<?= $m['winner'] === 'home' ? ' winner' : '' ?>">
+                    <strong><?= number_format($home['score'], 2) ?></strong>
+                    <?= htmlspecialchars($home['name']) ?>
+                    <?php if ($home['helmet']): ?><img src="<?= htmlspecialchars($home['helmet']) ?>" alt="" width="24" height="24"><?php endif; ?>
+                  </span>
+                </span>
+                <span class="rotc-details-arrow" aria-hidden="true">&#9656;</span>
+              </summary>
+
+              <div class="rotc-mm-body">
+                <?php if ($h2h): ?><p class="rotc-mm-h2h"><?= $h2h ?></p><?php endif; ?>
+                <div class="rotc-mm-panels">
+                  <?php rotc_wr_team_panel($away); ?>
+                  <?php rotc_wr_team_panel($home); ?>
+                </div>
+              </div>
+            </details>
+          <?php endforeach; ?>
         <?php endif; ?>
       </div>
     <?php endif; ?>
   </main>
 </div>
 
+<?php if ($matchups) rotc_player_hover_widget(); ?>
 <?php include __DIR__ . '/../templates/footer.php'; ?>
