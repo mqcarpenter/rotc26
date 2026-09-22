@@ -21,16 +21,26 @@
  * Output shape:
  * {
  *   "year": int, "week": int|null,
- *   "games": [ { "headline", "winner", "loser", "score", "excerpt",
- *                "url", "helmet", "helmetFlip", "isGameOfWeek",
+ *   "games": [ { "headline", "winner", "loser", "winnerId", "loserId",
+ *                "winnerScore", "loserScore", "score", "excerpt",
+ *                "url", "helmet", "helmetFlip", "loserHelmet",
+ *                "loserHelmetFlip", "isGameOfWeek",
  *                "topPerformer": {"name","team","score","franchise","photo"}|null
- *              }, ... ],   // EVERY game this week, Game of the Week first
+ *              }, ... ],   // EVERY game the requested week, Game of the Week first
  *   "standings": [ { "rank", "name", "record", "helmet", "helmetFlip" }, ... ],  // top 5
  *   "franchises": [ { "id", "name", "record", "helmet", "helmetFlip" }, ... ]    // every franchise, for a Teams page
  * }
  * Any section that has nothing to report is null/empty rather than the
  * whole response failing -- a missing standings block shouldn't take
  * down a homepage that only wanted the week's games.
+ *
+ * ?week=N (optional): games for that specific week of the CURRENT
+ * season instead of the auto-detected "most recently completed" week
+ * -- added so the WP theme's [rotc_matchup] shortcode (embedded in a
+ * recap article's body) can pull up a game from an earlier week than
+ * whatever week is "current" by the time someone reads the article.
+ * Invalid/out-of-range values fall back to the auto-detected week,
+ * same as omitting the param entirely.
  */
 
 $configPath = getenv('ROTC_CONFIG_PATH') ?: (dirname($_SERVER['DOCUMENT_ROOT']) . '/config.php');
@@ -64,15 +74,21 @@ function rotc_wp_feed_game(array $game, int $year, int $week): array {
     }
 
     return [
-        'headline'     => $winner['name'] . ' Tops ' . $loser['name'],
-        'winner'       => $winner['name'],
-        'loser'        => $loser['name'],
-        'score'        => number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2),
-        'excerpt'      => $excerpt,
-        'url'          => 'https://www.returnofthechampions.com/manage/scores/weekly-recap-article?year=' . $year . '&week=' . $week . '#game-' . $winner['id'] . '-' . $loser['id'],
-        'helmet'       => $winner['helmet'],
-        'helmetFlip'   => $winner['helmetFlip'],
-        'isGameOfWeek' => $game['isGameOfWeek'],
+        'headline'        => $winner['name'] . ' Tops ' . $loser['name'],
+        'winner'          => $winner['name'],
+        'loser'           => $loser['name'],
+        'winnerId'        => $winner['id'],
+        'loserId'         => $loser['id'],
+        'winnerScore'     => round($winner['score'], 2),
+        'loserScore'      => round($loser['score'], 2),
+        'score'           => number_format($winner['score'], 2) . "\u{2013}" . number_format($loser['score'], 2),
+        'excerpt'         => $excerpt,
+        'url'             => 'https://www.returnofthechampions.com/manage/scores/weekly-recap-article?year=' . $year . '&week=' . $week . '#game-' . $winner['id'] . '-' . $loser['id'],
+        'helmet'          => $winner['helmet'],
+        'helmetFlip'      => $winner['helmetFlip'],
+        'loserHelmet'     => $loser['helmet'],
+        'loserHelmetFlip' => $loser['helmetFlip'],
+        'isGameOfWeek'    => $game['isGameOfWeek'],
         'topPerformer' => $tp ? [
             'name'      => $tp['name'],
             'team'      => $tp['pd']['team'] ?? '',
@@ -84,9 +100,16 @@ function rotc_wp_feed_game(array $game, int $year, int $week): array {
 }
 
 try {
-    $current = rotc_current_recap_week((int) MFL_YEAR);
-    if ($current) {
-        $year = $current['year']; $week = $current['week'];
+    $year = (int) MFL_YEAR;
+    $weekParam = isset($_GET['week']) ? (int) $_GET['week'] : 0;
+    $week = $weekParam > 0 ? $weekParam : null;
+
+    if ($week === null) {
+        $current = rotc_current_recap_week($year);
+        if ($current) $week = $current['week'];
+    }
+
+    if ($week !== null) {
         $out['year'] = $year; $out['week'] = $week;
 
         $recap = rotc_weekly_recap_article($year, $week);
@@ -95,6 +118,10 @@ try {
                 $out['games'][] = rotc_wp_feed_game($game, $year, $week);
             }
         }
+        // An explicit ?week= that turned out to have no real results
+        // (future week, bad input) degrades to an empty games list --
+        // same "partial data over a hard failure" philosophy as every
+        // other branch here, not a 404/error response.
     }
 
     $standingsRaw = mfl_cached_get('leagueStandings', 300, ['ALL' => 1]);
